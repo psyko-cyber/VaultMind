@@ -12,6 +12,9 @@
     --cyan:#38BDF8; --violet:#6366F1; --indigo:#4F46E5; --green:#34D399;
     --soft:#AEB9CF; --faint:#5A6884;
     --accent:#38BDF8; --accent2:#6366F1;
+    /* sfondo di intestazione, tab e barra di scrittura: era un blu quasi nero
+       fisso, che nel tema chiaro diventava una fascia grigia */
+    --bar:rgba(7,11,20,.7); --bar-soft:rgba(7,11,20,.55);
     --disp:'Space Grotesk',sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
   }
   *{box-sizing:border-box} html,body{margin:0;height:100%}
@@ -66,7 +69,7 @@
   /* app */
   #app{display:flex;flex-direction:column;height:100vh}
   header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;
-    border-bottom:1px solid var(--border);background:rgba(7,11,20,.7);backdrop-filter:blur(8px)}
+    border-bottom:1px solid var(--border);background:var(--bar);backdrop-filter:blur(8px)}
   .hbrand{display:flex;align-items:center;gap:10px;color:#fff;font-family:var(--disp);font-weight:600;letter-spacing:-.3px;font-size:18px}
   .pills{display:flex;align-items:center;gap:8px}
   .pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
@@ -102,13 +105,12 @@
   .chip{font-size:12px;padding:6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--border);color:var(--soft)}
   .chip:hover{filter:brightness(1.25)}
 
-  .composer{border-top:1px solid var(--border);background:rgba(7,11,20,.7);backdrop-filter:blur(8px)}
-  .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:8px}
+  .composer{border-top:1px solid var(--border);background:var(--bar);backdrop-filter:blur(8px)}
+  .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:13px 20px 16px;display:flex;align-items:center;gap:8px}
   .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 14px;background:var(--panel);border:1px solid var(--border)}
   .searchbox input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:15px}
   .send{padding:10px;border-radius:12px;background:var(--cyan)}
   .send:hover{filter:brightness(1.1)}
-  .footnote{max-width:680px;width:100%;margin:0 auto;padding:0 20px 10px;font-family:var(--mono);font-size:10px;color:var(--faint);display:flex;align-items:center;gap:6px}
 
   .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6);z-index:50}
   .modalcard{width:min(92vw,420px);padding:24px}
@@ -120,6 +122,24 @@
   .fieldrow input{padding:8px 10px;font-size:13px}
   .fieldrow .rmrow{flex:0 0 auto;padding:8px;border:1px solid var(--border);border-radius:10px;color:var(--faint)}
   .fieldrow .rmrow:hover{color:#FCA5A5;border-color:#FCA5A5}
+  /* frecce per decidere l'ordine dei campi: colonnina stretta, non rubano
+     spazio ai due campi di testo */
+  .fieldrow .movecol{flex:0 0 auto;display:flex;flex-direction:column;gap:2px}
+  .fieldrow .movecol button{padding:0 6px;line-height:15px;font-size:11px;
+    border:1px solid var(--border);border-radius:6px;color:var(--faint)}
+  .fieldrow .movecol button:hover{color:var(--accent);border-color:var(--accent)}
+
+  /* voce critica: account da cui si rimette mano a tutto il resto */
+  .crit-row{display:flex;align-items:center;gap:10px;margin-top:14px;padding:11px 12px;
+    border-radius:12px;background:var(--panel2);border:1px solid var(--border)}
+  .crit-row .txt{flex:1;min-width:0}
+  .crit-row .t1{font-size:13px;color:var(--soft)}
+  .crit-row .t2{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.4}
+  .crit-warn{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.5;
+    background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.4);color:var(--soft)}
+  .crit-warn b{color:#FBBF24}
+  .badge-crit{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;
+    background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.45);color:#FBBF24;white-space:nowrap}
 
   /* TOTP / 2FA */
   .totp{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.3)}
@@ -155,27 +175,43 @@
 
   /* ---- TEMI ---- */
   /* default = scuro (gia' definito in :root). Qui le varianti. */
+  /* CHIARO — barre bianche leggermente azzurrate invece della fascia grigia
+     che veniva fuori tenendo lo sfondo scuro del tema notte. */
   body[data-theme="light"]{
-    --bg:#F7F9FC; --panel:#FFFFFF; --panel2:#F0F3F9; --border:#DCE3EF;
-    --cyan:#0284C7; --violet:#4F46E5; --indigo:#4338CA; --green:#059669;
-    --soft:#33415C; --faint:#7787A2;
-    --accent:#0284C7; --accent2:#4F46E5;
+    --bg:#F4F7FC; --panel:#FFFFFF; --panel2:#EEF3FA; --border:#D9E2F0;
+    --cyan:#0369A1; --violet:#4F46E5; --indigo:#4338CA; --green:#047857;
+    --soft:#2F3D57; --faint:#6B7C99;
+    --accent:#0369A1; --accent2:#4F46E5;
+    --bar:rgba(255,255,255,.85); --bar-soft:rgba(248,251,255,.8);
   }
-  body[data-theme="light"]{background-image:radial-gradient(rgba(2,132,199,.05) 1px,transparent 1px)}
+  body[data-theme="light"]{background-image:radial-gradient(rgba(3,105,161,.05) 1px,transparent 1px)}
+  body[data-theme="light"] header,
+  body[data-theme="light"] .composer{box-shadow:0 1px 18px rgba(15,23,41,.06)}
+  body[data-theme="light"] .card{box-shadow:0 4px 24px rgba(15,23,41,.08)}
   body[data-theme="light"] .b-user{color:#fff}
   body[data-theme="light"] .brand,
   body[data-theme="light"] .dbcard .dbtitle,
   body[data-theme="light"] .cred .title,
   body[data-theme="light"] .hbrand{color:#0F1729}
   body[data-theme="light"] .credline .v.shown{color:#0F1729}
+  body[data-theme="light"] .searchbox input,
+  body[data-theme="light"] .field{color:#0F1729}
 
+  /* NOTTE E ORO — blu notte profondo, ottone come contrasto. */
   body[data-theme="night"]{
-    --bg:#05070D; --panel:#0B0F1A; --panel2:#070A12; --border:#161C2A;
-    --cyan:#38BDF8; --violet:#6366F1; --indigo:#3730A3; --green:#34D399;
-    --soft:#8A95AC; --faint:#3D4558;
-    --accent:#38BDF8; --accent2:#6366F1;
+    --bg:#070C1A; --panel:#0E1730; --panel2:#0A1124; --border:#1E2C4C;
+    --cyan:#E3B341; --violet:#C9922E; --indigo:#1E3A8A; --green:#4ADE80;
+    --soft:#B9C4DB; --faint:#6A789A;
+    --accent:#E3B341; --accent2:#C9922E;
+    --bar:rgba(6,10,24,.75); --bar-soft:rgba(6,10,24,.6);
   }
-  body[data-theme="night"]{background-image:radial-gradient(rgba(56,189,248,.02) 1px,transparent 1px)}
+  body[data-theme="night"]{background-image:radial-gradient(rgba(227,179,65,.05) 1px,transparent 1px)}
+  body[data-theme="night"] .card{box-shadow:0 0 32px rgba(227,179,65,.10)}
+  body[data-theme="night"] .icon-chip{background:rgba(227,179,65,.08);border-color:rgba(227,179,65,.35)}
+  body[data-theme="night"] .b-user{background:var(--indigo);box-shadow:0 0 20px rgba(30,58,138,.45)}
+  /* il testo scuro sui bottoni dorati resta leggibile */
+  body[data-theme="night"] .btn,
+  body[data-theme="night"] .send{color:#1A1206}
 
   /* mini menu tema */
   #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--panel);border:1px solid var(--border);
@@ -269,7 +305,6 @@
       <div class="hbrand">🛡️ VaultMind</div>
     </div>
     <div class="pills">
-      <span class="pill net">⛔ 0 richieste di rete</span>
       <span class="pill db" id="pillDb">🗄️ 0 voci</span>
       <span class="pill llm hidden" id="pillLlm">✨ LLM locale</span>
       <button class="iconbtn" id="themeBtn" title="Tema">🎨</button>
@@ -279,7 +314,7 @@
   </header>
 
   <!-- TAB NAV -->
-  <div id="tabNav" style="display:flex;border-bottom:1px solid var(--border);background:rgba(7,11,20,.55);backdrop-filter:blur(8px)">
+  <div id="tabNav" style="display:flex;border-bottom:1px solid var(--border);background:var(--bar-soft);backdrop-filter:blur(8px)">
     <button class="tab-btn" data-tab="chat">💬 Chat</button>
     <button class="tab-btn" data-tab="db">🗄️ Database</button>
   </div>
@@ -288,7 +323,7 @@
   <div id="themeMenu" class="hidden">
     <button data-theme="dark" class="sel">🌙 Scuro</button>
     <button data-theme="light">☀️ Chiaro</button>
-    <button data-theme="night">⚫ Notte</button>
+    <button data-theme="night">🌌 Notte e oro</button>
   </div>
 
   <!-- MENU HAMBURGER -->
@@ -407,7 +442,6 @@
       <button class="iconbtn" id="micBtn" title="Detta la richiesta (vocale, in locale)" style="border-color:var(--green);color:var(--green)">🎤</button>
       <button class="send" id="sendBtn">➤</button>
     </div>
-    <div class="footnote">⚙️ <span id="backendNote">Ricerca eseguita in locale · recupero deterministico, nessun dato inviato</span></div>
   </div>
 </div>
 
@@ -453,6 +487,14 @@
     <div id="genPop" class="gen-pop hidden"></div>
     <input id="qrFile" type="file" accept="image/*" class="hidden" />
     <div style="margin-top:12px"><label class="lbl">Tag (separati da virgola)</label><input id="f_tags" class="field" style="font-family:var(--body)" placeholder="es. shopping, acquisti, prime"></div>
+    <div class="crit-row">
+      <div class="txt">
+        <div class="t1">⚠️ Voce critica</div>
+        <div class="t2">Gli account da cui si rimette mano a tutto il resto: banca, email principale, SPID.</div>
+      </div>
+      <div id="swCritical" class="sw"></div>
+    </div>
+    <div id="critWarn" class="crit-warn hidden"></div>
     <button id="saveCred" class="btn" style="margin-top:14px" disabled>Salva nel vault</button>
     <p class="hint">Per la 2FA: il <b>secret</b> lo vedi <b>solo quando attivi la 2FA</b> sul sito (la chiave sotto il QR, o "inserimento manuale"). Già configurata nell'app authenticator? Non è più estraibile a mano — ma puoi usare <b>📷 Da QR</b>: fai uno screenshot del QR di setup, oppure del QR di <b>"Esporta/Trasferisci account"</b> di Google Authenticator (importa tutti i secret in un colpo). La lettura del QR avviene <b>in locale nel browser</b>.</p>
   </div>
@@ -526,8 +568,6 @@ async function doUnlock(){
   if(!ok){ $("#lockErr").textContent = j.detail||"Errore"; $("#unlockBtn").disabled=false; return; }
   $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
   $("#pillDb").textContent = "🗄️ "+j.count+" voci";
-  $("#backendNote").textContent = "Embedding: "+j.embedding_backend+" · recupero locale e deterministico"
-    + (j.audio_ready ? " · 🎤 voce pronta" : "");
   window.AUDIO_READY = !!j.audio_ready;
   if(!j.audio_ready){ $("#micBtn").style.opacity=".5"; }
   if(j.llm) $("#pillLlm").classList.remove("hidden");
@@ -578,7 +618,8 @@ function isHttpUrl(v){ return /^https?:\/\//i.test((v||"").trim()); }
 
 function credCard(c, picker){
   const card=document.createElement("div"); card.className="cred rise";
-  card.innerHTML = `<div class="accent"></div><div class="title">🔑 <span>${esc(c.title)}</span></div>`;
+  card.innerHTML = `<div class="accent"></div><div class="title">🔑 <span>${esc(c.title)}</span>`
+    + (c.critical ? '<span class="badge-crit">critica</span>' : "") + `</div>`;
   if(picker){
     const btn=document.createElement("button"); btn.className="pickbtn"; btn.textContent="Mostra questa →";
     btn.onclick=async()=>{ const {j}=await api("/api/reveal",{text:String(c.id)}); addAI(c.title+":", [j], false); };
@@ -698,10 +739,18 @@ function addFieldRow(label, value){
       if(o){ l.value="OTP (2FA)"; v.value=o.secret; if(!$("#f_title").value.trim() && (o.issuer||o.name)) $("#f_title").value=(o.issuer||o.name); checkAddValid(); }
     }
   });
+  // L'ordine dei campi è quello con cui verranno mostrati: si sceglie qui.
+  const mov=document.createElement("div"); mov.className="movecol";
+  const up=document.createElement("button"); up.type="button"; up.textContent="▲"; up.title="Sposta su";
+  up.onclick=()=>{ const p=row.previousElementSibling; if(p) row.parentNode.insertBefore(row,p); };
+  const dn=document.createElement("button"); dn.type="button"; dn.textContent="▼"; dn.title="Sposta giù";
+  dn.onclick=()=>{ const n=row.nextElementSibling; if(n) row.parentNode.insertBefore(n,row); };
+  mov.appendChild(up); mov.appendChild(dn);
+
   const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕";
   rm.onclick=()=>{ row.remove(); checkAddValid(); };
   l.oninput=checkAddValid; v.oninput=checkAddValid;
-  row.appendChild(l); row.appendChild(v); row.appendChild(rm);
+  row.appendChild(l); row.appendChild(v); row.appendChild(mov); row.appendChild(rm);
   return row;
 }
 let editId=null;
@@ -711,6 +760,7 @@ function resetAddModal(){
   $("#addModalTitle").textContent="Nuova credenziale";
   $("#saveCred").textContent="Salva nel vault";
   $("#f_title").value=""; $("#f_tags").value="";
+  setSw($("#swCritical"), false); $("#critWarn").classList.add("hidden");
   $("#addFields").innerHTML="";
   $("#addFields").appendChild(addFieldRow("Email",""));
   $("#addFields").appendChild(addFieldRow("Password",""));
@@ -725,6 +775,7 @@ function openEdit(c){
   $("#saveCred").textContent="Salva modifiche";
   $("#f_title").value=c.title||"";
   $("#f_tags").value=(c.tags||[]).join(", ");
+  setSw($("#swCritical"), !!c.critical);
   $("#addFields").innerHTML="";
   // in modifica mostriamo TUTTI i campi (anche l'OTP, col secret, così è correggibile)
   (c.fields&&c.fields.length ? c.fields : [{label:"",value:""}]).forEach(f=> $("#addFields").appendChild(addFieldRow(f.label, f.value)));
@@ -735,11 +786,40 @@ function checkAddValid(){
   const hasTitle = $("#f_title").value.trim().length>0;
   const hasField = Array.from(document.querySelectorAll(".add-fvalue")).some(v=>v.value.trim().length>0);
   $("#saveCred").disabled = !(hasTitle && hasField);
+  aggiornaAvvisoCritica();
+}
+
+/* La voce ha sia una password sia il secondo fattore? */
+function haPasswordE2fa(){
+  let pw=false, otp=false;
+  document.querySelectorAll(".add-fieldrow").forEach(row=>{
+    const l=row.querySelector(".add-flabel").value.trim();
+    const v=row.querySelector(".add-fvalue").value.trim();
+    if(!v) return;
+    if(labelLooksOtp(l)) otp=true;
+    else if(/pass|pwd|pin|puk|puc|codice|secret/i.test(l)) pw=true;
+  });
+  return pw && otp;
+}
+/* Avviso, non blocco: la decisione resta dell'utente, ma consapevole. */
+function aggiornaAvvisoCritica(){
+  const box=$("#critWarn"); if(!box) return;
+  const mostra = $("#swCritical").classList.contains("on") && haPasswordE2fa();
+  box.classList.toggle("hidden", !mostra);
+  if(mostra) box.innerHTML =
+    "<b>Password e 2FA nella stessa voce.</b> Su un account critico questo annulla "
+    + "il senso del secondo fattore: chi apre il vault avrebbe entrambi. Per la banca "
+    + "o l'email principale conviene tenere la 2FA solo sul telefono. "
+    + "Puoi salvare lo stesso — è una scelta, non un errore.";
 }
 $("#f_title").addEventListener("input", checkAddValid);
 $("#addFieldRow").onclick=()=> $("#addFields").appendChild(addFieldRow("",""));
 $("#addOtpRow").onclick=()=>{ const r=addFieldRow("OTP (2FA)",""); $("#addFields").appendChild(r); const v=r.querySelector(".add-fvalue"); v.placeholder="Secret base32 dell'autenticatore"; v.focus(); };
 $("#addBtn").onclick=()=>{ resetAddModal(); $("#modal").classList.remove("hidden"); };
+$("#swCritical").addEventListener("click", ()=>{
+  setSw($("#swCritical"), !$("#swCritical").classList.contains("on"));
+  aggiornaAvvisoCritica();
+});
 
 /* ---- GENERATORE PASSWORD (tutto client-side, crypto-grade) ---- */
 function genPassword(len, up, low, dig, sym){
@@ -809,7 +889,8 @@ $("#saveCred").onclick=async()=>{
     // finirebbe nel vault come campo fantasma
     if(value.trim()) fields.push({label: label||"Valore", value});
   });
-  const payload={title:$("#f_title").value, fields, tags:$("#f_tags").value};
+  const payload={title:$("#f_title").value, fields, tags:$("#f_tags").value,
+                 critical:$("#swCritical").classList.contains("on")};
   let res;
   if(editId!=null){ payload.id=editId; res=await api("/api/update",payload); }
   else { res=await api("/api/add",payload); }
@@ -1051,12 +1132,12 @@ $("#commitBtn").onclick=async()=>{
   // La dimensione si adatta al totale: con 20 voci un blocco unico farebbe
   // saltare la barra da 0 a 100 senza che si veda niente.
   const BLOCK=Math.min(100, Math.max(5, Math.ceil(entries.length/10)));
-  let saved=0, count=null, failed=null;
+  let saved=0, count=null, failed=null, con2fa=0;
   impProgress(true, 0, `Salvataggio… 0 di ${entries.length}`); await paintTick();
   for(let i=0;i<entries.length;i+=BLOCK){
     const {ok,j} = await api("/api/import_commit",{entries:entries.slice(i,i+BLOCK), rebuild:false});
     if(!ok){ failed = j.detail||"Errore nel salvataggio"; break; }
-    saved += j.saved; count = j.count;
+    saved += j.saved; count = j.count; con2fa += (j.with_2fa || 0);
     impProgress(true, saved/entries.length*100, `Salvataggio… ${saved} di ${entries.length}`);
     await paintTick();
   }
@@ -1071,7 +1152,12 @@ $("#commitBtn").onclick=async()=>{
   if(count!=null) $("#pillDb").textContent="🗄️ "+count+" voci";
   if(failed){ alert(failed + (saved ? `\n\nLe prime ${saved} voci sono state salvate comunque.` : "")); return; }
   $("#importModal").classList.add("hidden");
-  addAI(`Importate ${saved} voci nel vault locale. Ora puoi chiederle in chat.`);
+  let msg = `Importate ${saved} voci nel vault locale. Ora puoi chiederle in chat.`;
+  // Dirlo esplicitamente: i secret 2FA entrano in silenzio con l'export, e da
+  // quel momento password e secondo fattore stanno nello stesso posto.
+  if(con2fa) msg += ` Di queste, ${con2fa} contengono anche un secret 2FA: `
+    + `per gli account critici (banca, email principale) valuta se tenere il codice solo sul telefono.`;
+  addAI(msg);
 };
 
 /* ---- INPUT VOCALE (Whisper locale, opzionale) ---- */
@@ -1418,7 +1504,9 @@ function dbCard(c){
 
   const head=document.createElement("div");
   head.style.cssText="display:flex;align-items:flex-start;justify-content:space-between;gap:8px";
-  const titleEl=document.createElement("div"); titleEl.className="dbtitle"; titleEl.innerHTML="🔑 "+esc(c.title);
+  const titleEl=document.createElement("div"); titleEl.className="dbtitle";
+  titleEl.innerHTML="🔑 "+esc(c.title)
+    + (c.critical ? ' <span class="badge-crit">critica</span>' : "");
   const acts=document.createElement("div"); acts.style.cssText="display:flex;gap:4px;flex-shrink:0";
   const editBtn=document.createElement("button"); editBtn.className="iconbtn"; editBtn.title="Modifica"; editBtn.textContent="✎";
   editBtn.style.cssText="border-color:var(--violet);color:var(--violet)"; editBtn.onclick=()=>openEdit(c);

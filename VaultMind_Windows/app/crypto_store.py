@@ -50,20 +50,28 @@ class Credential:
     title: str
     fields: List[Field] = field(default_factory=list)
     tags: List[str] = field(default_factory=list)
+    # Account da cui si può rimettere le mani su tutto il resto (banca, email
+    # principale). Serve a segnalare quando password e secondo fattore finiscono
+    # nello stesso posto: da quel momento il 2FA non è più un fattore separato.
+    critical: bool = False
 
     def public(self) -> dict:
         """Versione senza valori, per liste/ambiguità."""
         return {"id": self.id, "title": self.title, "tags": self.tags,
+                "critical": self.critical,
                 "field_labels": [f.label for f in self.fields]}
 
     def to_dict(self) -> dict:
         return {"id": self.id, "title": self.title, "tags": self.tags,
+                "critical": self.critical,
                 "fields": [asdict(f) for f in self.fields]}
 
     @staticmethod
     def from_dict(d: dict) -> "Credential":
+        # `critical` manca nei vault creati prima: assente = non critica
         return Credential(
             id=d["id"], title=d["title"], tags=d.get("tags", []),
+            critical=bool(d.get("critical", False)),
             fields=[Field(label=f.get("label", ""), value=f.get("value", "")) for f in d.get("fields", [])],
         )
 
@@ -160,11 +168,14 @@ class VaultStore:
         return [Field(label=str(f.get("label", "")).strip(), value=str(f.get("value", "")))
                 for f in fields if str(f.get("label", "")).strip() or str(f.get("value", "")).strip()]
 
-    def add(self, title: str, fields: List[dict], tags: List[str]) -> Credential:
-        """`fields` è una lista di {"label": ..., "value": ...}, in ordine libero."""
+    def add(self, title: str, fields: List[dict], tags: List[str],
+            critical: bool = False) -> Credential:
+        """`fields` è una lista di {"label": ..., "value": ...}, in ordine libero.
+        L'ordine dei campi è quello scelto dall'utente e viene conservato."""
         self._require_unlocked()
         new_id = (max((c.id for c in self._entries), default=0)) + 1
-        cred = Credential(id=new_id, title=title, fields=self._clean_fields(fields), tags=tags)
+        cred = Credential(id=new_id, title=title, fields=self._clean_fields(fields),
+                          tags=tags, critical=critical)
         self._entries.insert(0, cred)
         self._flush()
         return cred
@@ -190,6 +201,7 @@ class VaultStore:
                 title=str(it.get("title", "")),
                 fields=self._clean_fields(it.get("fields") or []),
                 tags=list(it.get("tags") or []),
+                critical=bool(it.get("critical", False)),
             ))
             next_id += 1
         # ogni voce entrerebbe in testa una alla volta: il risultato è l'inverso
@@ -208,7 +220,8 @@ class VaultStore:
         self._entries = []
         self._flush()
 
-    def update(self, cred_id: int, title: str, fields: List[dict], tags: List[str]) -> Optional[Credential]:
+    def update(self, cred_id: int, title: str, fields: List[dict], tags: List[str],
+               critical: bool = False) -> Optional[Credential]:
         """Sostituisce titolo/campi/tag di una voce esistente (mantiene id e posizione)."""
         self._require_unlocked()
         cred = self.get(cred_id)
@@ -217,6 +230,7 @@ class VaultStore:
         cred.title = title
         cred.fields = self._clean_fields(fields)
         cred.tags = tags
+        cred.critical = critical
         self._flush()
         return cred
 

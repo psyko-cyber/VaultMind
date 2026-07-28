@@ -57,12 +57,14 @@ class AddIn(BaseModel):
     title: str
     fields: List[FieldIn] = []
     tags: str = ""
+    critical: bool = False
 
 class UpdateIn(BaseModel):
     id: int
     title: str
     fields: List[FieldIn] = []
     tags: str = ""
+    critical: bool = False
 
 class ImportParseIn(BaseModel):
     text: str
@@ -266,7 +268,8 @@ def query(body: QueryIn):
     return {"kind": "single", "reply": reply,
             "results": [{"id": cred.id, "title": cred.title,
                          "fields": [{"label": f.label, "value": f.value} for f in cred.fields],
-                         "tags": cred.tags, "score": round(picks[0].score, 3)}]}
+                         "tags": cred.tags, "critical": cred.critical,
+                         "score": round(picks[0].score, 3)}]}
 
 
 @app.post("/api/reveal")
@@ -282,7 +285,7 @@ def reveal(body: QueryIn):
         raise HTTPException(status_code=404, detail="voce non trovata")
     return {"id": cred.id, "title": cred.title,
             "fields": [{"label": f.label, "value": f.value} for f in cred.fields],
-            "tags": cred.tags}
+            "tags": cred.tags, "critical": cred.critical}
 
 
 @app.post("/api/add")
@@ -290,7 +293,7 @@ def add(body: AddIn):
     _require_unlocked()
     tags = [t.strip().lower() for t in body.tags.split(",") if t.strip()]
     fields = [{"label": f.label.strip(), "value": f.value} for f in body.fields if f.label.strip() or f.value]
-    cred = S.store.add(body.title.strip(), fields, tags)
+    cred = S.store.add(body.title.strip(), fields, tags, body.critical)
     _rebuild_index()
     return {"ok": True, "id": cred.id, "count": len(S.store.entries)}
 
@@ -301,7 +304,7 @@ def update(body: UpdateIn):
     _require_unlocked()
     tags = [t.strip().lower() for t in body.tags.split(",") if t.strip()]
     fields = [{"label": f.label.strip(), "value": f.value} for f in body.fields if f.label.strip() or f.value]
-    cred = S.store.update(body.id, body.title.strip(), fields, tags)
+    cred = S.store.update(body.id, body.title.strip(), fields, tags, body.critical)
     if cred is None:
         raise HTTPException(status_code=404, detail="voce non trovata")
     _rebuild_index()
@@ -380,10 +383,15 @@ def import_commit(body: ImportCommitIn):
     """
     _require_unlocked()
     items = []
+    con_2fa = 0
     for e in body.entries:
         fields = [{"label": f.label.strip(), "value": f.value} for f in e.fields if f.label.strip() or f.value]
         title = e.title.strip() or (fields[0]["value"] if fields else "voce senza titolo")
         tags = [t.strip().lower() for t in e.tags if t.strip()]
+        # Un export di Bitwarden porta dentro anche i secret TOTP, in silenzio:
+        # vanno contati per poterlo dire all'utente a fine import.
+        if any(totp.is_otp_label(f["label"]) and (f["value"] or "").strip() for f in fields):
+            con_2fa += 1
         items.append({"title": title, "fields": fields, "tags": tags})
     if items:
         S.store.add_many(items)
@@ -391,7 +399,8 @@ def import_commit(body: ImportCommitIn):
         _rebuild_index()
     else:
         S.index_dirty = True
-    return {"ok": True, "saved": len(items), "count": len(S.store.entries)}
+    return {"ok": True, "saved": len(items), "with_2fa": con_2fa,
+            "count": len(S.store.entries)}
 
 
 @app.get("/api/backup")
@@ -468,6 +477,7 @@ def list_entries():
             "id": c.id,
             "title": c.title,
             "tags": c.tags,
+            "critical": c.critical,
             "fields": [{"label": f.label, "value": f.value} for f in c.fields],
         })
     return {"entries": result, "count": len(result)}
