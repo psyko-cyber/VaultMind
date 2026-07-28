@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>VaultMind — locale</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#0A0E1A; --panel:#121A2B; --panel2:#0E1524; --border:#1F2A40;
+    --cyan:#38BDF8; --violet:#6366F1; --indigo:#4F46E5; --green:#34D399;
+    --soft:#AEB9CF; --faint:#5A6884;
+    --accent:#38BDF8; --accent2:#6366F1;
+    --disp:'Space Grotesk',sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+  }
+  *{box-sizing:border-box} html,body{margin:0;height:100%}
+  /* scrollbar discreta e moderna */
+  *{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+  *::-webkit-scrollbar{width:8px;height:8px}
+  *::-webkit-scrollbar-track{background:transparent}
+  *::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+  *::-webkit-scrollbar-thumb:hover{background:var(--faint);background-clip:padding-box;border:2px solid transparent}
+  body{background:var(--bg);color:var(--soft);font-family:var(--body);
+    background-image:radial-gradient(rgba(56,189,248,.025) 1px,transparent 1px);background-size:24px 24px;}
+  button{font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
+  input{font-family:var(--body)}
+  .hidden{display:none!important}
+  @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+  .rise{animation:rise .35s cubic-bezier(.2,.7,.3,1) both}
+  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#22304a;border-radius:8px}
+
+  /* lock */
+  #lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:18px;
+    box-shadow:0 0 28px rgba(34,211,238,.14)}
+  .lockbox{width:min(92vw,400px);padding:32px}
+  .badge-row{display:flex;justify-content:center;margin-bottom:14px}
+  .icon-chip{padding:12px;border-radius:14px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.3);display:inline-flex}
+  .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:#fff;text-align:center;font-size:28px}
+  .sub{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--faint);text-align:center;margin-top:6px;text-transform:uppercase}
+  label.lbl{font-family:var(--disp);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
+  .field{width:100%;margin-top:6px;border-radius:12px;padding:12px 14px;background:var(--panel2);
+    border:1px solid var(--border);color:#fff;outline:none;font-family:var(--mono)}
+  .btn{width:100%;margin-top:12px;border-radius:12px;padding:12px;font-weight:700;background:var(--cyan);color:var(--bg)}
+  .btn:disabled{opacity:.4;cursor:default}
+  .hint{font-size:11px;color:var(--faint);margin-top:12px;line-height:1.4}
+  .err{color:#FCA5A5;font-size:12px;margin-top:8px;font-family:var(--mono)}
+
+  /* app */
+  #app{display:flex;flex-direction:column;height:100vh}
+  header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;
+    border-bottom:1px solid var(--border);background:rgba(7,11,20,.7);backdrop-filter:blur(8px)}
+  .hbrand{display:flex;align-items:center;gap:10px;color:#fff;font-family:var(--disp);font-weight:600;letter-spacing:-.3px;font-size:18px}
+  .pills{display:flex;align-items:center;gap:8px}
+  .pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
+  .pill.net{color:var(--green);border:1px solid rgba(52,211,153,.35)}
+  .pill.db{color:var(--cyan);border:1px solid rgba(34,211,238,.35)}
+  .pill.llm{color:var(--violet);border:1px solid rgba(167,139,250,.35)}
+  .iconbtn{padding:8px;border-radius:10px;border:1px solid var(--border)}
+  .iconbtn:hover{background:rgba(255,255,255,.05)}
+
+  main{flex:1;overflow-y:auto;padding:20px;max-width:680px;width:100%;margin:0 auto}
+  .row{display:flex;margin-bottom:12px}
+  .row.user{justify-content:flex-end}
+  .bubble{max-width:88%;border-radius:18px;padding:10px 16px;font-size:15px;line-height:1.5}
+  .b-user{background:var(--indigo);color:#fff;box-shadow:0 0 20px rgba(79,70,229,.3)}
+  .b-ai{background:var(--panel);border:1px solid var(--border);color:var(--soft)}
+  .ai-tag{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--accent);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+  .ai-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+
+  .cred{position:relative;overflow:hidden;border-radius:12px;padding:14px;margin-top:8px;background:var(--panel2);border:1px solid var(--border)}
+  .cred .accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan)}
+  .cred .title{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}
+  .credline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+  .credline .meta{min-width:0}
+  .credline .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
+  .credline .v{font-family:var(--mono);color:var(--soft);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .credline .v.shown{color:#fff;letter-spacing:0}
+  .acts{display:flex;gap:6px;flex-shrink:0}
+  .pickbtn{margin-top:8px;width:100%;text-align:left;border-radius:10px;padding:8px 12px;
+    background:rgba(34,211,238,.08);border:1px solid var(--cyan);color:var(--cyan)}
+
+  .chips{max-width:680px;width:100%;margin:0 auto;padding:0 20px 8px;display:flex;flex-wrap:wrap;gap:8px}
+  .chip{font-size:12px;padding:6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--border);color:var(--soft)}
+  .chip:hover{filter:brightness(1.25)}
+
+  .composer{border-top:1px solid var(--border);background:rgba(7,11,20,.7);backdrop-filter:blur(8px)}
+  .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:12px 20px;display:flex;align-items:center;gap:8px}
+  .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 14px;background:var(--panel);border:1px solid var(--border)}
+  .searchbox input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:15px}
+  .send{padding:10px;border-radius:12px;background:var(--cyan)}
+  .send:hover{filter:brightness(1.1)}
+  .footnote{max-width:680px;width:100%;margin:0 auto;padding:0 20px 10px;font-family:var(--mono);font-size:10px;color:var(--faint);display:flex;align-items:center;gap:6px}
+
+  .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6);z-index:50}
+  .modalcard{width:min(92vw,420px);padding:24px}
+  .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;color:#fff;font-family:var(--disp);font-weight:700}
+  svg{display:block}
+  .fieldrow{display:flex;gap:6px;margin-top:8px;align-items:flex-start}
+  .fieldrow .lbl-in{flex:0 0 38%}
+  .fieldrow .val-in{flex:1}
+  .fieldrow input{padding:8px 10px;font-size:13px}
+  .fieldrow .rmrow{flex:0 0 auto;padding:8px;border:1px solid var(--border);border-radius:10px;color:var(--faint)}
+  .fieldrow .rmrow:hover{color:#FCA5A5;border-color:#FCA5A5}
+
+  /* TOTP / 2FA */
+  .totp{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.3)}
+  .totp .trow{display:flex;align-items:center;justify-content:space-between;gap:10px}
+  .totp .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--green)}
+  .totp .tcode{font-family:var(--mono);font-size:24px;font-weight:700;color:#fff;letter-spacing:3px;margin-top:2px}
+  .totp .terr{font-family:var(--mono);font-size:12px;color:#FCA5A5;margin-top:4px}
+  .totp .tbar{margin-top:8px;height:4px;border-radius:4px;background:var(--border);overflow:hidden}
+  .totp .tbar i{display:block;height:100%;background:var(--green);width:100%;transition:width 1s linear}
+  .iconbtn.rec{background:rgba(52,211,153,.18)!important}
+  .onb-sec{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px;background:var(--panel2)}
+  .onb-head{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}
+
+  /* tab nav */
+  .tab-btn{flex:1;padding:11px;font-family:var(--disp);font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--faint);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s}
+  .tab-btn:hover{color:var(--soft)}
+  .tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+
+  /* database panel */
+  #dbPanel{flex:1;overflow-y:auto;padding:20px;max-width:980px;width:100%;margin:0 auto}
+  .db-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+  .db-title{font-family:var(--disp);font-size:13px;letter-spacing:1px;color:var(--cyan)}
+  #dbGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+  #dbEmpty{text-align:center;padding:48px 20px;color:var(--faint);font-family:var(--mono);font-size:13px}
+  .dbcard{display:flex;flex-direction:column;gap:6px}
+  .dbcard .dbtitle{color:#fff;font-weight:600;font-size:14px;flex:1;word-break:break-word}
+  .dbtags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
+  .dbtag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
+  .del-confirm{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(252,165,165,.07);
+    border:1px solid rgba(252,165,165,.3);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .del-confirm .msg{font-family:var(--mono);font-size:12px;color:#FCA5A5}
+
+  /* ---- TEMI ---- */
+  /* default = scuro (gia' definito in :root). Qui le varianti. */
+  body[data-theme="light"]{
+    --bg:#F7F9FC; --panel:#FFFFFF; --panel2:#F0F3F9; --border:#DCE3EF;
+    --cyan:#0284C7; --violet:#4F46E5; --indigo:#4338CA; --green:#059669;
+    --soft:#33415C; --faint:#7787A2;
+    --accent:#0284C7; --accent2:#4F46E5;
+  }
+  body[data-theme="light"]{background-image:radial-gradient(rgba(2,132,199,.05) 1px,transparent 1px)}
+  body[data-theme="light"] .b-user{color:#fff}
+  body[data-theme="light"] .brand,
+  body[data-theme="light"] .dbcard .dbtitle,
+  body[data-theme="light"] .cred .title,
+  body[data-theme="light"] .hbrand{color:#0F1729}
+  body[data-theme="light"] .credline .v.shown{color:#0F1729}
+
+  body[data-theme="night"]{
+    --bg:#05070D; --panel:#0B0F1A; --panel2:#070A12; --border:#161C2A;
+    --cyan:#38BDF8; --violet:#6366F1; --indigo:#3730A3; --green:#34D399;
+    --soft:#8A95AC; --faint:#3D4558;
+    --accent:#38BDF8; --accent2:#6366F1;
+  }
+  body[data-theme="night"]{background-image:radial-gradient(rgba(56,189,248,.02) 1px,transparent 1px)}
+
+  /* mini menu tema */
+  #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,.4);min-width:160px}
+  #themeMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;border-radius:8px;
+    color:var(--soft);font-size:13px}
+  #themeMenu button:hover{background:rgba(127,127,127,.12)}
+  #themeMenu button.sel{color:var(--cyan)}
+
+  /* generatore password */
+  .gen-pop{margin-top:10px;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--accent2)}
+  .gen-out{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .gen-out input{flex:1;font-family:var(--mono);font-size:14px;letter-spacing:1px;padding:9px 12px}
+  .gen-row{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--soft)}
+  .gen-row input[type=range]{flex:1;accent-color:var(--accent)}
+  .gen-row .len{font-family:var(--mono);min-width:26px;text-align:right;color:#fff}
+  .gen-toggles{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .gen-tg{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer}
+  .gen-tg input{accent-color:var(--accent)}
+
+  /* filtro database */
+  .db-filter{flex:1;max-width:280px;display:flex;align-items:center;gap:6px;border-radius:10px;
+    padding:7px 12px;background:var(--panel);border:1px solid var(--border)}
+  .db-filter input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:13px;font-family:var(--mono)}
+
+  /* menu hamburger */
+  #mainMenu{position:absolute;top:54px;left:16px;z-index:60;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,.45);min-width:200px}
+  #mainMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:8px;
+    color:var(--soft);font-size:13px}
+  #mainMenu button:hover{background:rgba(127,127,127,.1)}
+  #mainMenu .sep{height:1px;background:var(--border);margin:6px 4px}
+
+  /* pannello impostazioni */
+  #setModal .card{max-width:600px !important;width:100% !important}
+  .set-section{margin-top:18px}
+  .set-section h4{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 10px}
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 0;border-top:1px solid var(--border)}
+  .set-row:first-of-type{border-top:none}
+  .set-row > div:first-child{flex:1;min-width:0}
+  .set-row .lab{font-size:13px;color:var(--soft);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .set-row .desc{font-size:11px;color:var(--faint);margin-top:3px;line-height:1.4}
+  .set-row .ctl{flex:0 0 auto;white-space:nowrap}
+  /* switch */
+  .sw{position:relative;width:42px;height:24px;border-radius:999px;background:var(--border);cursor:pointer;transition:.2s;flex:0 0 auto}
+  .sw.on{background:var(--accent)}
+  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
+  .sw.on::after{transform:translateX(18px)}
+  .set-sel{background:var(--panel2);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--mono)}
+  .set-status{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:999px}
+  .set-status.ok{color:var(--green);border:1px solid rgba(52,211,153,.35)}
+  .set-status.off{color:var(--faint);border:1px solid var(--border)}
+  .set-msg{font-size:12px;font-family:var(--mono);margin-top:8px;min-height:16px}
+  .set-msg.ok{color:var(--green)} .set-msg.err{color:#FCA5A5}
+</style>
+</head>
+<body>
+
+<!-- LOCK -->
+<div id="lock">
+  <div class="card lockbox rise">
+    <div class="badge-row"><span class="icon-chip">🔒</span></div>
+    <div class="brand">VAULTMIND</div>
+    <div class="sub">LOCALE · OFFLINE · AES-256</div>
+    <div style="margin-top:26px">
+      <label class="lbl">Master password</label>
+      <input id="master" class="field" type="password" placeholder="••••••••••••" autofocus />
+      <button id="unlockBtn" class="btn" disabled>Sblocca vault</button>
+      <button id="restoreBtn" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">Ripristina da backup…</button>
+      <input id="restoreFile" type="file" accept="application/json,.json" class="hidden" />
+      <div id="lockErr" class="err"></div>
+      <p class="hint" id="lockHint">La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.</p>
+    </div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app" class="hidden">
+  <header>
+    <div style="display:flex;align-items:center;gap:10px">
+      <button class="iconbtn" id="menuBtn" title="Menu" style="font-size:18px;padding:6px 10px">☰</button>
+      <div class="hbrand">🛡️ VaultMind</div>
+    </div>
+    <div class="pills">
+      <span class="pill net">⛔ 0 richieste di rete</span>
+      <span class="pill db" id="pillDb">🗄️ 0 voci</span>
+      <span class="pill llm hidden" id="pillLlm">✨ LLM locale</span>
+      <button class="iconbtn" id="themeBtn" title="Tema">🎨</button>
+      <button class="iconbtn" id="backupBtn" title="Backup del vault (file cifrato)">💾</button>
+      <button class="iconbtn" id="lockAgain" title="Blocca">🔒</button>
+    </div>
+  </header>
+
+  <!-- TAB NAV -->
+  <div id="tabNav" style="display:flex;border-bottom:1px solid var(--border);background:rgba(7,11,20,.55);backdrop-filter:blur(8px)">
+    <button class="tab-btn" data-tab="chat">💬 Chat</button>
+    <button class="tab-btn" data-tab="db">🗄️ Database</button>
+  </div>
+
+  <!-- MENU TEMA -->
+  <div id="themeMenu" class="hidden">
+    <button data-theme="dark" class="sel">🌙 Scuro</button>
+    <button data-theme="light">☀️ Chiaro</button>
+    <button data-theme="night">⚫ Notte</button>
+  </div>
+
+  <!-- MENU HAMBURGER -->
+  <div id="mainMenu" class="hidden">
+    <button data-act="chat">💬 Chat</button>
+    <button data-act="db">🗄️ Database</button>
+    <div class="sep"></div>
+    <button data-act="import">⇪ Importa credenziali</button>
+    <button data-act="backup">💾 Backup del vault</button>
+    <div class="sep"></div>
+    <button data-act="settings">⚙️ Impostazioni</button>
+    <button data-act="lock">🔒 Blocca vault</button>
+  </div>
+
+  <!-- MODALE IMPOSTAZIONI -->
+  <div id="setModal" class="modal hidden">
+    <div class="card" style="max-height:88vh;overflow:auto">
+      <div class="mhead">⚙️ Impostazioni <button class="iconbtn" id="setClose">✕</button></div>
+
+      <div class="set-section">
+        <h4>Sicurezza</h4>
+        <div class="set-row">
+          <div><div class="lab">Cambia master password</div>
+            <div class="desc">Ri-cifra il vault con una nuova password.</div></div>
+          <button class="iconbtn ctl" id="openChangeMaster">Cambia…</button>
+        </div>
+        <div id="changeMasterBox" class="hidden" style="padding:10px 0">
+          <input id="cmOld" class="field" type="password" placeholder="Password attuale" />
+          <input id="cmNew" class="field" type="password" placeholder="Nuova password (min 8)" />
+          <input id="cmNew2" class="field" type="password" placeholder="Ripeti nuova password" />
+          <button id="cmSave" class="btn" style="background:var(--accent)">Aggiorna password</button>
+          <div id="cmMsg" class="set-msg"></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">Auto-blocco per inattività</div>
+            <div class="desc">Blocca il vault dopo un periodo senza attività.</div></div>
+          <select id="setAutolock" class="set-sel ctl">
+            <option value="0">Mai</option>
+            <option value="5">5 min</option>
+            <option value="10">10 min</option>
+            <option value="15">15 min</option>
+            <option value="30">30 min</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <h4>Assistente & dettatura</h4>
+        <div class="set-row">
+          <div><div class="lab">mind (Ollama) <span id="ollamaStatus" class="set-status off">—</span></div>
+            <div class="desc">Risposte intelligenti in chat. Se spento, usa risposte standard.</div></div>
+          <div id="swOllama" class="sw ctl"></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">Microfono / dettatura <span id="micStatus" class="set-status off">—</span></div>
+            <div class="desc">Input vocale nella barra di ricerca.</div></div>
+          <div id="swMic" class="sw ctl"></div>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <h4>Generatore password</h4>
+        <div class="set-row">
+          <div><div class="lab">Lunghezza predefinita</div></div>
+          <select id="setGenLen" class="set-sel ctl">
+            <option>12</option><option>16</option><option>20</option><option>24</option><option>32</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">Includi simboli</div></div>
+          <div id="swGenSym" class="sw ctl"></div>
+        </div>
+      </div>
+
+      <div class="set-section">
+        <h4>Dati</h4>
+        <div class="set-row">
+          <div><div class="lab">Importa da CSV o altre piattaforme</div>
+            <div class="desc">Bitwarden, 1Password, KeePass o testo libero.</div></div>
+          <button class="iconbtn ctl" id="setOpenImport">Importa…</button>
+        </div>
+      </div>
+
+      <div id="setMsg" class="set-msg"></div>
+    </div>
+  </div>
+
+  <main id="chat"></main>
+
+  <!-- DATABASE TAB -->
+  <div id="dbPanel" class="hidden">
+    <div class="db-head">
+      <div class="db-filter">
+        <span style="color:var(--faint)">🔍</span>
+        <input id="dbFilter" placeholder="Filtra per titolo o tag…" />
+      </div>
+      <div style="display:flex;gap:8px">
+        <button id="dbClearBtn" class="iconbtn" title="Svuota tutto il database" style="border-color:#FCA5A5;color:#FCA5A5">🧹 Svuota</button>
+        <button id="dbRefreshBtn" class="iconbtn" title="Aggiorna lista">↻</button>
+      </div>
+    </div>
+    <div id="dbGrid"></div>
+    <div id="dbEmpty" class="hidden">Nessuna voce nel vault.</div>
+  </div>
+
+  <div class="chips" id="chips"></div>
+
+  <div class="composer">
+    <div class="inner">
+      <button class="iconbtn" id="addBtn" title="Aggiungi credenziale" style="border-color:var(--cyan);color:var(--cyan)">＋</button>
+      <button class="iconbtn" id="importBtn" title="Import intelligente (incolla testo)" style="border-color:var(--violet);color:var(--violet)">⇪</button>
+      <div class="searchbox">
+        <span style="color:var(--faint)">🔍</span>
+        <input id="q" placeholder="Chiedi una credenziale…" />
+      </div>
+      <button class="iconbtn" id="micBtn" title="Detta la richiesta (vocale, in locale)" style="border-color:var(--green);color:var(--green)">🎤</button>
+      <button class="send" id="sendBtn">➤</button>
+    </div>
+    <div class="footnote">⚙️ <span id="backendNote">Ricerca eseguita in locale · recupero deterministico, nessun dato inviato</span></div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div id="importModal" class="modal hidden">
+  <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;overflow-y:auto">
+    <div class="mhead"><span>Import intelligente</span><button id="closeImport" class="iconbtn">✕</button></div>
+    <div id="importStep1">
+      <label class="lbl">Incolla qui le credenziali, anche disordinate</label>
+      <textarea id="importText" class="field" style="font-family:var(--mono);min-height:160px;resize:vertical" placeholder="Es.&#10;Google-- mario@gmail.com pass: Abc123!&#10;Steam&#10;mario99  Pwd!2024  -> recupero@gmail.com&#10;PIN sblocco: 1234"></textarea>
+      <button id="parseBtn" class="btn" style="background:var(--violet)" disabled>Analizza</button>
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--faint)">oppure</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
+      <button id="csvBtn" class="btn" style="background:transparent;border:1px dashed var(--cyan);color:var(--cyan);margin-top:0">📄 Importa da CSV (Bitwarden / 1Password / KeePass)</button>
+      <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden" />
+      <p class="hint">Il testo viene analizzato in locale. Se Ollama è attivo l'estrazione è più precisa; altrimenti si usa un parser euristico. Il <b>CSV</b> esportato da un altro password manager viene letto direttamente, senza LLM. <b>Niente viene salvato finché non confermi.</b></p>
+    </div>
+    <div id="importStep2" class="hidden">
+      <p class="hint" id="importSourceNote" style="margin-top:0"></p>
+      <div id="importList"></div>
+      <button id="commitBtn" class="btn">Salva le voci selezionate</button>
+      <button id="backToText" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">← Torna al testo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div id="modal" class="modal hidden">
+  <div class="card modalcard rise" style="max-height:88vh;overflow-y:auto">
+    <div class="mhead"><span id="addModalTitle">Nuova credenziale</span><button id="closeModal" class="iconbtn">✕</button></div>
+    <div><label class="lbl">Titolo (anche disordinato)</label><input id="f_title" class="field" placeholder="es. quella roba di amazon, oppure CIE"></div>
+    <div style="margin-top:14px"><label class="lbl">Campi</label></div>
+    <div id="addFields"></div>
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
+      <button id="addFieldRow" class="btn" style="background:transparent;border:1px dashed var(--cyan);color:var(--cyan);margin-top:0;padding:8px;flex:1 1 40%">+ Aggiungi campo</button>
+      <button id="addOtpRow" class="btn" style="background:transparent;border:1px dashed var(--green);color:var(--green);margin-top:0;padding:8px;flex:0 0 auto" title="Inserisci a mano il secret 2FA">+ 2FA / OTP</button>
+      <button id="qrBtn" class="btn" style="background:transparent;border:1px dashed var(--violet);color:var(--violet);margin-top:0;padding:8px;flex:0 0 auto" title="Leggi un QR (screenshot di setup o export authenticator)">📷 Da QR</button>
+      <button id="genBtn" class="btn" style="background:transparent;border:1px dashed var(--violet);color:var(--violet);margin-top:0;padding:8px;flex:0 0 auto" title="Genera una password sicura">🎲 Genera</button>
+    </div>
+    <div id="genPop" class="gen-pop hidden"></div>
+    <input id="qrFile" type="file" accept="image/*" class="hidden" />
+    <div style="margin-top:12px"><label class="lbl">Tag (separati da virgola)</label><input id="f_tags" class="field" style="font-family:var(--body)" placeholder="es. shopping, acquisti, prime"></div>
+    <button id="saveCred" class="btn" style="margin-top:14px" disabled>Salva nel vault</button>
+    <p class="hint">Per la 2FA: il <b>secret</b> lo vedi <b>solo quando attivi la 2FA</b> sul sito (la chiave sotto il QR, o "inserimento manuale"). Già configurata nell'app authenticator? Non è più estraibile a mano — ma puoi usare <b>📷 Da QR</b>: fai uno screenshot del QR di setup, oppure del QR di <b>"Esporta/Trasferisci account"</b> di Google Authenticator (importa tutti i secret in un colpo). La lettura del QR avviene <b>in locale nel browser</b>.</p>
+  </div>
+</div>
+
+<!-- ONBOARDING MODAL -->
+<div id="onboardModal" class="modal hidden">
+  <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;overflow-y:auto">
+    <div class="mhead"><span>Configurazione iniziale</span><button id="closeOnboard" class="iconbtn">✕</button></div>
+    <p class="hint" style="margin-top:0">Inserisci subito i tuoi dati più importanti. Compila quello che vuoi (anche solo alcuni campi) e attiva la voce con la spunta; il resto lo aggiungi quando vuoi. <b>Tutto resta cifrato in locale.</b></p>
+    <div id="onboardList"></div>
+    <button id="onboardSave" class="btn" style="margin-top:14px">Salva e inizia</button>
+    <button id="onboardSkip" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">Salta per ora</button>
+  </div>
+</div>
+
+<script src="/static/jsQR.js"></script>
+<script>
+const $ = (s)=>document.querySelector(s);
+const api = (path, body)=>fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}).then(r=>r.json().then(j=>({ok:r.ok,j})));
+
+const CHIPS = ["i miei account google","pin della cie","wifi ufficio","home banking","codice 2fa google"];
+
+/* ---- LOCK ---- */
+$("#master").addEventListener("input", e=>{ $("#unlockBtn").disabled = !e.target.value; });
+$("#master").addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.value) doUnlock(); });
+$("#unlockBtn").addEventListener("click", doUnlock);
+
+async function doUnlock(){
+  $("#lockErr").textContent="";
+  $("#unlockBtn").disabled=true; $("#unlockBtn").textContent="Sblocco…";
+  const {ok,j} = await api("/api/unlock",{master:$("#master").value});
+  $("#unlockBtn").textContent="Sblocca vault";
+  if(!ok){ $("#lockErr").textContent = j.detail||"Errore"; $("#unlockBtn").disabled=false; return; }
+  $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
+  $("#pillDb").textContent = "🗄️ "+j.count+" voci";
+  $("#backendNote").textContent = "Embedding: "+j.embedding_backend+" · recupero locale e deterministico"
+    + (j.audio_ready ? " · 🎤 voce pronta" : "");
+  window.AUDIO_READY = !!j.audio_ready;
+  if(!j.audio_ready){ $("#micBtn").style.opacity=".5"; }
+  if(j.llm) $("#pillLlm").classList.remove("hidden");
+  renderChips();
+  switchTab("chat");
+  // carica impostazioni: applica auto-lock, default generatore, microfono
+  try{
+    const s=await fetch("/api/settings").then(r=>r.json());
+    SETTINGS=s;
+    if(s.mic_enabled===false && $("#micBtn")) $("#micBtn").style.display="none";
+    resetAutolock();
+  }catch(e){}
+  if(j.created){
+    addAI("Vault creato. Configuriamo subito i tuoi dati principali.");
+    openOnboarding();
+  } else {
+    addAI("Vault sbloccato. Scrivimi cosa ti serve, anche in modo informale.");
+  }
+}
+
+/* ---- CHAT ---- */
+function rowEl(cls){ const r=document.createElement("div"); r.className="row "+cls+" rise"; return r; }
+function addUser(text){
+  const r=rowEl("user"); const b=document.createElement("div"); b.className="bubble b-user"; b.textContent=text;
+  r.appendChild(b); $("#chat").appendChild(r); scroll();
+}
+function addAI(text, results, ambiguous){
+  const r=rowEl(""); const wrap=document.createElement("div"); wrap.style.maxWidth="88%";
+  const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="mind"; wrap.appendChild(tag);
+  const b=document.createElement("div"); b.className="bubble b-ai"; b.textContent=text; wrap.appendChild(b);
+  (results||[]).forEach(c=> wrap.appendChild(credCard(c, ambiguous)));
+  r.appendChild(wrap); $("#chat").appendChild(r); scroll();
+}
+function scroll(){ const m=$("#chat"); m.scrollTop=m.scrollHeight; }
+
+function labelLooksOtp(label){
+  const l=(label||"").toLowerCase();
+  if(l.includes("autor")) return false;
+  return ["otp","totp","2fa","mfa","authenticator","auth","one time","one-time"].some(h=>l.includes(h));
+}
+
+function credCard(c, picker){
+  const card=document.createElement("div"); card.className="cred rise";
+  card.innerHTML = `<div class="accent"></div><div class="title">🔑 <span>${esc(c.title)}</span></div>`;
+  if(picker){
+    const btn=document.createElement("button"); btn.className="pickbtn"; btn.textContent="Mostra questa →";
+    btn.onclick=async()=>{ const {j}=await api("/api/reveal",{text:String(c.id)}); addAI(c.title+":", [j], false); };
+    card.appendChild(btn);
+  } else {
+    (c.fields||[]).forEach(f=>{ if(!labelLooksOtp(f.label)) card.appendChild(maskedLine(f.label, f.value)); });
+    if(c.id!=null && (c.fields||[]).some(f=>labelLooksOtp(f.label))) attachTotp(card, c.id);
+    if(c.id!=null && c.fields){
+      const edit=document.createElement("button"); edit.className="pickbtn";
+      edit.style.background="rgba(167,139,250,.08)"; edit.style.borderColor="var(--violet)"; edit.style.color="var(--violet)";
+      edit.textContent="✎ Modifica / completa";
+      edit.onclick=()=>openEdit(c);
+      card.appendChild(edit);
+    }
+  }
+  return card;
+}
+
+/* widget 2FA live: codice a 6 cifre + countdown, ricalcolato in locale */
+async function attachTotp(card, id){
+  const {ok,j}=await api("/api/totp",{cred_id:id});
+  if(!ok || !j.otp || !j.otp.length) return;
+  j.otp.forEach(o=>{
+    const w=document.createElement("div"); w.className="totp";
+    if(o.error){ w.innerHTML=`<div class="k">${esc(o.label)} · 2FA</div><div class="terr">${esc(o.error)}</div>`; card.appendChild(w); return; }
+    w.innerHTML=`<div class="trow"><div><div class="k">${esc(o.label)} · 2FA</div><div class="tcode"></div></div><button class="iconbtn tcopy">⧉</button></div><div class="tbar"><i></i></div>`;
+    const codeEl=w.querySelector(".tcode"), bar=w.querySelector(".tbar i"), copy=w.querySelector(".tcopy");
+    let cur=o;
+    const paint=()=>{ codeEl.textContent=cur.code.slice(0,3)+" "+cur.code.slice(3); bar.style.width=Math.max(0,Math.round(cur.remaining/cur.period*100))+"%"; };
+    copy.onclick=async()=>{ try{await navigator.clipboard.writeText(cur.code);}catch(e){} copy.textContent="✓"; copy.style.color="var(--green)"; setTimeout(()=>{copy.textContent="⧉";copy.style.color="";},8000); };
+    paint(); card.appendChild(w);
+    const tick=setInterval(async()=>{
+      if(!document.body.contains(w)){ clearInterval(tick); return; }
+      cur.remaining-=1;
+      if(cur.remaining<=0){
+        const r=await api("/api/totp",{cred_id:id});
+        if(r.ok && r.j.otp){ const m=r.j.otp.find(x=>x.label===o.label); if(m && !m.error) cur=m; }
+      }
+      paint();
+    },1000);
+  });
+}
+
+function maskedLine(label, value){
+  const line=document.createElement("div"); line.className="credline";
+  const meta=document.createElement("div"); meta.className="meta";
+  meta.innerHTML=`<div class="k">${label}</div><div class="v">${"•".repeat(Math.min(value.length,14))}</div>`;
+  const vEl=meta.querySelector(".v");
+  const acts=document.createElement("div"); acts.className="acts";
+  let shown=false, hideT=null;
+  const eye=document.createElement("button"); eye.className="iconbtn"; eye.textContent="👁";
+  eye.onclick=()=>{ shown=!shown; vEl.textContent=shown?value:"•".repeat(Math.min(value.length,14)); vEl.classList.toggle("shown",shown);
+    clearTimeout(hideT); if(shown) hideT=setTimeout(()=>{shown=false;vEl.textContent="•".repeat(Math.min(value.length,14));vEl.classList.remove("shown");},15000); };
+  const copy=document.createElement("button"); copy.className="iconbtn"; copy.textContent="⧉";
+  copy.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){} copy.textContent="✓"; copy.style.color="var(--green)";
+    setTimeout(()=>{ navigator.clipboard.writeText("").catch(()=>{}); copy.textContent="⧉"; copy.style.color=""; },12000); };
+  acts.appendChild(eye); acts.appendChild(copy);
+  line.appendChild(meta); line.appendChild(acts);
+  return line;
+}
+
+async function send(){
+  const q=$("#q").value.trim(); if(!q) return;
+  // comando speciale: /clear svuota tutto il DB con conferma
+  if(q.toLowerCase()==="/clear"){
+    addUser(q); $("#q").value="";
+    promptClearAll();
+    return;
+  }
+  addUser(q); $("#q").value="";
+  const {ok,j}=await api("/api/query",{text:q});
+  if(!ok){ addAI(j.detail||"Errore."); return; }
+  addAI(j.reply, j.results, j.kind==="ambiguous");
+}
+$("#sendBtn").addEventListener("click", send);
+$("#q").addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
+
+function renderChips(){
+  const box=$("#chips"); box.innerHTML="";
+  CHIPS.forEach(c=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=c;
+    b.onclick=()=>{ $("#q").value=c; $("#q").focus(); }; box.appendChild(b); });
+}
+
+/* ---- ADD MODAL (campi dinamici) ---- */
+function addFieldRow(label, value){
+  const row=document.createElement("div"); row.className="fieldrow add-fieldrow";
+  const l=document.createElement("input"); l.className="field lbl-in add-flabel"; l.placeholder="Etichetta (es. Email, PIN…)"; l.value=label||"";
+  l.style.fontFamily="var(--disp)"; l.style.fontSize="11px"; l.style.letterSpacing=".5px";
+  const v=document.createElement("input"); v.className="field val-in add-fvalue"; v.placeholder="Valore"; v.value=value||"";
+  v.style.fontFamily="var(--mono)";
+  v.addEventListener("input", ()=>{
+    if(/^otpauth:\/\/totp\//i.test(v.value.trim())){
+      const o=parseOtpauth(v.value.trim());
+      if(o){ l.value="OTP (2FA)"; v.value=o.secret; if(!$("#f_title").value.trim() && (o.issuer||o.name)) $("#f_title").value=(o.issuer||o.name); checkAddValid(); }
+    }
+  });
+  const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕";
+  rm.onclick=()=>{ row.remove(); checkAddValid(); };
+  l.oninput=checkAddValid; v.oninput=checkAddValid;
+  row.appendChild(l); row.appendChild(v); row.appendChild(rm);
+  return row;
+}
+let editId=null;
+function resetAddModal(){
+  editId=null;
+  const gp=$("#genPop"); if(gp) gp.classList.add("hidden");
+  $("#addModalTitle").textContent="Nuova credenziale";
+  $("#saveCred").textContent="Salva nel vault";
+  $("#f_title").value=""; $("#f_tags").value="";
+  $("#addFields").innerHTML="";
+  $("#addFields").appendChild(addFieldRow("Email",""));
+  $("#addFields").appendChild(addFieldRow("Password",""));
+  checkAddValid();
+}
+function openEdit(c){
+  editId=c.id;
+  const gp=$("#genPop"); if(gp) gp.classList.add("hidden");
+  $("#addModalTitle").textContent="Modifica credenziale";
+  $("#saveCred").textContent="Salva modifiche";
+  $("#f_title").value=c.title||"";
+  $("#f_tags").value=(c.tags||[]).join(", ");
+  $("#addFields").innerHTML="";
+  // in modifica mostriamo TUTTI i campi (anche l'OTP, col secret, così è correggibile)
+  (c.fields&&c.fields.length ? c.fields : [{label:"",value:""}]).forEach(f=> $("#addFields").appendChild(addFieldRow(f.label, f.value)));
+  checkAddValid();
+  $("#modal").classList.remove("hidden");
+}
+function checkAddValid(){
+  const hasTitle = $("#f_title").value.trim().length>0;
+  const hasField = Array.from(document.querySelectorAll(".add-fvalue")).some(v=>v.value.trim().length>0);
+  $("#saveCred").disabled = !(hasTitle && hasField);
+}
+$("#f_title").addEventListener("input", checkAddValid);
+$("#addFieldRow").onclick=()=> $("#addFields").appendChild(addFieldRow("",""));
+$("#addOtpRow").onclick=()=>{ const r=addFieldRow("OTP (2FA)",""); $("#addFields").appendChild(r); const v=r.querySelector(".add-fvalue"); v.placeholder="Secret base32 dell'autenticatore"; v.focus(); };
+$("#addBtn").onclick=()=>{ resetAddModal(); $("#modal").classList.remove("hidden"); };
+
+/* ---- GENERATORE PASSWORD (tutto client-side, crypto-grade) ---- */
+function genPassword(len, up, low, dig, sym){
+  let pool="";
+  if(low) pool+="abcdefghijkmnpqrstuvwxyz";       // niente l/o per leggibilità
+  if(up)  pool+="ABCDEFGHJKLMNPQRSTUVWXYZ";        // niente I/O
+  if(dig) pool+="23456789";                        // niente 0/1
+  if(sym) pool+="!@#$%^&*()-_=+[]{}?";
+  if(!pool) return "";
+  const arr=new Uint32Array(len); crypto.getRandomValues(arr);
+  let out=""; for(let i=0;i<len;i++) out+=pool[arr[i]%pool.length];
+  return out;
+}
+function buildGenPop(){
+  const pop=$("#genPop"); pop.innerHTML="";
+  const dLen=(SETTINGS && SETTINGS.gen_length) ? SETTINGS.gen_length : 20;
+  const dSym=(SETTINGS && SETTINGS.gen_symbols!==undefined) ? SETTINGS.gen_symbols : true;
+  pop.innerHTML=`
+    <div class="gen-out">
+      <input id="genOut" class="field" readonly style="margin-top:0" />
+      <button id="genCopy" class="iconbtn" title="Copia">⧉</button>
+      <button id="genRefresh" class="iconbtn" title="Rigenera">↻</button>
+    </div>
+    <div class="gen-row">Lunghezza <input id="genLen" type="range" min="8" max="40" value="${dLen}"><span class="len" id="genLenVal">${dLen}</span></div>
+    <div class="gen-toggles">
+      <label class="gen-tg"><input type="checkbox" id="genUp" checked> A-Z</label>
+      <label class="gen-tg"><input type="checkbox" id="genLow" checked> a-z</label>
+      <label class="gen-tg"><input type="checkbox" id="genDig" checked> 0-9</label>
+      <label class="gen-tg"><input type="checkbox" id="genSym" ${dSym?"checked":""}> !@#</label>
+    </div>
+    <button id="genUse" class="btn" style="margin-top:12px;background:var(--accent)">Usa questa password</button>`;
+  const regen=()=>{
+    const len=+$("#genLen").value; $("#genLenVal").textContent=len;
+    $("#genOut").value=genPassword(len, $("#genUp").checked, $("#genLow").checked, $("#genDig").checked, $("#genSym").checked);
+  };
+  pop.querySelectorAll("input").forEach(el=> el.addEventListener("input", regen));
+  $("#genRefresh").onclick=regen;
+  $("#genCopy").onclick=async()=>{ try{await navigator.clipboard.writeText($("#genOut").value);}catch(e){}
+    $("#genCopy").textContent="✓"; $("#genCopy").style.color="var(--green)"; setTimeout(()=>{$("#genCopy").textContent="⧉";$("#genCopy").style.color="";},6000); };
+  $("#genUse").onclick=()=>{
+    const pw=$("#genOut").value; if(!pw) return;
+    // cerca un campo Password vuoto, altrimenti il primo campo Password, altrimenti ne crea uno
+    let target=null;
+    document.querySelectorAll(".add-fieldrow").forEach(row=>{
+      const lab=row.querySelector(".add-flabel").value.trim().toLowerCase();
+      const val=row.querySelector(".add-fvalue");
+      if(lab.includes("pass")){ if(!target || (!val.value && target.value)) target=val; }
+    });
+    if(target){ target.value=pw; }
+    else { const r=addFieldRow("Password", pw); $("#addFields").appendChild(r); }
+    pop.classList.add("hidden"); checkAddValid();
+  };
+  regen();
+}
+$("#genBtn").onclick=()=>{
+  const pop=$("#genPop");
+  if(pop.classList.contains("hidden")){ buildGenPop(); pop.classList.remove("hidden"); }
+  else pop.classList.add("hidden");
+};
+$("#closeModal").onclick=()=>$("#modal").classList.add("hidden");
+$("#saveCred").onclick=async()=>{
+  const fields=[];
+  document.querySelectorAll(".add-fieldrow").forEach(row=>{
+    const label = row.querySelector(".add-flabel").value.trim();
+    const value = row.querySelector(".add-fvalue").value;
+    if(label || value) fields.push({label: label||"Valore", value});
+  });
+  const payload={title:$("#f_title").value, fields, tags:$("#f_tags").value};
+  let res;
+  if(editId!=null){ payload.id=editId; res=await api("/api/update",payload); }
+  else { res=await api("/api/add",payload); }
+  const {ok,j}=res;
+  if(ok){
+    $("#pillDb").textContent="🗄️ "+j.count+" voci"; $("#modal").classList.add("hidden");
+    addAI(editId!=null ? "Credenziale aggiornata. Rifai la ricerca per vederla completa."
+                       : "Salvata nel vault locale. Ora puoi chiederla in linguaggio naturale.");
+    editId=null;
+    if(!$("#dbPanel").classList.contains("hidden")) loadDb();
+  } else { alert(j.detail||"Errore"); }
+};
+
+$("#lockAgain").onclick=async()=>{ await api("/api/lock"); location.reload(); };
+
+/* ---- BACKUP ---- */
+$("#backupBtn").onclick=async()=>{
+  try{
+    const res = await fetch("/api/backup");
+    if(!res.ok){ addAI("Backup non riuscito."); return; }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "vaultmind-backup.json";
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    addAI("Backup scaricato: un file cifrato che puoi copiare su un altro dispositivo. Per ripristinarlo, dalla schermata di blocco usa \u201cRipristina da backup\u201d e poi sblocca con questa stessa master password.");
+  }catch(e){ addAI("Backup non riuscito."); }
+};
+
+/* ---- RESTORE (dalla schermata di blocco) ---- */
+$("#restoreBtn").onclick=()=>$("#restoreFile").click();
+$("#restoreFile").addEventListener("change", async (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  const content = await file.text();
+  const {ok,j} = await api("/api/restore",{content});
+  if(ok){ $("#lockErr").style.color="var(--green)"; $("#lockErr").textContent="Backup ripristinato. Sblocca con la master password del dispositivo di origine."; }
+  else { $("#lockErr").style.color=""; $("#lockErr").textContent = j.detail||"Ripristino non riuscito."; }
+  e.target.value="";
+});
+
+/* ---- IMPORT INTELLIGENTE ---- */
+$("#importBtn").onclick=()=>{ resetImport(); $("#importModal").classList.remove("hidden"); };
+$("#closeImport").onclick=()=>$("#importModal").classList.add("hidden");
+$("#backToText").onclick=()=>{ $("#importStep2").classList.add("hidden"); $("#importStep1").classList.remove("hidden"); };
+$("#importText").addEventListener("input", e=>{ $("#parseBtn").disabled = !e.target.value.trim(); });
+
+function resetImport(){
+  $("#importText").value=""; $("#parseBtn").disabled=true;
+  $("#importList").innerHTML=""; $("#importStep2").classList.add("hidden"); $("#importStep1").classList.remove("hidden");
+}
+
+$("#parseBtn").onclick=async()=>{
+  $("#parseBtn").disabled=true; $("#parseBtn").textContent="Analizzo…";
+  const {ok,j} = await api("/api/import_parse",{text:$("#importText").value});
+  $("#parseBtn").textContent="Analizza"; $("#parseBtn").disabled=false;
+  if(!ok){ alert(j.detail||"Errore"); return; }
+  renderImportList(j.entries, j.source);
+  $("#importStep1").classList.add("hidden"); $("#importStep2").classList.remove("hidden");
+};
+
+/* ---- IMPORT DA CSV (Bitwarden/1Password/KeePass) ---- */
+$("#csvBtn").onclick=()=>$("#csvFile").click();
+$("#csvFile").addEventListener("change", async (e)=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  let content;
+  try{ content=await file.text(); }catch(err){ alert("Non riesco a leggere il file."); return; }
+  const {ok,j}=await api("/api/import_csv",{content});
+  if(!ok){ alert(j.detail||"Errore nella lettura del CSV"); return; }
+  if(!j.entries || !j.entries.length){ alert("Nessuna voce riconosciuta nel CSV. Formato non supportato?"); return; }
+  renderImportList(j.entries, j.source);
+  $("#importStep1").classList.add("hidden"); $("#importStep2").classList.remove("hidden");
+});
+
+function renderImportList(entries, source){
+  const box=$("#importList"); box.innerHTML="";
+  $("#importSourceNote").innerHTML = entries.length
+    ? `${entries.length} voci proposte (estrazione: <b>${esc(source)}</b>). Controlla le etichette e i valori, correggi se serve, poi salva.`
+    : "Nessuna voce riconosciuta nel testo.";
+  entries.forEach((e, i)=>{
+    const card=document.createElement("div"); card.className="cred imp-card"; card.style.marginTop="10px"; card.dataset.i=i;
+    card.innerHTML = `<div class="accent" style="background:var(--violet)"></div>`;
+    const head=document.createElement("div"); head.style.display="flex"; head.style.alignItems="center"; head.style.gap="8px"; head.style.marginBottom="8px";
+    const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=true; chk.className="imp-chk";
+    const ttlIn=document.createElement("input"); ttlIn.className="field imp-title"; ttlIn.value=e.title||""; ttlIn.style.padding="7px 10px"; ttlIn.style.fontSize="14px"; ttlIn.style.fontWeight="600"; ttlIn.style.color="#fff";
+    head.appendChild(chk); head.appendChild(ttlIn); card.appendChild(head);
+
+    const fieldsBox=document.createElement("div"); fieldsBox.className="imp-fields";
+    (e.fields&&e.fields.length ? e.fields : [{label:"",value:""}]).forEach(f=> fieldsBox.appendChild(impFieldRow(f.label, f.value)));
+    card.appendChild(fieldsBox);
+
+    const addRowBtn=document.createElement("button"); addRowBtn.className="btn"; addRowBtn.textContent="+ Campo";
+    addRowBtn.style.background="transparent"; addRowBtn.style.border="1px dashed var(--violet)"; addRowBtn.style.color="var(--violet)";
+    addRowBtn.style.marginTop="8px"; addRowBtn.style.padding="6px 10px"; addRowBtn.style.fontSize="12px";
+    addRowBtn.onclick=()=> fieldsBox.appendChild(impFieldRow("",""));
+    card.appendChild(addRowBtn);
+
+    const tagsRow=document.createElement("div"); tagsRow.style.marginTop="8px";
+    const tagsIn=document.createElement("input"); tagsIn.className="field imp-tags"; tagsIn.style.padding="7px 10px"; tagsIn.style.fontSize="13px";
+    tagsIn.placeholder="Tag (virgola)"; tagsIn.value=(e.tags||[]).join(", ");
+    tagsRow.appendChild(tagsIn); card.appendChild(tagsRow);
+
+    box.appendChild(card);
+  });
+  $("#commitBtn").disabled = entries.length===0;
+}
+
+function impFieldRow(label, value){
+  const row=document.createElement("div"); row.className="fieldrow imp-fieldrow";
+  const l=document.createElement("input"); l.className="field lbl-in imp-flabel"; l.placeholder="Etichetta (es. PIN)"; l.value=label||"";
+  l.style.fontFamily="var(--disp)"; l.style.fontSize="11px"; l.style.letterSpacing=".5px";
+  const v=document.createElement("input"); v.className="field val-in imp-fvalue"; v.placeholder="Valore"; v.value=value||"";
+  v.style.fontFamily="var(--mono)";
+  if(!value){ v.style.borderColor="#FBBF24"; }
+  v.oninput=()=>{ v.style.borderColor="var(--border)"; };
+  const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕";
+  rm.onclick=()=> row.remove();
+  row.appendChild(l); row.appendChild(v); row.appendChild(rm);
+  return row;
+}
+
+$("#commitBtn").onclick=async()=>{
+  const cards = $("#importList").querySelectorAll(".imp-card");
+  const entries=[];
+  cards.forEach(card=>{
+    const chk = card.querySelector(".imp-chk"); if(!chk.checked) return;
+    const title = card.querySelector(".imp-title").value.trim();
+    const tags = card.querySelector(".imp-tags").value.split(",").map(t=>t.trim()).filter(Boolean);
+    const fields=[];
+    card.querySelectorAll(".imp-fieldrow").forEach(row=>{
+      const label = row.querySelector(".imp-flabel").value.trim();
+      const value = row.querySelector(".imp-fvalue").value;
+      if(label || value) fields.push({label: label||"Valore", value});
+    });
+    if(title || fields.length) entries.push({title, fields, tags});
+  });
+  if(!entries.length){ alert("Seleziona almeno una voce."); return; }
+  $("#commitBtn").disabled=true; $("#commitBtn").textContent="Salvo…";
+  const {ok,j} = await api("/api/import_commit",{entries});
+  $("#commitBtn").textContent="Salva le voci selezionate"; $("#commitBtn").disabled=false;
+  if(ok){ $("#pillDb").textContent="🗄️ "+j.count+" voci"; $("#importModal").classList.add("hidden");
+    addAI(`Importate ${j.saved} voci nel vault locale. Ora puoi chiederle in chat.`); }
+  else { alert(j.detail||"Errore nel salvataggio"); }
+};
+
+/* ---- INPUT VOCALE (Whisper locale, opzionale) ---- */
+let mediaRec=null, audioChunks=[], recording=false;
+$("#micBtn").onclick=async()=>{
+  if(!window.AUDIO_READY){
+    addAI("Input vocale non attivo. Per abilitarlo (tutto in locale): nella cartella dell'app esegui  pip install -r requirements-audio.txt  e riavvia. Al primo uso scarica il modello, poi funziona offline.");
+    return;
+  }
+  if(recording){ try{ mediaRec.stop(); }catch(e){} return; }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ addAI("Microfono non disponibile in questo browser."); return; }
+  try{
+    const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+    mediaRec=new MediaRecorder(stream); audioChunks=[];
+    mediaRec.ondataavailable=e=>{ if(e.data && e.data.size) audioChunks.push(e.data); };
+    mediaRec.onstop=async()=>{
+      stream.getTracks().forEach(t=>t.stop());
+      recording=false; $("#micBtn").classList.remove("rec"); $("#micBtn").textContent="⏳";
+      const blob=new Blob(audioChunks,{type:(mediaRec.mimeType||"audio/webm")});
+      const fd=new FormData(); fd.append("file", blob, "audio.webm");
+      try{
+        const res=await fetch("/api/transcribe",{method:"POST",body:fd});
+        const j=await res.json(); $("#micBtn").textContent="🎤";
+        if(!res.ok){ addAI(j.detail||"Trascrizione non riuscita."); return; }
+        if(j.text){ $("#q").value=j.text; $("#q").focus(); }
+        else addAI("Non ho capito l'audio, riprova.");
+      }catch(e){ $("#micBtn").textContent="🎤"; addAI("Errore durante la trascrizione."); }
+    };
+    mediaRec.start(); recording=true; $("#micBtn").textContent="⏹"; $("#micBtn").classList.add("rec");
+  }catch(e){ addAI("Permesso microfono negato o non disponibile."); }
+};
+
+/* ---- ONBOARDING (primo avvio): CIE + Home banking precompilati ---- */
+const CIE_TEMPLATE  = {icon:"🪪", title:"CIE — Carta d'identità elettronica", tags:"cie, documento, identita, spid",
+   fields:[["Numero documento",""],["PIN",""],["PUK",""],["Scadenza",""]]};
+const BANK_TEMPLATE = {icon:"🏦", tags:"banca, conto, homebanking",
+   fields:[["Banca (nome)",""],["Utente / Codice cliente",""],["Password",""],["PIN dispositivo",""],["IBAN",""]]};
+
+function onbSection(kind, icon, titleText, fields, tags, removable){
+  const sec=document.createElement("div"); sec.className="onb-sec"; sec.dataset.kind=kind; sec.dataset.tags=tags;
+  const head=document.createElement("label"); head.className="onb-head";
+  const chk=document.createElement("input"); chk.type="checkbox"; chk.className="onb-chk"; chk.checked=true; head.appendChild(chk);
+  const ttl=document.createElement("span"); ttl.innerHTML=` ${icon} ${esc(titleText)}`; ttl.style.flex="1"; head.appendChild(ttl);
+  if(removable){ const rm=document.createElement("button"); rm.className="iconbtn"; rm.textContent="✕"; rm.style.marginLeft="auto";
+    rm.onclick=(e)=>{ e.preventDefault(); sec.remove(); }; head.appendChild(rm); }
+  sec.appendChild(head);
+  const fb=document.createElement("div"); fb.className="onb-fields"; fb.style.marginTop="8px";
+  fields.forEach(([l,v])=> fb.appendChild(onbFieldRow(l,v)));
+  sec.appendChild(fb);
+  return sec;
+}
+
+function openOnboarding(){
+  const box=$("#onboardList"); box.innerHTML="";
+  // CIE — voce singola
+  box.appendChild(onbSection("cie", CIE_TEMPLATE.icon, CIE_TEMPLATE.title, CIE_TEMPLATE.fields, CIE_TEMPLATE.tags, false));
+  // Home banking — ripetibile (puoi averne più di una)
+  const banks=document.createElement("div"); banks.id="onbBanks";
+  banks.appendChild(onbSection("bank", BANK_TEMPLATE.icon, "Home banking", BANK_TEMPLATE.fields, BANK_TEMPLATE.tags, false));
+  box.appendChild(banks);
+  const addBank=document.createElement("button"); addBank.className="btn";
+  addBank.style.cssText="background:transparent;border:1px dashed var(--cyan);color:var(--cyan);margin-top:10px;padding:8px";
+  addBank.textContent="+ Aggiungi un'altra banca";
+  addBank.onclick=()=> banks.appendChild(onbSection("bank", BANK_TEMPLATE.icon, "Home banking", BANK_TEMPLATE.fields, BANK_TEMPLATE.tags, true));
+  box.appendChild(addBank);
+  $("#onboardModal").classList.remove("hidden");
+}
+function onbFieldRow(label, value){
+  const row=document.createElement("div"); row.className="fieldrow onb-fieldrow";
+  const l=document.createElement("input"); l.className="field lbl-in onb-flabel"; l.value=label||"";
+  l.style.fontFamily="var(--disp)"; l.style.fontSize="11px"; l.style.letterSpacing=".5px";
+  const v=document.createElement("input"); v.className="field val-in onb-fvalue"; v.placeholder="Valore (lascia vuoto se non ce l'hai)"; v.value=value||"";
+  v.style.fontFamily="var(--mono)";
+  const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕"; rm.onclick=()=>row.remove();
+  row.appendChild(l); row.appendChild(v); row.appendChild(rm);
+  return row;
+}
+$("#closeOnboard").onclick=$("#onboardSkip").onclick=()=>{ $("#onboardModal").classList.add("hidden");
+  addAI("Saltato. Puoi aggiungere le voci quando vuoi col pulsante ＋. Scrivimi pure cosa ti serve."); };
+$("#onboardSave").onclick=async()=>{
+  $("#onboardSave").disabled=true; $("#onboardSave").textContent="Salvo…";
+  let saved=0;
+  for(const sec of $("#onboardList").querySelectorAll(".onb-sec")){
+    if(!sec.querySelector(".onb-chk").checked) continue;
+    const fields=[];
+    sec.querySelectorAll(".onb-fieldrow").forEach(row=>{
+      const label=row.querySelector(".onb-flabel").value.trim();
+      const value=row.querySelector(".onb-fvalue").value;
+      if(value.trim()) fields.push({label: label||"Valore", value});  // salviamo solo i campi compilati
+    });
+    if(!fields.length) continue;
+    let title, tags=sec.dataset.tags;
+    if(sec.dataset.kind==="bank"){
+      const bankName=(fields.find(f=>/banca/i.test(f.label))||{}).value||"";
+      title = bankName ? `Home banking ${bankName.trim()}` : "Home banking";
+      if(bankName.trim()) tags = tags + ", " + bankName.trim().toLowerCase();
+    } else {
+      title = CIE_TEMPLATE.title;
+    }
+    const {ok,j}=await api("/api/add",{title, fields, tags});
+    if(ok){ saved++; $("#pillDb").textContent="🗄️ "+j.count+" voci"; }
+  }
+  $("#onboardSave").disabled=false; $("#onboardSave").textContent="Salva e inizia";
+  $("#onboardModal").classList.add("hidden");
+  addAI(saved ? `Salvate ${saved} voci. Ora puoi chiederle: prova "pin della cie" o "home banking".`
+              : "Niente da salvare (nessun campo compilato). Puoi aggiungere le voci col pulsante ＋ quando vuoi.");
+};
+
+/* ---- IMPORT 2FA DA QR (decodifica 100% locale nel browser) ---- */
+const B32="ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+function b32encode(bytes){
+  let bits=0,val=0,out="";
+  for(const b of bytes){ val=(val<<8)|b; bits+=8; while(bits>=5){ out+=B32[(val>>>(bits-5))&31]; bits-=5; } }
+  if(bits>0) out+=B32[(val<<(5-bits))&31];
+  return out;
+}
+function parseOtpauth(uri){
+  const m=/^otpauth:\/\/totp\/([^?]*)\?(.*)$/i.exec(uri); if(!m) return null;
+  const label=decodeURIComponent(m[1]||"");
+  const params=new URLSearchParams(m[2]);
+  const secret=(params.get("secret")||"").replace(/\s/g,"");
+  if(!secret) return null;
+  const issuer=params.get("issuer")||(label.includes(":")?label.split(":")[0]:"");
+  const name=label.includes(":")?label.split(":").slice(1).join(":"):label;
+  return {issuer:issuer.trim(), name:name.trim(), secret};
+}
+/* parser minimale del protobuf di Google Authenticator (otpauth-migration) */
+function _vint(buf,p){ let s=0,r=0,b; do{ b=buf[p.i++]; r|=(b&0x7f)<<s; s+=7; }while(b&0x80); return r>>>0; }
+function parseMigration(b64){
+  let bin; try{ bin=atob(b64); }catch(e){ return []; }
+  const buf=new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) buf[i]=bin.charCodeAt(i);
+  const out=[]; const p={i:0}; const dec=new TextDecoder();
+  while(p.i<buf.length){
+    const key=_vint(buf,p), field=key>>3, wt=key&7;
+    if(field===1 && wt===2){
+      const len=_vint(buf,p); const end=p.i+len; const sub={i:p.i};
+      let secret=null,name="",issuer="";
+      while(sub.i<end){
+        const k=_vint(buf,sub), f=k>>3, w=k&7;
+        if(w===2){ const l=_vint(buf,sub); const slice=buf.slice(sub.i,sub.i+l); sub.i+=l;
+          if(f===1) secret=slice; else if(f===2) name=dec.decode(slice); else if(f===3) issuer=dec.decode(slice);
+        } else if(w===0){ _vint(buf,sub); } else { break; } }
+      p.i=end;
+      if(secret) out.push({issuer:(issuer||"").trim(), name:(name||"").trim(), secret:b32encode(secret)});
+    } else if(wt===0){ _vint(buf,p); }
+    else if(wt===2){ const len=_vint(buf,p); p.i+=len; }
+    else break;
+  }
+  return out;
+}
+function decodeQRFile(file){
+  return new Promise((res,rej)=>{
+    const img=new Image(); const url=URL.createObjectURL(file);
+    img.onload=()=>{ const cv=document.createElement("canvas"); cv.width=img.naturalWidth; cv.height=img.naturalHeight;
+      const ctx=cv.getContext("2d"); ctx.drawImage(img,0,0);
+      let data; try{ data=ctx.getImageData(0,0,cv.width,cv.height); }catch(e){ URL.revokeObjectURL(url); return rej(e); }
+      URL.revokeObjectURL(url);
+      const code=(typeof jsQR==="function") ? jsQR(data.data,data.width,data.height) : null;
+      res(code?code.data:null);
+    };
+    img.onerror=()=>{ URL.revokeObjectURL(url); rej(new Error("immagine")); };
+    img.src=url;
+  });
+}
+/* Accorpa il secret 2FA a una voce esistente con lo stesso nome, altrimenti la crea.
+   Risolve il caso "Epic Games": il 2FA finisce sulla credenziale completa, non su una voce spoglia. */
+async function mergeOrCreateOtp(issuer, name, secret){
+  const q=(issuer||name||"").trim();
+  if(q){
+    const {ok,j}=await api("/api/query",{text:q});
+    if(ok && j.kind==="single" && j.results[0]){
+      const r=j.results[0];
+      const fields=(r.fields||[]).filter(f=>!labelLooksOtp(f.label)).concat([{label:"OTP (2FA)", value:secret}]);
+      const u=await api("/api/update",{id:r.id, title:r.title, fields, tags:(r.tags||[]).join(", ")});
+      if(u.ok){ $("#pillDb").textContent="🗄️ "+u.j.count+" voci"; return {merged:true, title:r.title}; }
+    }
+  }
+  const title=(issuer && name && issuer!==name) ? `${issuer} (${name})` : (issuer||name||"Account 2FA");
+  const tags=[issuer,"2fa","otp"].filter(Boolean).join(", ");
+  const a=await api("/api/add",{title, fields:[{label:"OTP (2FA)", value:secret}], tags});
+  if(a.ok) $("#pillDb").textContent="🗄️ "+a.j.count+" voci";
+  return {merged:false, title};
+}
+
+$("#qrBtn").onclick=()=>$("#qrFile").click();
+$("#qrFile").addEventListener("change", async (e)=>{
+  const file=e.target.files[0]; e.target.value=""; if(!file) return;
+  let data;
+  try{ data=await decodeQRFile(file); }catch(err){ alert("Non riesco a leggere l'immagine."); return; }
+  if(!data){ alert("Nessun QR trovato. Assicurati che sia ben inquadrato e a fuoco."); return; }
+  if(/^otpauth-migration:/i.test(data)){
+    const m=/[?&]data=([^&]+)/.exec(data);
+    const list=m?parseMigration(decodeURIComponent(m[1])):[];
+    if(!list.length){ alert("QR di export riconosciuto ma nessun account leggibile."); return; }
+    const names=list.map(o=>"• "+((o.issuer||o.name)||"(senza nome)")).join("\n");
+    if(!confirm(`Trovati ${list.length} account 2FA:\n\n${names}\n\nLi importo? Se esiste già una voce con lo stesso nome, ci aggiungo il 2FA; altrimenti la creo.`)) return;
+    let merged=0, created=0;
+    for(const o of list){
+      const r=await mergeOrCreateOtp(o.issuer, o.name, o.secret);
+      if(r.merged) merged++; else created++;
+    }
+    $("#modal").classList.add("hidden");
+    addAI(`Import 2FA completato: ${merged} accorpati a voci esistenti, ${created} nuove voci. Chiedi p.es. "codice 2fa <nome>" per il codice live.`);
+  } else if(/^otpauth:\/\/totp\//i.test(data)){
+    const o=parseOtpauth(data);
+    if(!o){ alert("QR otpauth non valido."); return; }
+    if($("#modal").classList.contains("hidden")){ resetAddModal(); $("#modal").classList.remove("hidden"); }
+    if(!$("#f_title").value.trim()) $("#f_title").value=(o.issuer||o.name||"");
+    const row=addFieldRow("OTP (2FA)", o.secret); $("#addFields").appendChild(row); checkAddValid();
+    addAI("Secret 2FA letto dal QR e inserito nel form. Controlla il titolo e salva.");
+  } else {
+    alert("Il QR non contiene credenziali 2FA (atteso un codice otpauth://).");
+  }
+});
+
+function esc(s){ return (s||"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
+
+/* ================= TAB NAVIGATION ================= */
+function switchTab(tab){
+  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===tab));
+  const isChat = tab==="chat";
+  $("#chat").classList.toggle("hidden", !isChat);
+  $("#chips").classList.toggle("hidden", !isChat);
+  document.querySelector(".composer").classList.toggle("hidden", !isChat);
+  $("#dbPanel").classList.toggle("hidden", isChat);
+  if(!isChat) loadDb();
+}
+document.querySelectorAll(".tab-btn").forEach(b=> b.addEventListener("click", ()=> switchTab(b.dataset.tab)));
+
+/* ===== MENU HAMBURGER ===== */
+$("#menuBtn").addEventListener("click", (e)=>{ e.stopPropagation(); $("#mainMenu").classList.toggle("hidden"); $("#themeMenu").classList.add("hidden"); });
+document.querySelectorAll("#mainMenu button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const act=btn.dataset.act; $("#mainMenu").classList.add("hidden");
+    if(act==="chat") switchTab("chat");
+    else if(act==="db") switchTab("db");
+    else if(act==="import"){ resetImport(); $("#importModal").classList.remove("hidden"); }
+    else if(act==="backup") $("#backupBtn").click();
+    else if(act==="lock") $("#lockAgain").click();
+    else if(act==="settings") openSettings();
+  });
+});
+document.addEventListener("click",(e)=>{
+  if(!$("#mainMenu").classList.contains("hidden") && !e.target.closest("#mainMenu") && e.target.id!=="menuBtn")
+    $("#mainMenu").classList.add("hidden");
+});
+
+/* ===== IMPOSTAZIONI ===== */
+let SETTINGS={};
+function setSw(el,on){ el.classList.toggle("on",!!on); }
+async function openSettings(){
+  const {ok,j}=await fetch("/api/settings").then(r=>r.json().then(d=>({ok:r.ok,j:d})));
+  if(ok){
+    SETTINGS=j;
+    $("#setAutolock").value=String(j.autolock_minutes ?? 10);
+    setSw($("#swOllama"), j.use_ollama);
+    setSw($("#swMic"), j.mic_enabled);
+    $("#setGenLen").value=String(j.gen_length ?? 20);
+    setSw($("#swGenSym"), j.gen_symbols);
+    // stato reale componenti
+    const os=$("#ollamaStatus"), ms=$("#micStatus");
+    os.textContent=j._ollama_available?"attivo":"non rilevato"; os.className="set-status "+(j._ollama_available?"ok":"off");
+    ms.textContent=j._audio_available?"pronto":"non installato"; ms.className="set-status "+(j._audio_available?"ok":"off");
+  }
+  $("#cmMsg").textContent=""; $("#setMsg").textContent="";
+  $("#changeMasterBox").classList.add("hidden");
+  $("#setModal").classList.remove("hidden");
+}
+$("#setClose").onclick=()=>$("#setModal").classList.add("hidden");
+async function saveSetting(patch){
+  const {ok,j}=await api("/api/settings",patch);
+  if(ok){ SETTINGS=j.settings; flashSet("Salvato.","ok"); }
+  else flashSet("Errore nel salvataggio.","err");
+}
+function flashSet(msg,kind){ const m=$("#setMsg"); m.textContent=msg; m.className="set-msg "+kind; setTimeout(()=>{m.textContent="";},2500); }
+
+$("#setAutolock").addEventListener("change",e=>{ saveSetting({autolock_minutes:parseInt(e.target.value)}); resetAutolock(); });
+$("#setGenLen").addEventListener("change",e=>saveSetting({gen_length:parseInt(e.target.value)}));
+$("#swOllama").addEventListener("click",()=>{ const on=!$("#swOllama").classList.contains("on"); setSw($("#swOllama"),on); saveSetting({use_ollama:on}); });
+$("#swMic").addEventListener("click",()=>{ const on=!$("#swMic").classList.contains("on"); setSw($("#swMic"),on); saveSetting({mic_enabled:on}); applyMicSetting(on); });
+$("#swGenSym").addEventListener("click",()=>{ const on=!$("#swGenSym").classList.contains("on"); setSw($("#swGenSym"),on); saveSetting({gen_symbols:on}); });
+$("#setOpenImport").onclick=()=>{ $("#setModal").classList.add("hidden"); resetImport(); $("#importModal").classList.remove("hidden"); };
+
+/* cambio master password */
+$("#openChangeMaster").onclick=()=>$("#changeMasterBox").classList.toggle("hidden");
+$("#cmSave").onclick=async()=>{
+  const o=$("#cmOld").value, n=$("#cmNew").value, n2=$("#cmNew2").value;
+  const msg=$("#cmMsg");
+  if(n.length<8){ msg.textContent="La nuova password deve avere almeno 8 caratteri."; msg.className="set-msg err"; return; }
+  if(n!==n2){ msg.textContent="Le due nuove password non coincidono."; msg.className="set-msg err"; return; }
+  const {ok,j}=await api("/api/change_master",{old_master:o,new_master:n});
+  if(ok){ msg.textContent="Password aggiornata."; msg.className="set-msg ok";
+    $("#cmOld").value=$("#cmNew").value=$("#cmNew2").value="";
+    setTimeout(()=>$("#changeMasterBox").classList.add("hidden"),1500); }
+  else { msg.textContent=j.detail||"Errore."; msg.className="set-msg err"; }
+};
+
+/* applica microfono: mostra/nasconde il bottone dettatura se presente */
+function applyMicSetting(on){
+  const mic=document.querySelector("#micBtn, .mic-btn, [data-mic]");
+  if(mic) mic.style.display = on ? "" : "none";
+}
+
+/* ===== AUTO-LOCK per inattività ===== */
+let _autolockTimer=null;
+function resetAutolock(){
+  if(_autolockTimer) clearTimeout(_autolockTimer);
+  const mins=(SETTINGS.autolock_minutes ?? 10);
+  if(!mins || mins<=0) return;
+  _autolockTimer=setTimeout(async()=>{ await api("/api/lock"); location.reload(); }, mins*60*1000);
+}
+["click","keydown","mousemove","touchstart"].forEach(ev=>
+  document.addEventListener(ev, ()=>{ if(!$("#app").classList.contains("hidden")) resetAutolock(); }, {passive:true}));
+
+
+/* ================= DATABASE GUI ================= */
+let DB_ENTRIES=[];
+async function loadDb(){
+  const {ok,j} = await fetch("/api/list").then(r=>r.json().then(d=>({ok:r.ok,j:d})));
+  if(!ok) return;
+  DB_ENTRIES = j.entries || [];
+  renderDb();
+}
+function renderDb(){
+  const filter=($("#dbFilter").value||"").trim().toLowerCase();
+  const list = filter
+    ? DB_ENTRIES.filter(c =>
+        (c.title||"").toLowerCase().includes(filter) ||
+        (c.tags||[]).some(t=>t.toLowerCase().includes(filter)))
+    : DB_ENTRIES;
+  const grid = $("#dbGrid"); grid.innerHTML="";
+  if(!list.length){
+    $("#dbEmpty").textContent = filter ? "Nessuna voce corrisponde al filtro." : "Nessuna voce nel vault.";
+    $("#dbEmpty").classList.remove("hidden"); return;
+  }
+  $("#dbEmpty").classList.add("hidden");
+  list.forEach(c => grid.appendChild(dbCard(c)));
+}
+$("#dbFilter").addEventListener("input", renderDb);
+
+function dbCard(c){
+  const card=document.createElement("div"); card.className="cred dbcard rise"; card.id="dbcard-"+c.id;
+  card.innerHTML=`<div class="accent"></div>`;
+
+  const head=document.createElement("div");
+  head.style.cssText="display:flex;align-items:flex-start;justify-content:space-between;gap:8px";
+  const titleEl=document.createElement("div"); titleEl.className="dbtitle"; titleEl.innerHTML="🔑 "+esc(c.title);
+  const acts=document.createElement("div"); acts.style.cssText="display:flex;gap:4px;flex-shrink:0";
+  const editBtn=document.createElement("button"); editBtn.className="iconbtn"; editBtn.title="Modifica"; editBtn.textContent="✎";
+  editBtn.style.cssText="border-color:var(--violet);color:var(--violet)"; editBtn.onclick=()=>openEdit(c);
+  const delBtn=document.createElement("button"); delBtn.className="iconbtn"; delBtn.title="Elimina"; delBtn.textContent="🗑";
+  delBtn.style.cssText="border-color:#FCA5A5;color:#FCA5A5"; delBtn.onclick=()=>showDeleteConfirm(card,c);
+  acts.appendChild(editBtn); acts.appendChild(delBtn);
+  head.appendChild(titleEl); head.appendChild(acts); card.appendChild(head);
+
+  if(c.tags && c.tags.length){
+    const tr=document.createElement("div"); tr.className="dbtags";
+    c.tags.forEach(t=>{ const s=document.createElement("span"); s.className="dbtag"; s.textContent=t; tr.appendChild(s); });
+    card.appendChild(tr);
+  }
+
+  const fb=document.createElement("div"); fb.style.cssText="display:flex;flex-direction:column;gap:4px;margin-top:4px";
+  (c.fields||[]).forEach(f=>{ if(!labelLooksOtp(f.label)) fb.appendChild(maskedLine(f.label, f.value)); });
+  card.appendChild(fb);
+  if((c.fields||[]).some(f=>labelLooksOtp(f.label))) attachTotp(card, c.id);
+  return card;
+}
+
+function showDeleteConfirm(card, c){
+  const ex=card.querySelector(".del-confirm"); if(ex){ ex.remove(); return; }
+  const box=document.createElement("div"); box.className="del-confirm";
+  const msg=document.createElement("span"); msg.className="msg"; msg.textContent="Eliminare questa voce?";
+  const btns=document.createElement("div"); btns.style.cssText="display:flex;gap:6px";
+  const yes=document.createElement("button"); yes.className="iconbtn"; yes.textContent="Sì, elimina";
+  yes.style.cssText="border-color:#FCA5A5;color:#FCA5A5;font-size:12px;padding:4px 10px";
+  yes.onclick=async()=>{
+    const r=await fetch("/api/delete/"+c.id,{method:"DELETE"}); const j=await r.json();
+    if(r.ok){ $("#pillDb").textContent="🗄️ "+j.count+" voci";
+      DB_ENTRIES = DB_ENTRIES.filter(x=>x.id!==c.id); card.remove();
+      if(!$("#dbGrid").children.length) $("#dbEmpty").classList.remove("hidden"); }
+    else alert(j.detail||"Errore");
+  };
+  const no=document.createElement("button"); no.className="iconbtn"; no.textContent="Annulla";
+  no.style.cssText="font-size:12px;padding:4px 10px"; no.onclick=()=>box.remove();
+  btns.appendChild(yes); btns.appendChild(no);
+  box.appendChild(msg); box.appendChild(btns); card.appendChild(box);
+}
+$("#dbRefreshBtn").addEventListener("click", loadDb);
+
+/* ================= /clear (svuota tutto) ================= */
+function promptClearAll(){
+  // conferma in chat con bottoni espliciti
+  const r=rowEl(""); const wrap=document.createElement("div"); wrap.style.maxWidth="88%";
+  const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="⚠️ Conferma"; wrap.appendChild(tag);
+  const b=document.createElement("div"); b.className="bubble b-ai";
+  b.innerHTML="Stai per <b>eliminare TUTTE le voci</b> del vault. L'operazione è irreversibile (puoi però ripristinare da un backup). Confermi?";
+  wrap.appendChild(b);
+  const btns=document.createElement("div"); btns.style.cssText="display:flex;gap:8px;margin-top:10px";
+  const yes=document.createElement("button"); yes.className="pickbtn"; yes.style.cssText="width:auto;background:rgba(252,165,165,.1);border-color:#FCA5A5;color:#FCA5A5";
+  yes.textContent="Sì, svuota tutto";
+  const no=document.createElement("button"); no.className="pickbtn"; no.style.cssText="width:auto";
+  no.textContent="Annulla";
+  yes.onclick=async()=>{
+    yes.disabled=true; no.disabled=true; yes.textContent="Svuoto…";
+    const {ok,j}=await api("/api/clear");
+    if(ok){ $("#pillDb").textContent="🗄️ "+j.count+" voci";
+      addAI(`Database svuotato: rimosse ${j.removed} voci. Puoi aggiungerne di nuove col pulsante ＋ o con l'import.`);
+      if(!$("#dbPanel").classList.contains("hidden")) loadDb();
+    } else addAI(j.detail||"Errore durante lo svuotamento.");
+  };
+  no.onclick=()=>{ btns.remove(); addAI("Annullato. Nessuna voce è stata toccata."); };
+  btns.appendChild(yes); btns.appendChild(no); wrap.appendChild(btns);
+  r.appendChild(wrap); $("#chat").appendChild(r); scroll();
+}
+$("#dbClearBtn").addEventListener("click", ()=>{ switchTab("chat"); promptClearAll(); });
+
+/* ================= TEMA ================= */
+function applyTheme(name){
+  if(name==="dark") document.body.removeAttribute("data-theme");
+  else document.body.setAttribute("data-theme", name);
+  THEME=name;
+  try{ localStorage.setItem("vaultmind_theme", name); }catch(e){}
+  document.querySelectorAll("#themeMenu button").forEach(btn=> btn.classList.toggle("sel", btn.dataset.theme===name));
+}
+let THEME="dark";
+try{ const saved=localStorage.getItem("vaultmind_theme"); if(saved) applyTheme(saved); }catch(e){}
+$("#themeBtn").addEventListener("click", (e)=>{ e.stopPropagation(); $("#themeMenu").classList.toggle("hidden"); });
+document.querySelectorAll("#themeMenu button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{ applyTheme(btn.dataset.theme); $("#themeMenu").classList.add("hidden"); });
+});
+document.addEventListener("click", (e)=>{
+  if(!$("#themeMenu").classList.contains("hidden") && !e.target.closest("#themeMenu") && e.target.id!=="themeBtn")
+    $("#themeMenu").classList.add("hidden");
+});
+</script>
+</body>
+</html>

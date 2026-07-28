@@ -1,0 +1,12 @@
+# VaultMind — dipendenze base (leggere, l'app gira subito)
+fastapi>=0.110
+uvicorn>=0.29
+pydantic>=2.6
+cryptography>=42.0
+argon2-cffi>=23.1
+numpy>=1.26
+python-multipart>=0.0.9
+# Finestra nativa desktop (al posto del browser). Su macOS usa il WebView di
+# sistema (WKWebView), nessuna dipendenza pesante. Se l'install fallisce,
+# l'app ripiega automaticamente sul browser.
+pywebview>=5.0

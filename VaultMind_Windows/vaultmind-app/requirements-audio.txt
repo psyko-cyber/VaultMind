@@ -1,0 +1,5 @@
+# VaultMind — input vocale OPZIONALE (Whisper in locale).
+# Installa con:  pip install -r requirements-audio.txt
+# Al primo uso scarica il modello (~150 MB per "base"), poi gira 100% offline.
+# Nessun dato lascia il dispositivo: la trascrizione avviene sul tuo PC.
+faster-whisper>=1.0

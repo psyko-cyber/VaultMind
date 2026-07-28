@@ -1,0 +1,4 @@
+# VaultMind — embedding semantici "veri" (opzionale).
+# Installa questi per passare da fallback char-n-gram a embedding all-MiniLM-L6-v2.
+# Nota: la PRIMA volta scarica il modello (~80 MB) da HuggingFace; poi gira offline.
+sentence-transformers>=2.7
