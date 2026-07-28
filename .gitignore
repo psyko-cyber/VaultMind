@@ -14,6 +14,9 @@ vault.json
 settings.json
 *.vaultmind-backup
 
+# Pacchetto da consegnare: binario rigenerabile dal codice, inutile in git
+PACCHETTO X INSTALLAZIONE EVERYWHERE/*.zip
+
 # Sistema
 .DS_Store
 Thumbs.db
