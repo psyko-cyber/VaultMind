@@ -12,11 +12,17 @@ chi prova segnala un problema, quella riga dice esattamente quale build aveva.
 
 ## Cosa contiene
 
-Tutta la cartella `VaultMind_Windows`, più due file scritti per chi riceve:
+Tutta la cartella `VaultMind_Windows`: **19 file**, di cui uno solo da lanciare.
 
-- **`INIZIA DA QUI.txt`** — le istruzioni. In sintesi: estrarre lo zip ed
-  eseguire `vaultmind-app\run.bat`. Avvisa di tre cose che altrimenti fanno
-  scrivere "non funziona": il download da ~1,9 GB di Ollama (evitabile),
+Chi riceve estrae lo zip e fa doppio clic su **`run.bat`**, che si trova subito
+in vista. Alla prima esecuzione prepara l'ambiente, costruisce `VaultMind.exe` e
+crea l'icona sul Desktop; dalle volte successive apre l'app e chiude il terminale.
+Se nel frattempo il codice è cambiato, se ne accorge e ricostruisce da solo.
+
+Più due file scritti per chi riceve:
+
+- **`INIZIA DA QUI.txt`** — le istruzioni. Avvisa di tre cose che altrimenti
+  fanno scrivere "non funziona": il download da ~1,9 GB di Ollama (evitabile),
   l'avviso SmartScreen, e il fatto che al primo avvio la master password si
   **crea** e non è recuperabile.
 - **`VERSIONE.txt`** — versione, data di build, commit.
@@ -37,9 +43,12 @@ Se preferisci averlo anche su GitHub, si cambia in un minuto — ma tieni
 presente che il repository è privato, quindi chi deve testare **non** potrebbe
 comunque scaricarlo da lì: il pacchetto va consegnato a mano.
 
-## Nota su `Installa VaultMind.bat` (la strada del .exe)
+## Perché c'è un solo file da lanciare
 
-Nel pacchetto c'è anche quel file, ma **non è la strada da consigliare a chi
-prova**: usa `where python`, che su Windows 11 trova il finto alias del
-Microsoft Store e fa fallire tutto in modo incomprensibile. `run.bat` invece
-gestisce già quel caso. Sistemare il `.bat` è il punto 3.3 del [TODO](../TODO.md).
+Prima ce n'erano due, `run.bat` e `Installa VaultMind.bat`, e sembrava che
+entrambi installassero l'app: uno invece avviava soltanto dal sorgente lasciando
+un terminale aperto. Ora esiste solo `run.bat`, che al primo avvio costruisce
+davvero l'applicazione. Con lui sono spariti anche `installa.ps1`,
+`setup-comune.ps1`, `Avvia VaultMind.vbs`, `run.sh`, `main.py`,
+`LEGGIMI-WINDOWS.txt` e il vecchio `README.md`: tutto recuperabile da git se
+dovesse servire.
