@@ -37,6 +37,7 @@ class Session:
         self.store: Optional[VaultStore] = None
         self.index: Optional[SearchIndex] = None
         self.embeddings: Optional[Embeddings] = None
+        self.index_dirty: bool = False   # indice da riallineare prima della prossima ricerca
 
 S = Session()
 
@@ -77,6 +78,9 @@ class ImportEntry(BaseModel):
 
 class ImportCommitIn(BaseModel):
     entries: List[ImportEntry]
+    # False = blocco intermedio di un import grande: salva ma non ricostruire
+    # l'indice (lo si fa una volta sola, sull'ultimo blocco).
+    rebuild: bool = True
 
 class RestoreIn(BaseModel):
     content: str  # contenuto del file di backup (JSON cifrato)
@@ -96,10 +100,18 @@ def _rebuild_index():
     emb = _ensure_embeddings()
     S.index = SearchIndex(emb)
     S.index.build(S.store.entries)
+    S.index_dirty = False
 
 def _require_unlocked():
     if S.store is None or not S.store.unlocked or S.index is None:
         raise HTTPException(status_code=401, detail="Vault bloccato.")
+
+def _require_index():
+    """Riallinea l'indice se un import a blocchi lo ha invalidato.
+    Ricostruirlo a ogni blocco costerebbe quanto l'import stesso: si paga
+    una volta sola, e solo se serve davvero (cioè prima di una ricerca)."""
+    if S.index_dirty:
+        _rebuild_index()
 
 
 # ---------------- endpoints ----------------
@@ -198,6 +210,13 @@ def unlock(body: UnlockIn):
         except WrongPassword:
             raise HTTPException(status_code=403, detail="Master password errata.")
     else:
+        # creazione del vault: qui la password non si "verifica", si FISSA.
+        # Una password debole scelta per sbaglio resterebbe l'unica chiave.
+        if len(body.master) < 8:
+            raise HTTPException(
+                status_code=400,
+                detail="Scegli una master password di almeno 8 caratteri: è l'unica chiave del vault.",
+            )
         os.makedirs(os.path.dirname(DEFAULT_VAULT), exist_ok=True)
         store.create(body.master)
         created = True
@@ -218,6 +237,7 @@ def unlock(body: UnlockIn):
 @app.post("/api/query")
 def query(body: QueryIn):
     _require_unlocked()
+    _require_index()
     _use_llm = _load_settings().get("use_ollama", True)
     results = S.index.query(body.text)
     kind, picks = interpret(results)
@@ -342,17 +362,26 @@ def import_csv_endpoint(body: ImportCsvIn):
 
 @app.post("/api/import_commit")
 def import_commit(body: ImportCommitIn):
-    """Salva nel vault le voci confermate dall'utente."""
+    """Salva nel vault le voci confermate dall'utente.
+
+    Gli import grandi (export CSV da centinaia di voci) arrivano a blocchi, così
+    la UI può mostrare l'avanzamento: ogni blocco è una sola riscrittura cifrata
+    del vault, e l'indice si ricostruisce solo sull'ultimo (`rebuild`).
+    """
     _require_unlocked()
-    saved = 0
+    items = []
     for e in body.entries:
         fields = [{"label": f.label.strip(), "value": f.value} for f in e.fields if f.label.strip() or f.value]
         title = e.title.strip() or (fields[0]["value"] if fields else "voce senza titolo")
         tags = [t.strip().lower() for t in e.tags if t.strip()]
-        S.store.add(title, fields, tags)
-        saved += 1
-    _rebuild_index()
-    return {"ok": True, "saved": saved, "count": len(S.store.entries)}
+        items.append({"title": title, "fields": fields, "tags": tags})
+    if items:
+        S.store.add_many(items)
+    if body.rebuild:
+        _rebuild_index()
+    else:
+        S.index_dirty = True
+    return {"ok": True, "saved": len(items), "count": len(S.store.entries)}
 
 
 @app.get("/api/backup")
@@ -463,4 +492,5 @@ def lock():
         S.store.lock()
     S.store = None
     S.index = None
+    S.index_dirty = False
     return {"ok": True}

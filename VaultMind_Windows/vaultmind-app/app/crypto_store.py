@@ -154,16 +154,48 @@ class VaultStore:
         self._flush()
 
     # ---------- mutazioni ----------
+    @staticmethod
+    def _clean_fields(fields: List[dict]) -> List[Field]:
+        """Scarta i campi del tutto vuoti e normalizza etichetta/valore."""
+        return [Field(label=str(f.get("label", "")).strip(), value=str(f.get("value", "")))
+                for f in fields if str(f.get("label", "")).strip() or str(f.get("value", "")).strip()]
+
     def add(self, title: str, fields: List[dict], tags: List[str]) -> Credential:
         """`fields` è una lista di {"label": ..., "value": ...}, in ordine libero."""
         self._require_unlocked()
         new_id = (max((c.id for c in self._entries), default=0)) + 1
-        clean_fields = [Field(label=str(f.get("label", "")).strip(), value=str(f.get("value", "")))
-                        for f in fields if str(f.get("label", "")).strip() or str(f.get("value", "")).strip()]
-        cred = Credential(id=new_id, title=title, fields=clean_fields, tags=tags)
+        cred = Credential(id=new_id, title=title, fields=self._clean_fields(fields), tags=tags)
         self._entries.insert(0, cred)
         self._flush()
         return cred
+
+    def add_many(self, items: List[dict]) -> List[Credential]:
+        """Inserisce più voci con UNA sola riscrittura del vault.
+
+        Perché esiste: _flush() ri-serializza e ri-cifra l'INTERO vault a ogni
+        chiamata. Importando un CSV voce per voce il costo diventa quadratico
+        (800 voci = 800 cifrature di un file che nel frattempo cresce), ed è la
+        ragione per cui l'import di un export Bitwarden impiegava minuti.
+        Qui cifratura e scrittura su disco avvengono una volta sola.
+
+        `items` = [{"title":…, "fields":[{"label","value"}…], "tags":[…]}, …]
+        L'ordine finale è identico a quello di add() chiamata in sequenza.
+        """
+        self._require_unlocked()
+        next_id = (max((c.id for c in self._entries), default=0)) + 1
+        creds: List[Credential] = []
+        for it in items:
+            creds.append(Credential(
+                id=next_id,
+                title=str(it.get("title", "")),
+                fields=self._clean_fields(it.get("fields") or []),
+                tags=list(it.get("tags") or []),
+            ))
+            next_id += 1
+        # ogni voce entrerebbe in testa una alla volta: il risultato è l'inverso
+        self._entries[0:0] = list(reversed(creds))
+        self._flush()
+        return creds
 
     def delete(self, cred_id: int) -> None:
         self._require_unlocked()
@@ -182,10 +214,8 @@ class VaultStore:
         cred = self.get(cred_id)
         if cred is None:
             return None
-        clean_fields = [Field(label=str(f.get("label", "")).strip(), value=str(f.get("value", "")))
-                        for f in fields if str(f.get("label", "")).strip() or str(f.get("value", "")).strip()]
         cred.title = title
-        cred.fields = clean_fields
+        cred.fields = self._clean_fields(fields)
         cred.tags = tags
         self._flush()
         return cred

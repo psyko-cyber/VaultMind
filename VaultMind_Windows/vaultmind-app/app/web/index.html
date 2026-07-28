@@ -46,6 +46,18 @@
   .btn:disabled{opacity:.4;cursor:default}
   .hint{font-size:11px;color:var(--faint);margin-top:12px;line-height:1.4}
   .err{color:#FCA5A5;font-size:12px;margin-top:8px;font-family:var(--mono)}
+  /* avviso di primo avvio: il vault non esiste ancora, la password va CREATA */
+  .firstrun{margin-top:20px;padding:12px 14px;border-radius:12px;font-size:12px;line-height:1.5;
+    background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);color:var(--soft)}
+  .firstrun b{color:var(--cyan);display:block;margin-bottom:3px}
+
+  /* barra di avanzamento (import, operazioni lunghe) */
+  .prg{height:6px;border-radius:6px;background:var(--border);overflow:hidden}
+  .prg i{display:block;height:100%;width:0;background:var(--accent);border-radius:6px;transition:width .15s linear}
+  /* indeterminata: usata quando il lavoro e' lato server e non sappiamo la percentuale */
+  .prg.indet i{width:35%!important;transition:none;animation:prgslide 1.1s ease-in-out infinite}
+  @keyframes prgslide{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
+  .prg-txt{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:7px;text-align:center}
 
   /* app */
   #app{display:flex;flex-direction:column;height:100vh}
@@ -192,8 +204,10 @@
   #mainMenu button:hover{background:rgba(127,127,127,.1)}
   #mainMenu .sep{height:1px;background:var(--border);margin:6px 4px}
 
-  /* pannello impostazioni */
-  #setModal .card{max-width:600px !important;width:100% !important}
+  /* pannello impostazioni.
+     Il modale usa .card (non .modalcard): il padding sta tutto lì, quindi senza
+     questa riga il contenuto tocca i bordi e sembra tagliato ai lati. */
+  #setModal .card{max-width:600px !important;width:100% !important;padding:24px 26px}
   .set-section{margin-top:18px}
   .set-section h4{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
     color:var(--accent);margin:0 0 10px}
@@ -224,9 +238,15 @@
     <div class="badge-row"><span class="icon-chip">🔒</span></div>
     <div class="brand">VAULTMIND</div>
     <div class="sub">LOCALE · OFFLINE · AES-256</div>
+    <div id="firstRunNote" class="firstrun hidden">
+      <b>Primo avvio su questo dispositivo</b>
+      Non c'è ancora nessun vault: la master password che scegli adesso è quella
+      che proteggerà tutte le credenziali.
+    </div>
     <div style="margin-top:26px">
-      <label class="lbl">Master password</label>
+      <label class="lbl" id="masterLbl">Master password</label>
       <input id="master" class="field" type="password" placeholder="••••••••••••" autofocus />
+      <input id="master2" class="field hidden" type="password" placeholder="Ripeti la master password" />
       <button id="unlockBtn" class="btn" disabled>Sblocca vault</button>
       <button id="restoreBtn" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">Ripristina da backup…</button>
       <input id="restoreFile" type="file" accept="application/json,.json" class="hidden" />
@@ -390,6 +410,10 @@
 <div id="importModal" class="modal hidden">
   <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;overflow-y:auto">
     <div class="mhead"><span>Import intelligente</span><button id="closeImport" class="iconbtn">✕</button></div>
+    <div id="impProgress" class="hidden" style="margin-bottom:14px">
+      <div class="prg"><i></i></div>
+      <div class="prg-txt"></div>
+    </div>
     <div id="importStep1">
       <label class="lbl">Incolla qui le credenziali, anche disordinate</label>
       <textarea id="importText" class="field" style="font-family:var(--mono);min-height:160px;resize:vertical" placeholder="Es.&#10;Google-- mario@gmail.com pass: Abc123!&#10;Steam&#10;mario99  Pwd!2024  -> recupero@gmail.com&#10;PIN sblocco: 1234"></textarea>
@@ -448,15 +472,52 @@ const api = (path, body)=>fetch(path,{method:"POST",headers:{"Content-Type":"app
 const CHIPS = ["i miei account google","pin della cie","wifi ufficio","home banking","codice 2fa google"];
 
 /* ---- LOCK ---- */
-$("#master").addEventListener("input", e=>{ $("#unlockBtn").disabled = !e.target.value; });
-$("#master").addEventListener("keydown", e=>{ if(e.key==="Enter" && e.target.value) doUnlock(); });
+/* Al primo avvio il vault non esiste ancora: la schermata non deve CHIEDERE una
+   password mai creata, ma dire chiaramente che va impostata adesso. In quel caso
+   serve anche la conferma: un refuso qui renderebbe il vault inapribile. */
+let FIRST_RUN = false;
+
+async function initLock(){
+  try{
+    const s = await fetch("/api/status").then(r=>r.json());
+    FIRST_RUN = !s.exists;
+  }catch(e){ FIRST_RUN = false; }
+  applyLockMode();
+}
+function applyLockMode(){
+  $("#firstRunNote").classList.toggle("hidden", !FIRST_RUN);
+  $("#master2").classList.toggle("hidden", !FIRST_RUN);
+  $("#masterLbl").textContent = FIRST_RUN ? "Imposta la master password" : "Master password";
+  $("#master").placeholder = FIRST_RUN ? "almeno 8 caratteri" : "••••••••••••";
+  $("#unlockBtn").textContent = FIRST_RUN ? "Crea il vault" : "Sblocca vault";
+  $("#lockHint").innerHTML = FIRST_RUN
+    ? "Da questa password si deriva la chiave di cifratura del vault (Argon2 + AES-256). Non viene salvata da nessuna parte e non lascia il dispositivo: <b>se la dimentichi, il vault non è recuperabile.</b>"
+    : "La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.";
+  checkLockValid();
+}
+function checkLockValid(){
+  const p = $("#master").value;
+  $("#unlockBtn").disabled = FIRST_RUN
+    ? !(p.length >= 8 && p === $("#master2").value)
+    : !p;
+}
+$("#master").addEventListener("input", checkLockValid);
+$("#master2").addEventListener("input", checkLockValid);
+$("#master").addEventListener("keydown", e=>{
+  if(e.key!=="Enter") return;
+  if(FIRST_RUN) $("#master2").focus();
+  else if(e.target.value) doUnlock();
+});
+$("#master2").addEventListener("keydown", e=>{ if(e.key==="Enter" && !$("#unlockBtn").disabled) doUnlock(); });
 $("#unlockBtn").addEventListener("click", doUnlock);
+initLock();
 
 async function doUnlock(){
-  $("#lockErr").textContent="";
-  $("#unlockBtn").disabled=true; $("#unlockBtn").textContent="Sblocco…";
+  $("#lockErr").textContent=""; $("#lockErr").style.color="";
+  const idle = FIRST_RUN ? "Crea il vault" : "Sblocca vault";
+  $("#unlockBtn").disabled=true; $("#unlockBtn").textContent = FIRST_RUN ? "Creo il vault…" : "Sblocco…";
   const {ok,j} = await api("/api/unlock",{master:$("#master").value});
-  $("#unlockBtn").textContent="Sblocca vault";
+  $("#unlockBtn").textContent = idle;
   if(!ok){ $("#lockErr").textContent = j.detail||"Errore"; $("#unlockBtn").disabled=false; return; }
   $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
   $("#pillDb").textContent = "🗄️ "+j.count+" voci";
@@ -746,7 +807,10 @@ $("#restoreFile").addEventListener("change", async (e)=>{
   const file = e.target.files[0]; if(!file) return;
   const content = await file.text();
   const {ok,j} = await api("/api/restore",{content});
-  if(ok){ $("#lockErr").style.color="var(--green)"; $("#lockErr").textContent="Backup ripristinato. Sblocca con la master password del dispositivo di origine."; }
+  if(ok){
+    // il vault ora esiste: si torna alla modalita' "sblocca", non "crea"
+    FIRST_RUN=false; $("#master").value=""; $("#master2").value=""; applyLockMode();
+    $("#lockErr").style.color="var(--green)"; $("#lockErr").textContent="Backup ripristinato. Sblocca con la master password del dispositivo di origine."; }
   else { $("#lockErr").style.color=""; $("#lockErr").textContent = j.detail||"Ripristino non riuscito."; }
   e.target.value="";
 });
@@ -760,14 +824,41 @@ $("#importText").addEventListener("input", e=>{ $("#parseBtn").disabled = !e.tar
 function resetImport(){
   $("#importText").value=""; $("#parseBtn").disabled=true;
   $("#importList").innerHTML=""; $("#importStep2").classList.add("hidden"); $("#importStep1").classList.remove("hidden");
+  impProgress(false);
 }
+
+/* ---- BARRA DI AVANZAMENTO DELL'IMPORT ----
+   Un export Bitwarden può avere centinaia di voci: lettura, anteprima e
+   salvataggio richiedono secondi, e senza riscontro sembra che l'app sia
+   bloccata. `pct` a null = barra indeterminata (lavoro lato server). */
+function impProgress(show, pct, txt){
+  const box=$("#impProgress");
+  box.classList.toggle("hidden", !show);
+  if(!show) return;
+  const bar=box.querySelector(".prg"), fill=box.querySelector(".prg i");
+  const indet = (pct===null || pct===undefined);
+  bar.classList.toggle("indet", indet);
+  if(!indet) fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
+  box.querySelector(".prg-txt").textContent = txt || "";
+}
+/* Cede il controllo al browser: senza questo la barra non verrebbe mai
+   ridisegnata. requestAnimationFrame da' il momento giusto per disegnare, ma
+   se la finestra e' minimizzata o in background NON scatta affatto: il timeout
+   di riserva evita che un import lungo resti appeso a meta'. */
+const paintTick=()=>new Promise(r=>{
+  let done=false;
+  const fin=()=>{ if(!done){ done=true; r(); } };
+  requestAnimationFrame(()=>setTimeout(fin,0));
+  setTimeout(fin,120);
+});
 
 $("#parseBtn").onclick=async()=>{
   $("#parseBtn").disabled=true; $("#parseBtn").textContent="Analizzo…";
+  impProgress(true, null, "Analisi del testo in locale…");
   const {ok,j} = await api("/api/import_parse",{text:$("#importText").value});
   $("#parseBtn").textContent="Analizza"; $("#parseBtn").disabled=false;
-  if(!ok){ alert(j.detail||"Errore"); return; }
-  renderImportList(j.entries, j.source);
+  if(!ok){ impProgress(false); alert(j.detail||"Errore"); return; }
+  await renderImportList(j.entries, j.source);
   $("#importStep1").classList.add("hidden"); $("#importStep2").classList.remove("hidden");
 };
 
@@ -776,20 +867,30 @@ $("#csvBtn").onclick=()=>$("#csvFile").click();
 $("#csvFile").addEventListener("change", async (e)=>{
   const file=e.target.files[0]; e.target.value=""; if(!file) return;
   let content;
-  try{ content=await file.text(); }catch(err){ alert("Non riesco a leggere il file."); return; }
+  impProgress(true, null, "Lettura del file…"); await paintTick();
+  try{ content=await file.text(); }catch(err){ impProgress(false); alert("Non riesco a leggere il file."); return; }
+  impProgress(true, null, "Analisi del CSV in locale…"); await paintTick();
   const {ok,j}=await api("/api/import_csv",{content});
-  if(!ok){ alert(j.detail||"Errore nella lettura del CSV"); return; }
-  if(!j.entries || !j.entries.length){ alert("Nessuna voce riconosciuta nel CSV. Formato non supportato?"); return; }
-  renderImportList(j.entries, j.source);
+  if(!ok){ impProgress(false); alert(j.detail||"Errore nella lettura del CSV"); return; }
+  if(!j.entries || !j.entries.length){ impProgress(false); alert("Nessuna voce riconosciuta nel CSV. Formato non supportato?"); return; }
+  await renderImportList(j.entries, j.source);
   $("#importStep1").classList.add("hidden"); $("#importStep2").classList.remove("hidden");
 });
 
-function renderImportList(entries, source){
+/* L'anteprima è editabile: ogni voce sono diversi <input>, e con migliaia di
+   voci costruirle tutte di fila congela la finestra. Si cede il controllo al
+   browser a tempo (non ogni N voci): finché il lavoro è breve non si paga
+   nulla, e su liste enormi la finestra resta viva e la barra avanza. */
+async function renderImportList(entries, source){
   const box=$("#importList"); box.innerHTML="";
   $("#importSourceNote").innerHTML = entries.length
     ? `${entries.length} voci proposte (estrazione: <b>${esc(source)}</b>). Controlla le etichette e i valori, correggi se serve, poi salva.`
     : "Nessuna voce riconosciuta nel testo.";
-  entries.forEach((e, i)=>{
+  const BUDGET_MS=90;
+  let lastYield=performance.now();
+  let buf=document.createDocumentFragment();
+  for(let i=0;i<entries.length;i++){
+    const e=entries[i];
     const card=document.createElement("div"); card.className="cred imp-card"; card.style.marginTop="10px"; card.dataset.i=i;
     card.innerHTML = `<div class="accent" style="background:var(--violet)"></div>`;
     const head=document.createElement("div"); head.style.display="flex"; head.style.alignItems="center"; head.style.gap="8px"; head.style.marginBottom="8px";
@@ -812,8 +913,15 @@ function renderImportList(entries, source){
     tagsIn.placeholder="Tag (virgola)"; tagsIn.value=(e.tags||[]).join(", ");
     tagsRow.appendChild(tagsIn); card.appendChild(tagsRow);
 
-    box.appendChild(card);
-  });
+    buf.appendChild(card);
+    if(performance.now()-lastYield > BUDGET_MS || i === entries.length-1){
+      box.appendChild(buf); buf=document.createDocumentFragment();
+      impProgress(true, (i+1)/entries.length*100, `Preparo l'anteprima… ${i+1} di ${entries.length}`);
+      await paintTick();
+      lastYield=performance.now();
+    }
+  }
+  impProgress(false);
   $("#commitBtn").disabled = entries.length===0;
 }
 
@@ -848,11 +956,31 @@ $("#commitBtn").onclick=async()=>{
   });
   if(!entries.length){ alert("Seleziona almeno una voce."); return; }
   $("#commitBtn").disabled=true; $("#commitBtn").textContent="Salvo…";
-  const {ok,j} = await api("/api/import_commit",{entries});
+
+  // Salvataggio a blocchi: ogni blocco è UNA riscrittura cifrata del vault,
+  // e l'indice si ricostruisce una volta sola alla fine (rebuild:true).
+  const BLOCK=100;
+  let saved=0, count=null, failed=null;
+  impProgress(true, 0, `Salvataggio… 0 di ${entries.length}`); await paintTick();
+  for(let i=0;i<entries.length;i+=BLOCK){
+    const {ok,j} = await api("/api/import_commit",{entries:entries.slice(i,i+BLOCK), rebuild:false});
+    if(!ok){ failed = j.detail||"Errore nel salvataggio"; break; }
+    saved += j.saved; count = j.count;
+    impProgress(true, saved/entries.length*100, `Salvataggio… ${saved} di ${entries.length}`);
+    await paintTick();
+  }
+  if(saved>0){
+    // vale anche se un blocco è fallito: l'indice va riallineato comunque
+    impProgress(true, 100, "Preparo la ricerca sulle nuove voci…"); await paintTick();
+    const fin = await api("/api/import_commit",{entries:[], rebuild:true});
+    if(fin.ok) count = fin.j.count;
+  }
+  impProgress(false);
   $("#commitBtn").textContent="Salva le voci selezionate"; $("#commitBtn").disabled=false;
-  if(ok){ $("#pillDb").textContent="🗄️ "+j.count+" voci"; $("#importModal").classList.add("hidden");
-    addAI(`Importate ${j.saved} voci nel vault locale. Ora puoi chiederle in chat.`); }
-  else { alert(j.detail||"Errore nel salvataggio"); }
+  if(count!=null) $("#pillDb").textContent="🗄️ "+count+" voci";
+  if(failed){ alert(failed + (saved ? `\n\nLe prime ${saved} voci sono state salvate comunque.` : "")); return; }
+  $("#importModal").classList.add("hidden");
+  addAI(`Importate ${saved} voci nel vault locale. Ora puoi chiederle in chat.`);
 };
 
 /* ---- INPUT VOCALE (Whisper locale, opzionale) ---- */
