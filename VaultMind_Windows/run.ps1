@@ -29,7 +29,9 @@ function Err($m){ Write-Host "  [ERRORE] $m" -ForegroundColor Red }
 function Has($cmd){ return [bool](Get-Command $cmd -ErrorAction SilentlyContinue) }
 
 # Il primo avvio scarica centinaia di MB: senza riscontro visivo sembra
-# bloccato. Barra sulla stessa riga (`r) + barra nativa di PowerShell.
+# bloccato. Si usa SOLO una barra di testo sulla stessa riga (`r): la barra
+# nativa Write-Progress e' quella banda blu che resta incollata in cima alla
+# finestra e sporca l'output, quindi niente.
 $script:PHASE = "preparazione"
 function Bar($cur, $tot, $label){
   if($tot -le 0){ $tot = 1 }
@@ -43,7 +45,6 @@ function Bar($cur, $tot, $label){
   $lbl  = [string]$label
   if($lbl.Length -gt 30){ $lbl = $lbl.Substring(0, 30) }
   Write-Host ("`r  [{0}] {1,3}%  {2}" -f $bar, $pct, $lbl.PadRight(30)) -NoNewline -ForegroundColor Cyan
-  Write-Progress -Id 1 -Activity ("VaultMind - " + $script:PHASE) -Status $lbl -PercentComplete $pct
 }
 function BarDone(){ Write-Host "" }
 function Step($n, $title){
@@ -309,9 +310,7 @@ $piArgs += "vaultmind_launcher.py"
 
 Write-Host "    Alcuni minuti. Sotto scorre l'output dello strumento di build:" -ForegroundColor Gray
 Write-Host ""
-Write-Progress -Id 1 -Activity "VaultMind - creazione dell'applicazione" -Status "in corso..." -PercentComplete 50
 & $PY -m PyInstaller @piArgs
-Write-Progress -Id 1 -Activity "VaultMind" -Completed
 
 if (-not (Test-Path $EXE)) {
   Write-Host ""
@@ -326,7 +325,6 @@ Step 7 "Icona sul Desktop"
 if (EnsureShortcut) { Bar 1 1 "creata"; BarDone; Ok "Icona 'VaultMind' sul Desktop." }
 else { BarDone; Warn "Icona non creata. Avvia da: dist\VaultMind.exe" }
 
-Write-Progress -Id 1 -Activity "VaultMind" -Completed
 Write-Host ""
 Write-Host "============================================================" -ForegroundColor White
 Write-Host "  FATTO. VaultMind e' sul Desktop." -ForegroundColor Green

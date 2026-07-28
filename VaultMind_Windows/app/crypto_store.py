@@ -259,41 +259,7 @@ class VaultStore:
                 os.remove(tmp)
 
 
-# Credenziali d'esempio (dati volutamente "disordinati") per popolare un vault demo.
-# Ogni voce: (titolo, [{"label":..., "value":...}, ...], tag)
-SEED = [
-    ("amzn prime", [{"label": "Email", "value": "marco.paolo@gmail.com"}, {"label": "Password", "value": "Fr@nco2024!"}],
-     ["amazon", "prime", "acquisti", "shopping", "spedizioni"]),
-    ("AWS console lavoro", [{"label": "Email", "value": "l.giordano@neten.it"}, {"label": "Password", "value": "kP9$mxQ2vL!a"}],
-     ["amazon", "aws", "cloud", "console", "server"]),
-    ("quella roba della posta", [{"label": "Email", "value": "marco.paolo@gmail.com"}, {"label": "Password", "value": "Estate!2023"}],
-     ["gmail", "email", "posta", "mail", "google"]),
-    # Secondo account Google + esempio di 2FA (TOTP): mostra sia il raggruppamento
-    # "google account" sia il codice OTP generato in locale. Il secret è di test.
-    ("Google lavoro", [{"label": "Email", "value": "l.giordano@gmail.com"},
-                       {"label": "Password", "value": "Lavoro#G2025"},
-                       {"label": "OTP (2FA)", "value": "JBSWY3DPEHPK3PXP"}],
-     ["google", "gmail", "lavoro", "workspace"]),
-    ("wifi sala riunioni", [{"label": "SSID", "value": "Neten-Guest"}, {"label": "Password", "value": "Neten2024Guest"}],
-     ["rete", "internet", "wireless", "ufficio", "wlan"]),
-    ("home banking", [{"label": "Utente", "value": "GIORDANOLU"}, {"label": "Password", "value": "8472-conto-!Q"}],
-     ["banca", "conto", "bonifici", "homebanking"]),
-    ("netflix famiglia", [{"label": "Email", "value": "famiglia.giordano@gmail.com"}, {"label": "Password", "value": "SerieTV#2022"}],
-     ["streaming", "serie", "film", "tv"]),
-    ("spotify", [{"label": "Email", "value": "marco.paolo@gmail.com"}, {"label": "Password", "value": "m3l0d1a$$"}],
-     ["musica", "premium", "playlist"]),
-    ("router di casa (admin)", [{"label": "Utente", "value": "admin"}, {"label": "Password", "value": "adminFastweb!9"}],
-     ["rete", "modem", "fastweb", "wifi", "amministrazione"]),
-    # Esempio con piu' di due campi: documento d'identità digitale italiano (CIE).
-    ("CIE — Carta d'identità elettronica",
-     [{"label": "Numero ID", "value": "CA00112233"},
-      {"label": "PIN", "value": "4821"},
-      {"label": "PUC", "value": "987654321012"},
-      {"label": "Telefono associato", "value": "+39 333 1234567"}],
-     ["cie", "identita", "documento", "spid", "carta"]),
-]
-
-
-def seed_into(store: "VaultStore") -> None:
-    for title, fields, tags in reversed(SEED):
-        store.add(title, fields, tags)
+# Nessun dato di esempio: un vault appena creato deve essere VUOTO.
+# Le vecchie 10 voci demo (password inventate, indirizzi verosimili) erano utili
+# per le dimostrazioni, ma chi installa l'app per la prima volta si trovava il
+# database gia' sporco e doveva ripulirlo a mano.

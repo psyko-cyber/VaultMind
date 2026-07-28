@@ -51,7 +51,11 @@
     background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);color:var(--soft)}
   .firstrun b{color:var(--cyan);display:block;margin-bottom:3px}
 
-  /* barra di avanzamento (import, operazioni lunghe) */
+  /* barra di avanzamento (import, operazioni lunghe).
+     Sticky: con l'anteprima lunga si e' scrollati in fondo, sul pulsante Salva,
+     e una barra in cima al modale non la vedrebbe nessuno. */
+  #impProgress{position:sticky;top:0;z-index:5;background:var(--panel);
+    padding:10px 0 12px;border-bottom:1px solid var(--border)}
   .prg{height:6px;border-radius:6px;background:var(--border);overflow:hidden}
   .prg i{display:block;height:100%;width:0;background:var(--accent);border-radius:6px;transition:width .15s linear}
   /* indeterminata: usata quando il lavoro e' lato server e non sappiamo la percentuale */
@@ -89,6 +93,7 @@
   .credline .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
   .credline .v{font-family:var(--mono);color:var(--soft);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .credline .v.shown{color:#fff;letter-spacing:0}
+  .credline .v.urlv{color:var(--cyan);font-size:13px}
   .acts{display:flex;gap:6px;flex-shrink:0}
   .pickbtn{margin-top:8px;width:100%;text-align:left;border-radius:10px;padding:8px 12px;
     background:rgba(34,211,238,.08);border:1px solid var(--cyan);color:var(--cyan)}
@@ -563,6 +568,13 @@ function labelLooksOtp(label){
   if(l.includes("autor")) return false;
   return ["otp","totp","2fa","mfa","authenticator","auth","one time","one-time"].some(h=>l.includes(h));
 }
+/* L'indirizzo del sito non è un segreto: mascherarlo con i pallini lo
+   renderebbe inutile proprio quando serve, cioè per aprire la pagina di login. */
+function labelLooksUrl(label){
+  const l=(label||"").toLowerCase();
+  return ["url","sito","link","indirizzo","website","web"].some(h=>l.includes(h));
+}
+function isHttpUrl(v){ return /^https?:\/\//i.test((v||"").trim()); }
 
 function credCard(c, picker){
   const card=document.createElement("div"); card.className="cred rise";
@@ -613,6 +625,29 @@ async function attachTotp(card, id){
 function maskedLine(label, value){
   const line=document.createElement("div"); line.className="credline";
   const meta=document.createElement("div"); meta.className="meta";
+
+  // Gli URL si mostrano subito, con il pulsante per aprirli nel browser di
+  // sistema (non nella finestra dell'app, che perderebbe il vault).
+  if(labelLooksUrl(label)){
+    meta.innerHTML=`<div class="k">${esc(label)}</div><div class="v shown urlv"></div>`;
+    meta.querySelector(".v").textContent=value;
+    const acts=document.createElement("div"); acts.className="acts";
+    if(isHttpUrl(value)){
+      const open=document.createElement("button"); open.className="iconbtn"; open.textContent="↗";
+      open.title="Apri nel browser";
+      open.onclick=async()=>{ const r=await api("/api/open_url",{url:value});
+        if(!r.ok){ open.textContent="✕"; setTimeout(()=>open.textContent="↗",3000); } };
+      acts.appendChild(open);
+    }
+    const copyU=document.createElement("button"); copyU.className="iconbtn"; copyU.textContent="⧉"; copyU.title="Copia l'indirizzo";
+    copyU.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){}
+      copyU.textContent="✓"; copyU.style.color="var(--green)";
+      setTimeout(()=>{copyU.textContent="⧉";copyU.style.color="";},6000); };
+    acts.appendChild(copyU);
+    line.appendChild(meta); line.appendChild(acts);
+    return line;
+  }
+
   meta.innerHTML=`<div class="k">${label}</div><div class="v">${"•".repeat(Math.min(value.length,14))}</div>`;
   const vEl=meta.querySelector(".v");
   const acts=document.createElement("div"); acts.className="acts";
@@ -679,6 +714,8 @@ function resetAddModal(){
   $("#addFields").innerHTML="";
   $("#addFields").appendChild(addFieldRow("Email",""));
   $("#addFields").appendChild(addFieldRow("Password",""));
+  // URL della pagina di accesso: lasciato vuoto non viene salvato
+  $("#addFields").appendChild(addFieldRow("URL",""));
   checkAddValid();
 }
 function openEdit(c){
@@ -768,7 +805,9 @@ $("#saveCred").onclick=async()=>{
   document.querySelectorAll(".add-fieldrow").forEach(row=>{
     const label = row.querySelector(".add-flabel").value.trim();
     const value = row.querySelector(".add-fvalue").value;
-    if(label || value) fields.push({label: label||"Valore", value});
+    // serve il VALORE: un'etichetta da sola (es. la riga URL lasciata vuota)
+    // finirebbe nel vault come campo fantasma
+    if(value.trim()) fields.push({label: label||"Valore", value});
   });
   const payload={title:$("#f_title").value, fields, tags:$("#f_tags").value};
   let res;
@@ -833,13 +872,21 @@ function resetImport(){
    bloccata. `pct` a null = barra indeterminata (lavoro lato server). */
 function impProgress(show, pct, txt){
   const box=$("#impProgress");
+  const eraVisibile = !box.classList.contains("hidden");
   box.classList.toggle("hidden", !show);
   if(!show) return;
+  // Alla comparsa la si porta sotto gli occhi. Il CSS sticky da solo non basta:
+  // la card ha un'animazione d'ingresso, e un transform sull'antenato puo'
+  // annullare position:sticky. Questo funziona comunque.
+  if(!eraVisibile) { try{ box.scrollIntoView({block:"nearest"}); }catch(e){} }
   const bar=box.querySelector(".prg"), fill=box.querySelector(".prg i");
   const indet = (pct===null || pct===undefined);
   bar.classList.toggle("indet", indet);
-  if(!indet) fill.style.width = Math.max(0, Math.min(100, pct)) + "%";
-  box.querySelector(".prg-txt").textContent = txt || "";
+  const p = Math.max(0, Math.min(100, pct));
+  if(!indet) fill.style.width = p + "%";
+  // la percentuale la scrive sempre questa funzione: cosi' non puo' mancare
+  // in una fase e comparire in un'altra
+  box.querySelector(".prg-txt").textContent = (indet ? "" : Math.round(p) + "%  ·  ") + (txt || "");
 }
 /* Cede il controllo al browser: senza questo la barra non verrebbe mai
    ridisegnata. requestAnimationFrame da' il momento giusto per disegnare, ma
@@ -852,13 +899,55 @@ const paintTick=()=>new Promise(r=>{
   setTimeout(fin,120);
 });
 
+/* Divide il testo incollato in blocchi analizzati uno alla volta, così la
+   percentuale è reale e non una finta animazione. Si taglia SOLO dove il parser
+   comincerebbe comunque una voce nuova — riga vuota, oppure riga che sembra il
+   nome di un servizio — altrimenti si spezzerebbe una voce a metà. Se non ci
+   sono punti di taglio sicuri resta un blocco solo e la barra torna indeterminata. */
+function bloccaTesto(text, righeMin){
+  const righe = text.split(/\r?\n/);
+  const sembraTitolo = (l)=>{
+    const s = l.trim();
+    return s.length >= 2 && s.length <= 40 && !s.includes("@")
+           && !/[:=]/.test(s) && s.split(/\s+/).length <= 3
+           && /^[\w .()/&'+\-]+$/.test(s);
+  };
+  const blocchi = []; let cur = [];
+  for(const l of righe){
+    if(cur.length >= righeMin && (!l.trim() || sembraTitolo(l))){
+      blocchi.push(cur.join("\n")); cur = [];
+    }
+    cur.push(l);
+  }
+  if(cur.length) blocchi.push(cur.join("\n"));
+  return blocchi.filter(b=>b.trim());
+}
+
 $("#parseBtn").onclick=async()=>{
   $("#parseBtn").disabled=true; $("#parseBtn").textContent="Analizzo…";
-  impProgress(true, null, "Analisi del testo in locale…");
-  const {ok,j} = await api("/api/import_parse",{text:$("#importText").value});
+  // blocchi ampi: ogni blocco è una chiamata all'assistente, che su macchine
+  // modeste impiega decine di secondi. Meglio pochi blocchi grandi.
+  const blocchi = bloccaTesto($("#importText").value, 40);
+  const uno = blocchi.length <= 1;
+  impProgress(true, uno ? null : 0, uno ? "Analisi del testo in locale…" : `Analisi in locale… blocco 1 di ${blocchi.length}`);
+  await paintTick();
+
+  let entries = [], source = null, errore = null;
+  for(let i=0;i<blocchi.length;i++){
+    // la percentuale precede il blocco su cui si sta lavorando, non lo segue
+    if(!uno){
+      impProgress(true, i/blocchi.length*100, `Analisi in locale… blocco ${i+1} di ${blocchi.length}`);
+      await paintTick();
+    }
+    const {ok,j} = await api("/api/import_parse",{text:blocchi[i]});
+    if(!ok){ errore = j.detail||"Errore"; break; }
+    entries = entries.concat(j.entries||[]);
+    if(!source) source = j.source;
+  }
+  if(!uno && !errore){ impProgress(true, 100, "Analisi completata"); await paintTick(); }
   $("#parseBtn").textContent="Analizza"; $("#parseBtn").disabled=false;
-  if(!ok){ impProgress(false); alert(j.detail||"Errore"); return; }
-  await renderImportList(j.entries, j.source);
+  if(errore){ impProgress(false); alert(errore); return; }
+  await renderImportList(entries, source||"euristica");
   $("#importStep1").classList.add("hidden"); $("#importStep2").classList.remove("hidden");
 };
 
@@ -959,7 +1048,9 @@ $("#commitBtn").onclick=async()=>{
 
   // Salvataggio a blocchi: ogni blocco è UNA riscrittura cifrata del vault,
   // e l'indice si ricostruisce una volta sola alla fine (rebuild:true).
-  const BLOCK=100;
+  // La dimensione si adatta al totale: con 20 voci un blocco unico farebbe
+  // saltare la barra da 0 a 100 senza che si veda niente.
+  const BLOCK=Math.min(100, Math.max(5, Math.ceil(entries.length/10)));
   let saved=0, count=null, failed=null;
   impProgress(true, 0, `Salvataggio… 0 di ${entries.length}`); await paintTick();
   for(let i=0;i<entries.length;i+=BLOCK){

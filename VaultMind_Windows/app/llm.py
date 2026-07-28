@@ -63,7 +63,44 @@ def _generate(system: str, prompt: str, model: str, timeout: float,
         return None
 
 
-def extract_entries(text: str, model: str = DEFAULT_MODEL, timeout: float = 60.0):
+def _flatten_entries(parsed):
+    """Riporta la risposta del modello alla forma attesa: [{title, fields, tags}].
+
+    Serve perché llama3.2:3b, pur avendo `format: json`, spesso ignora la forma
+    richiesta e restituisce una MAPPA titolo -> dati:
+        [{"Gmail": {"fields": [...]}, "Amazon": {"fields": [...]}}]
+    invece di una lista di voci. Senza questa conversione ogni elemento risulta
+    privo di `fields`, viene scartato a valle e l'import finisce con zero voci.
+    """
+    def da_mappa(m: dict):
+        out = []
+        for k, v in m.items():
+            if isinstance(v, dict) and ("fields" in v or "tags" in v):
+                e = dict(v)
+                e.setdefault("title", k)
+                out.append(e)
+        return out
+
+    if isinstance(parsed, dict):
+        if "fields" in parsed or "title" in parsed:
+            return [parsed]
+        return da_mappa(parsed)
+
+    if isinstance(parsed, list):
+        out = []
+        for it in parsed:
+            if not isinstance(it, dict):
+                continue
+            if "fields" in it or "title" in it:
+                out.append(it)
+            else:
+                out.extend(da_mappa(it))
+        return out
+
+    return []
+
+
+def extract_entries(text: str, model: str = DEFAULT_MODEL, timeout: float = 45.0):
     """
     Estrae credenziali strutturate da un blob di testo disordinato.
     L'LLM legge il testo (password incluse) per strutturarlo, ma resta in locale.
@@ -96,9 +133,10 @@ def extract_entries(text: str, model: str = DEFAULT_MODEL, timeout: float = 60.0
                 if isinstance(parsed.get(key), list):
                     parsed = parsed[key]
                     break
-            else:
-                parsed = [parsed]
-        return parsed if isinstance(parsed, list) else None
+        voci = _flatten_entries(parsed)
+        # None = "non ho una risposta usabile", così il chiamante ripiega
+        # sull'euristica invece di proporre una lista vuota.
+        return voci or None
     except Exception:
         return None
 

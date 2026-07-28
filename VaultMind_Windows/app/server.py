@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .crypto_store import VaultStore, WrongPassword, seed_into
+from .crypto_store import VaultStore, WrongPassword
 from .embedding import Embeddings
 from .search import SearchIndex, interpret
 from .import_parse import heuristic_extract
@@ -45,7 +45,6 @@ S = Session()
 # ---------------- modelli richiesta ----------------
 class UnlockIn(BaseModel):
     master: str
-    seed_if_new: bool = True
 
 class QueryIn(BaseModel):
     text: str
@@ -220,8 +219,6 @@ def unlock(body: UnlockIn):
         os.makedirs(os.path.dirname(DEFAULT_VAULT), exist_ok=True)
         store.create(body.master)
         created = True
-        if body.seed_if_new:
-            seed_into(store)
     S.store = store
     _rebuild_index()
     return {
@@ -339,13 +336,26 @@ def import_parse(body: ImportParseIn):
     text = body.text.strip()
     if not text:
         return {"source": "none", "entries": []}
-    parsed = llm.extract_entries(text)        # prova con Ollama (locale)
-    source = "llm"
-    if parsed is None:
-        parsed = heuristic_extract(text)      # fallback senza LLM
+
+    def _pulisci(parsed):
+        out = [_normalize_entry(e) for e in (parsed or []) if isinstance(e, dict)]
+        return [e for e in out if e["fields"]]
+
+    entries, source = [], "euristica"
+    # Rispetta l'interruttore "mind" delle impostazioni: chi lo spegne non si
+    # aspetta di aspettare l'LLM anche qui.
+    if _load_settings().get("use_ollama", True):
+        entries = _pulisci(llm.extract_entries(text))
+        if entries:
+            source = "llm"
+
+    # Rete di sicurezza: se l'LLM non ha prodotto NIENTE di utilizzabile
+    # (risposta fuori formato, troncata, o timeout) si usa comunque il parser
+    # locale, invece di rispondere "nessuna voce riconosciuta".
+    if not entries:
+        entries = _pulisci(heuristic_extract(text))
         source = "euristica"
-    entries = [_normalize_entry(e) for e in parsed if isinstance(e, dict)]
-    entries = [e for e in entries if e["fields"]]
+
     return {"source": source, "entries": entries}
 
 
@@ -484,6 +494,27 @@ def clear_all():
     S.store.clear()
     _rebuild_index()
     return {"ok": True, "removed": removed, "count": len(S.store.entries)}
+
+
+class OpenUrlIn(BaseModel):
+    url: str
+
+@app.post("/api/open_url")
+def open_url(body: OpenUrlIn):
+    """Apre un URL nel browser di SISTEMA.
+
+    Serve perché nella finestra nativa (pywebview) un link normale navigherebbe
+    la finestra dell'app, portandola via dal vault. Solo http/https: qualunque
+    altro schema (file:, javascript:, ...) trasformerebbe un campo del vault in
+    un modo per eseguire cose sulla macchina.
+    """
+    _require_unlocked()
+    u = (body.url or "").strip()
+    if not u.lower().startswith(("http://", "https://")):
+        raise HTTPException(status_code=400, detail="Sono ammessi solo indirizzi http:// o https://")
+    import webbrowser
+    webbrowser.open(u)
+    return {"ok": True}
 
 
 @app.post("/api/lock")
