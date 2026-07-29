@@ -8,10 +8,13 @@ dell'esecuzione. Nessun endpoint è esposto sulla rete: il bind è loopback.
 from __future__ import annotations
 import os
 import json
+import secrets
+import hashlib
+import time
 from pathlib import Path
 from typing import List, Optional, Any
 
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException, UploadFile, File, Request
 from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -118,7 +121,11 @@ def _require_index():
 # ---------------- endpoints ----------------
 @app.get("/", response_class=HTMLResponse)
 def home():
-    return (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    # La pagina riceve il token di sessione: nessun altro sito può leggere
+    # questo HTML (same-origin policy), quindi nessun altro sito può parlare
+    # con le API. Vale per pywebview e per il fallback browser.
+    html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
+    return html.replace("__VM_TOKEN__", UI_TOKEN)
 
 
 @app.get("/api/status")
@@ -158,9 +165,186 @@ def _save_settings(s: dict) -> None:
         json.dump(s, f, indent=2)
 
 
+# ---------------- sicurezza: chi può parlare con questo server ----------------
+# Il bind su 127.0.0.1 tiene fuori la RETE, non il BROWSER: qualsiasi pagina
+# web aperta può INVIARE richieste al loopback anche senza poterne leggere le
+# risposte — e un POST cieco su /api/clear o /api/delete farebbe danni con il
+# vault sbloccato. Tre serrature, tutte necessarie:
+#   1. header X-VaultMind-Token su ogni /api/*. La UI lo riceve dentro l'HTML
+#      servito da "/" (che nessun altro sito può leggere); un sito terzo non
+#      può nemmeno inviare un header custom senza un preflight CORS, che qui
+#      viene rifiutato.
+#   2. controllo dell'header Host: chiude il DNS rebinding (attacker.com che
+#      risolve a 127.0.0.1 arriva col Host sbagliato).
+#   3. le estensioni browser abbinate hanno un token SEPARATO, legato alla
+#      loro origine e limitato a EXT_ALLOWED: dal browser solo lettura, mai
+#      scrittura sul vault.
+UI_TOKEN = secrets.token_urlsafe(32)
+
+# endpoint concessi a un token di estensione (sola lettura + stato)
+EXT_ALLOWED = {"/api/status", "/api/query", "/api/reveal", "/api/totp", "/api/list"}
+
+_EXT_SCHEMES = ("chrome-extension://", "moz-extension://")
+
+# codice di abbinamento in corso: solo in RAM, mai su disco
+_pairing: dict = {}
+
+
+def _hash_token(tok: str) -> str:
+    return hashlib.sha256(tok.encode("utf-8")).hexdigest()
+
+def _ext_registry() -> list:
+    return list(_load_settings().get("extensions", []))
+
+def _ext_for_token(tok: str):
+    """L'estensione abbinata per questo token, o None. Su disco sta solo
+    l'hash: chi legge settings.json non ricava il token."""
+    if not tok:
+        return None
+    h = _hash_token(tok)
+    for e in _ext_registry():
+        if secrets.compare_digest(h, str(e.get("token_hash", ""))):
+            return e
+    return None
+
+def _origin_paired(origin: str) -> bool:
+    return any(e.get("origin") == origin for e in _ext_registry())
+
+def _cors_headers(origin: str) -> dict:
+    """Solo per l'estensione abbinata (Chrome bypassa CORS con host_permissions,
+    Firefox no: rispondere non costa nulla e tiene aperta quella strada)."""
+    return {
+        "Access-Control-Allow-Origin": origin,
+        "Access-Control-Allow-Headers": "Content-Type, X-VaultMind-Token",
+        "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+        "Vary": "Origin",
+    }
+
+
+@app.middleware("http")
+async def _guardia(request: Request, call_next):
+    # serratura 2: solo loopback esplicito, chiunque altro non esiste
+    host = (request.headers.get("host") or "").rsplit(":", 1)[0].strip("[]").lower()
+    if host not in ("127.0.0.1", "localhost", "::1"):
+        return JSONResponse({"detail": "Host non consentito."}, status_code=403)
+
+    path = request.url.path
+    if not path.startswith("/api/"):
+        return await call_next(request)   # "/" e /static: è la pagina stessa
+
+    origin = request.headers.get("origin", "")
+
+    # preflight CORS: risposta utile solo all'estensione abbinata (o in
+    # abbinamento, per il solo claim); per ogni altra origine è un rifiuto
+    if request.method == "OPTIONS":
+        if _origin_paired(origin) or (path == "/api/pair/claim" and origin.startswith(_EXT_SCHEMES)):
+            return PlainTextResponse("", headers=_cors_headers(origin))
+        return PlainTextResponse("Origine non autorizzata.", status_code=403)
+
+    # unico endpoint senza token: protetto dal codice mostrato nell'app,
+    # dal limite di tentativi e dal requisito di origine estensione
+    if path == "/api/pair/claim":
+        resp = await call_next(request)
+        if origin.startswith(_EXT_SCHEMES):
+            for k, v in _cors_headers(origin).items():
+                resp.headers[k] = v
+        return resp
+
+    tok = request.headers.get("x-vaultmind-token", "")
+    if secrets.compare_digest(tok, UI_TOKEN):
+        return await call_next(request)   # la UI dell'app: accesso pieno
+
+    ext = _ext_for_token(tok)
+    if ext is not None:
+        # serratura 3: il token vale solo dall'origine con cui fu abbinato...
+        if origin and origin != ext.get("origin"):
+            return JSONResponse({"detail": "Origine diversa da quella abbinata."}, status_code=403)
+        # ...e solo in lettura
+        if path not in EXT_ALLOWED:
+            return JSONResponse({"detail": "L'estensione ha accesso in sola lettura."}, status_code=403)
+        resp = await call_next(request)
+        if origin:
+            for k, v in _cors_headers(origin).items():
+                resp.headers[k] = v
+        return resp
+
+    return JSONResponse({"detail": "Richiesta non autorizzata."}, status_code=401)
+
+
+# ---------------- abbinamento estensione browser ----------------
+@app.post("/api/pair/start")
+def pair_start():
+    """Genera il codice di abbinamento e lo consegna alla UI: il codice si
+    legge NELL'APP, quindi autorizza chi controlla l'app — una pagina web non
+    può né vederlo né spendere i 5 tentativi senza un'origine da estensione."""
+    _require_unlocked()
+    code = "".join(secrets.choice("0123456789") for _ in range(6))
+    _pairing.clear()
+    _pairing.update({"code": code, "expires": time.time() + 120, "attempts": 0})
+    return {"code": code, "expires_in": 120}
+
+
+class PairClaimIn(BaseModel):
+    code: str
+    name: str = "Estensione browser"
+
+@app.post("/api/pair/claim")
+def pair_claim(body: PairClaimIn, request: Request):
+    origin = request.headers.get("origin", "")
+    if not origin.startswith(_EXT_SCHEMES):
+        raise HTTPException(status_code=403, detail="L'abbinamento è riservato alle estensioni browser.")
+    if not _pairing or time.time() > _pairing.get("expires", 0):
+        _pairing.clear()
+        raise HTTPException(status_code=400, detail="Nessun codice attivo. In VaultMind: Impostazioni → Estensione browser → Associa.")
+    _pairing["attempts"] = _pairing.get("attempts", 0) + 1
+    if _pairing["attempts"] > 5:
+        _pairing.clear()
+        raise HTTPException(status_code=429, detail="Troppi tentativi: genera un nuovo codice nell'app.")
+    if not secrets.compare_digest(body.code.strip(), _pairing["code"]):
+        raise HTTPException(status_code=403, detail="Codice errato.")
+    _pairing.clear()
+    token = secrets.token_urlsafe(32)
+    s = _load_settings()
+    # ri-abbinare la stessa estensione sostituisce il token vecchio
+    exts = [e for e in s.get("extensions", []) if e.get("origin") != origin]
+    exts.append({
+        "name": (body.name.strip() or "Estensione browser")[:60],
+        "origin": origin,
+        "token_hash": _hash_token(token),
+        "created": time.strftime("%Y-%m-%d %H:%M"),
+    })
+    s["extensions"] = exts
+    _save_settings(s)
+    return {"ok": True, "token": token}
+
+
+@app.get("/api/pair/list")
+def pair_list():
+    """Per le impostazioni: quali estensioni sono abbinate (mai gli hash)."""
+    _require_unlocked()
+    return {"extensions": [{"name": e.get("name"), "origin": e.get("origin"),
+                            "created": e.get("created")} for e in _ext_registry()]}
+
+
+class PairRevokeIn(BaseModel):
+    origin: str
+
+@app.post("/api/pair/revoke")
+def pair_revoke(body: PairRevokeIn):
+    _require_unlocked()
+    s = _load_settings()
+    before = s.get("extensions", [])
+    s["extensions"] = [e for e in before if e.get("origin") != body.origin]
+    _save_settings(s)
+    return {"ok": True, "removed": len(before) - len(s["extensions"])}
+
+
 @app.get("/api/settings")
 def get_settings():
     s = _load_settings()
+    # gli abbinamenti hanno il loro endpoint (/api/pair/list): qui non servono
+    # e conterrebbero gli hash dei token
+    s.pop("extensions", None)
     # arricchisce con lo stato reale dei componenti (sola lettura)
     s["_ollama_available"] = llm.available()
     s["_audio_available"] = transcribe.available()

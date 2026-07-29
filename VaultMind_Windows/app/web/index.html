@@ -4,6 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>VaultMind — locale</title>
+<link rel="icon" type="image/png" href="/static/logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
 <style>
@@ -276,7 +277,7 @@
 <!-- LOCK -->
 <div id="lock">
   <div class="card lockbox rise">
-    <div class="badge-row"><span class="icon-chip">🔒</span></div>
+    <div class="badge-row"><img src="/static/logo.png" alt="" style="width:64px;height:64px"></div>
     <div class="brand">VAULTMIND</div>
     <div class="sub">LOCALE · OFFLINE · AES-256</div>
     <div id="firstRunNote" class="firstrun hidden">
@@ -302,7 +303,7 @@
   <header>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="iconbtn" id="menuBtn" title="Menu" style="font-size:18px;padding:6px 10px">☰</button>
-      <div class="hbrand">🛡️ VaultMind</div>
+      <div class="hbrand" style="display:flex;align-items:center;gap:8px"><img src="/static/logo.png" alt="" style="width:22px;height:22px">VaultMind</div>
     </div>
     <div class="pills">
       <span class="pill db" id="pillDb">🗄️ 0 voci</span>
@@ -396,6 +397,21 @@
           <div><div class="lab">Includi simboli</div></div>
           <div id="swGenSym" class="sw ctl"></div>
         </div>
+      </div>
+
+      <div class="set-section">
+        <h4>Estensione browser</h4>
+        <div class="set-row">
+          <div><div class="lab">Chrome · Edge · Brave</div>
+            <div class="desc">L'estensione legge dal vault sbloccato, in sola lettura: nessuna copia delle credenziali nel browser.</div></div>
+          <button class="iconbtn ctl" id="pairStart">Associa…</button>
+        </div>
+        <div id="pairBox" class="hidden" style="padding:10px 0">
+          <div class="desc" style="text-align:center">Scrivi questo codice nell'estensione:</div>
+          <div id="pairCode" style="font-family:'JetBrains Mono',monospace;font-size:30px;letter-spacing:10px;text-align:center;padding:8px 0;color:var(--accent)"></div>
+          <div id="pairCountdown" class="desc" style="text-align:center"></div>
+        </div>
+        <div id="extList"></div>
       </div>
 
       <div class="set-section">
@@ -514,6 +530,23 @@
 <script src="/static/jsQR.js"></script>
 <script>
 const $ = (s)=>document.querySelector(s);
+
+/* ---- TOKEN DI SESSIONE ----
+   Iniettato dal server dentro questa pagina, che nessun altro sito può leggere
+   (same-origin policy). Senza questo header il server rifiuta ogni /api/*:
+   il loopback smette di fidarsi di chiunque bussi — una pagina web qualsiasi
+   poteva inviare POST ciechi (es. /api/clear) verso 127.0.0.1.
+   Il wrapper aggiunge l'header a ogni chiamata: i singoli fetch non cambiano. */
+const VM_TOKEN = "__VM_TOKEN__";
+const _rawFetch = window.fetch.bind(window);
+window.fetch = (url, opts) => {
+  if (typeof url === "string" && url.startsWith("/api/")) {
+    opts = opts || {};
+    opts.headers = Object.assign({}, opts.headers, {"X-VaultMind-Token": VM_TOKEN});
+  }
+  return _rawFetch(url, opts);
+};
+
 const api = (path, body)=>fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}).then(r=>r.json().then(j=>({ok:r.ok,j})));
 
 const CHIPS = ["i miei account google","pin della cie","wifi ufficio","home banking","codice 2fa google"];
@@ -1424,6 +1457,9 @@ async function openSettings(){
   }
   $("#cmMsg").textContent=""; $("#setMsg").textContent="";
   $("#changeMasterBox").classList.add("hidden");
+  $("#pairBox").classList.add("hidden");
+  if(_pairTimer){ clearInterval(_pairTimer); _pairTimer=null; }
+  loadExtList();
   $("#setModal").classList.remove("hidden");
 }
 $("#setClose").onclick=()=>$("#setModal").classList.add("hidden");
@@ -1440,6 +1476,52 @@ $("#swOllama").addEventListener("click",()=>{ const on=!$("#swOllama").classList
 $("#swMic").addEventListener("click",()=>{ const on=!$("#swMic").classList.contains("on"); setSw($("#swMic"),on); saveSetting({mic_enabled:on}); applyMicSetting(on); });
 $("#swGenSym").addEventListener("click",()=>{ const on=!$("#swGenSym").classList.contains("on"); setSw($("#swGenSym"),on); saveSetting({gen_symbols:on}); });
 $("#setOpenImport").onclick=()=>{ $("#setModal").classList.add("hidden"); resetImport(); $("#importModal").classList.remove("hidden"); };
+
+/* ---- estensione browser: abbinamento e revoca ----
+   Il codice si legge QUI, nell'app: chi controlla l'app autorizza. Il server
+   accetta il codice solo da un'origine chrome-extension:// e consegna un
+   token di sola lettura, revocabile da questa lista. */
+let _pairTimer=null;
+const _escAttr=(s)=>esc(s).replace(/"/g,"&quot;");
+async function loadExtList(){
+  const {ok,j}=await fetch("/api/pair/list").then(r=>r.json().then(d=>({ok:r.ok,j:d}))).catch(()=>({ok:false}));
+  const box=$("#extList"); if(!box) return [];
+  if(!ok){ box.innerHTML=""; return []; }
+  const exts=j.extensions||[];
+  box.innerHTML=exts.map(e=>
+    `<div class="set-row"><div><div class="lab">🧩 ${esc(e.name)}</div>
+       <div class="desc">${esc(e.origin)} · abbinata il ${esc(e.created||"—")}</div></div>
+       <button class="iconbtn ctl" data-revoke="${_escAttr(e.origin)}">Revoca</button></div>`).join("");
+  box.querySelectorAll("[data-revoke]").forEach(b=>b.onclick=async()=>{
+    await api("/api/pair/revoke",{origin:b.dataset.revoke});
+    flashSet("Estensione revocata: non può più leggere dal vault.","ok");
+    loadExtList();
+  });
+  return exts.map(e=>e.origin);
+}
+$("#pairStart").onclick=async()=>{
+  const {ok,j}=await api("/api/pair/start",{});
+  if(!ok){ flashSet(j.detail||"Errore.","err"); return; }
+  const prima=await loadExtList();          // origini già abbinate, per accorgersi della nuova
+  $("#pairCode").textContent=j.code;
+  $("#pairBox").classList.remove("hidden");
+  let left=j.expires_in||120;
+  $("#pairCountdown").textContent="Vale per "+left+" secondi";
+  if(_pairTimer) clearInterval(_pairTimer);
+  _pairTimer=setInterval(async()=>{
+    left--;
+    if(left<=0){ clearInterval(_pairTimer); _pairTimer=null; $("#pairBox").classList.add("hidden"); return; }
+    $("#pairCountdown").textContent="Vale per "+left+" secondi";
+    if(left%3===0){                          // l'abbinamento riuscito si vede dalla lista
+      const ora=await loadExtList();
+      if(ora.some(o=>!prima.includes(o))){
+        clearInterval(_pairTimer); _pairTimer=null;
+        $("#pairBox").classList.add("hidden");
+        flashSet("Estensione abbinata.","ok");
+      }
+    }
+  },1000);
+};
 
 /* cambio master password */
 $("#openChangeMaster").onclick=()=>$("#changeMasterBox").classList.toggle("hidden");
