@@ -18,7 +18,14 @@ SmartScreen (siamo senza firma), la master password che al primo avvio si
 La versione precisa la mostra l'installer stesso e, dopo, la voce in
 "App installate" (oggi: 6.7).
 
-## 2. `VaultMind-Windows.zip` — il ripiego (~0,1 MB)
+## 1-bis. `VaultMind-Estensione.zip` — l'estensione per il browser (~50 KB)
+
+L'estensione Chrome/Edge/Brave: cerca e copia dal vault mentre si naviga.
+Dentro c'è `COME SI INSTALLA.txt` (modalità sviluppatore, niente Web Store
+per ora). Richiede l'app **6.7 aggiornata** (build dal 29/07 sera): con un
+exe più vecchio l'abbinamento non esiste e l'estensione resta cieca.
+
+## 2. `VaultMind-Windows.zip` — il ripiego (~0,3 MB)
 
 Il canale vecchio: tutta la cartella `VaultMind_Windows`, e chi riceve fa
 doppio clic su `run.bat`, che si costruisce l'app sulla sua macchina
