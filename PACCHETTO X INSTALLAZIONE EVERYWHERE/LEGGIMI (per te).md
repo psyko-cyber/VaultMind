@@ -1,54 +1,52 @@
 # Pacchetto da mandare a chi testa
 
-Qui dentro c'è **`VaultMind-Windows.zip`**: il pacchetto pronto da inviare a
-chiunque debba provare VaultMind su Windows. Il nome del file non cambia mai —
-è sempre la versione più recente.
+Due consegnabili. I nomi dei file non cambiano mai: sono sempre la versione
+più recente.
+
+## 1. `VaultMind-Setup.exe` — quello principale (~108 MB)
+
+L'installer con procedura guidata: doppio clic, Avanti → Installa, icona sul
+Desktop e nel menu Start, disinstallazione da "App installate". Chi lo riceve
+**non ha bisogno di Python, non scarica niente, non costruisce niente**:
+l'applicazione è già dentro.
+
+Da mandare **insieme a `INIZIA DA QUI (per chi riceve).txt`**, che avvisa
+delle tre cose che altrimenti fanno scrivere "non funziona": l'avviso
+SmartScreen (siamo senza firma), la master password che al primo avvio si
+**crea** e non è recuperabile, e la spunta Ollama (~2 GB, facoltativa).
+
+La versione precisa la mostra l'installer stesso e, dopo, la voce in
+"App installate" (oggi: 6.7).
+
+## 2. `VaultMind-Windows.zip` — il ripiego (~0,1 MB)
+
+Il canale vecchio: tutta la cartella `VaultMind_Windows`, e chi riceve fa
+doppio clic su `run.bat`, che si costruisce l'app sulla sua macchina
+(serve Python, scarica i componenti, minuti di attesa). Resta utile se:
+
+- un antivirus aziendale blocca l'exe da 108 MB e conviene passare dal sorgente;
+- chi testa vuole *vedere* il codice che esegue (col nostro pitch, succederà);
+- serve provare una modifica al volo senza ricompilare l'installer.
+
+Dentro c'è `VERSIONE.txt` con data di build e commit: se chi prova segnala un
+problema, quella riga dice esattamente quale build aveva. Escluso a ogni
+rigenerazione: `vault.json`, `settings.json`, log, `__pycache__`, `.venv`,
+cartelle di build. **Un vault non deve mai finire dentro un pacchetto che
+spedisci** — ogni zip viene ricontrollato per questo.
 
 ## Dopo ogni modifica al codice
 
-Chiedimi *"aggiorna il pacchetto"* e lo rigenero dall'ultimo stato del codice.
-Dentro lo zip c'è `VERSIONE.txt` con data di build e riferimento al commit: se
-chi prova segnala un problema, quella riga dice esattamente quale build aveva.
+Chiedimi *"aggiorna il pacchetto"*:
 
-## Cosa contiene
+- l'installer si rigenera con `installer/build-installer.ps1` (che pretende un
+  exe più recente del codice — altrimenti si ferma e chiede di rilanciare
+  `run.bat` — e a fine compilazione **copia da solo** l'exe aggiornato qui);
+- lo zip lo rigenero dall'ultimo stato del codice.
 
-Tutta la cartella `VaultMind_Windows`: **19 file**, di cui uno solo da lanciare.
+## Perché i binari non sono dentro git
 
-Chi riceve estrae lo zip e fa doppio clic su **`run.bat`**, che si trova subito
-in vista. Alla prima esecuzione prepara l'ambiente, costruisce `VaultMind.exe` e
-crea l'icona sul Desktop; dalle volte successive apre l'app e chiude il terminale.
-Se nel frattempo il codice è cambiato, se ne accorge e ricostruisce da solo.
-
-Più due file scritti per chi riceve:
-
-- **`INIZIA DA QUI.txt`** — le istruzioni. Avvisa di tre cose che altrimenti
-  fanno scrivere "non funziona": il download da ~1,9 GB di Ollama (evitabile),
-  l'avviso SmartScreen, e il fatto che al primo avvio la master password si
-  **crea** e non è recuperabile.
-- **`VERSIONE.txt`** — versione, data di build, commit.
-
-## Cosa NON contiene, e perché
-
-Escluso a ogni rigenerazione: `vault.json`, `settings.json`, i log,
-`__pycache__`, `.venv`, le cartelle di build. Il primo è il punto che conta:
-**un vault non deve mai finire dentro un pacchetto che spedisci.** Ogni zip
-viene ricontrollato per questo prima di essere consegnato.
-
-## Perché lo zip non è dentro git
-
-È un file binario rigenerabile dal codice: committarne uno nuovo a ogni
-modifica gonfierebbe il repository senza aggiungere niente che il codice non
-dica già. Nel repo resta questo file, così la cartella non sparisce.
-Se preferisci averlo anche su GitHub, si cambia in un minuto — ma tieni
-presente che il repository è privato, quindi chi deve testare **non** potrebbe
-comunque scaricarlo da lì: il pacchetto va consegnato a mano.
-
-## Perché c'è un solo file da lanciare
-
-Prima ce n'erano due, `run.bat` e `Installa VaultMind.bat`, e sembrava che
-entrambi installassero l'app: uno invece avviava soltanto dal sorgente lasciando
-un terminale aperto. Ora esiste solo `run.bat`, che al primo avvio costruisce
-davvero l'applicazione. Con lui sono spariti anche `installa.ps1`,
-`setup-comune.ps1`, `Avvia VaultMind.vbs`, `run.sh`, `main.py`,
-`LEGGIMI-WINDOWS.txt` e il vecchio `README.md`: tutto recuperabile da git se
-dovesse servire.
+Sono file rigenerabili dal codice: committarne uno nuovo a ogni modifica
+gonfierebbe il repository senza aggiungere niente che il codice non dica già.
+Nel repo resta questo file, così la cartella non sparisce. E comunque il
+repository è privato: chi deve testare non potrebbe scaricarli da lì, il
+pacchetto va consegnato a mano.

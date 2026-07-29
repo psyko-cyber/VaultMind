@@ -1,0 +1,81 @@
+============================================================
+ VaultMind - gestore di password 100% locale
+ Windows 10 / 11
+============================================================
+
+Cos'e':
+Un gestore di password che gira SOLO sul tuo computer. Niente
+cloud, niente account, niente registrazione. Le credenziali le
+chiedi scrivendo in italiano normale ("dammi la password di
+amazon") e le trova anche se le hai salvate con nomi disordinati.
+
+------------------------------------------------------------
+ INSTALLAZIONE
+------------------------------------------------------------
+
+1. Doppio clic su   VaultMind-Setup.exe
+2. Avanti -> Installa. Fine.
+
+VaultMind e' sul Desktop e nel menu Start, come una qualsiasi
+applicazione. Niente da estrarre, niente componenti da
+scaricare: e' tutto gia' dentro l'installer.
+
+Durante l'installazione c'e' una casella FACOLTATIVA:
+"Scarica e installa Ollama". E' un componente da circa 2 GB
+che serve solo a rendere piu' naturali le frasi dell'assistente
+in chat: VaultMind funziona benissimo anche senza. Se hai la
+connessione lenta o non ti interessa, lasciala vuota.
+
+------------------------------------------------------------
+ SE WINDOWS TI AVVISA
+------------------------------------------------------------
+
+Puo' comparire "Windows ha protetto il PC" oppure un avviso
+dell'antivirus. Succede perche' il programma non ha una firma
+digitale a pagamento, non perche' ci sia qualcosa di strano.
+Clicca "Ulteriori informazioni" > "Esegui comunque".
+
+------------------------------------------------------------
+ AL PRIMO AVVIO: LA MASTER PASSWORD
+------------------------------------------------------------
+
+L'app ti chiede di SCEGLIERE la master password. E' la prima
+volta, quindi la stai creando adesso: non e' una password che
+devi indovinare.
+
+Da quella password si genera la chiave che cifra tutto. Non
+viene salvata da nessuna parte e non esiste nessun "recupero
+password": se la dimentichi, il contenuto e' perso davvero.
+Non c'e' trucco, e' proprio il funzionamento.
+
+------------------------------------------------------------
+ QUESTO E' UN PROTOTIPO
+------------------------------------------------------------
+
+Serve per provarlo e dire cosa non va. Non e' ancora un
+prodotto verificato da terzi: per il test usa password di
+prova o comunque non le tue piu' critiche (banca, PEC...).
+
+------------------------------------------------------------
+ DOVE FINISCONO I DATI / COME SI DISINSTALLA
+------------------------------------------------------------
+
+- L'applicazione sta in una sua cartella utente
+  (%LOCALAPPDATA%\Programs\VaultMind).
+- Le tue password stanno SOLO in  %USERPROFILE%\.vaultmind
+  sul tuo computer, cifrate.
+- Si disinstalla da Impostazioni > App > App installate,
+  come qualsiasi programma. Alla fine ti chiede se eliminare
+  anche il vault con le password: se rispondi Si' e' PER
+  SEMPRE, non esiste recupero. Se non sei sicuro, rispondi No.
+
+L'app apre una porta solo su 127.0.0.1, cioe' il tuo stesso
+computer. Non e' raggiungibile dalla rete, nemmeno dal wifi
+di casa.
+
+------------------------------------------------------------
+ SE QUALCOSA NON PARTE
+------------------------------------------------------------
+
+Fai uno screenshot dell'errore e mandalo a Luca, insieme al
+file  %USERPROFILE%\.vaultmind\vaultmind.log  se esiste.

@@ -14,8 +14,12 @@ vault.json
 settings.json
 *.vaultmind-backup
 
-# Pacchetto da consegnare: binario rigenerabile dal codice, inutile in git
+# Pacchetto da consegnare: binari rigenerabili dal codice, inutili in git
 PACCHETTO X INSTALLAZIONE EVERYWHERE/*.zip
+PACCHETTO X INSTALLAZIONE EVERYWHERE/*.exe
+
+# Installer compilato (installer/build-installer.ps1): rigenerabile, ~100 MB
+installer/Output/
 
 # Sistema
 .DS_Store
