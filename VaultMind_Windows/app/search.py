@@ -64,8 +64,28 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
 
 
+# Parti di dominio che non identificano nessun servizio: non diventano token
+# "forti", altrimenti la query "com" raggrupperebbe mezzo vault. Le parti da
+# 1-2 lettere (it, de, co...) sono già escluse dal limite di lunghezza.
+_TLD_NOISE = {"www", "com", "net", "org", "info", "biz", "gov", "edu"}
+
+
 def _tokens(s: str) -> List[str]:
-    return [t for t in _norm(s).split(" ") if t and t not in _STOP]
+    out: List[str] = []
+    for t in _norm(s).split(" "):
+        if not t or t in _STOP:
+            continue
+        out.append(t)
+        # "amazon.it" indicizzava UN SOLO token, col punto: la query "amazon"
+        # non lo combaciava mai. Su un vault importato da Bitwarden — dove i
+        # titoli SONO domini — la disambiguazione non scattava quasi mai
+        # ("amazon" restituiva solo la voce intitolata senza dominio).
+        # Le parti diventano token a loro volta: amazon.it -> anche "amazon".
+        if "." in t or "@" in t:
+            for p in re.split(r"[.@]", t):
+                if len(p) >= 3 and p not in _TLD_NOISE and p not in _STOP:
+                    out.append(p)
+    return out
 
 
 def _alias_expand(toks: set) -> set:
