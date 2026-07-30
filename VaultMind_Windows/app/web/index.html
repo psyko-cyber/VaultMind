@@ -276,6 +276,13 @@
   .set-status.off{color:var(--faint);border:1px solid var(--border)}
   .set-msg{font-size:12px;font-family:var(--mono);margin-top:8px;min-height:16px}
   .set-msg.ok{color:var(--green)} .set-msg.err{color:#FCA5A5}
+  /* Percorso di un file salvato: da leggere E da copiare. `user-select:text`
+     esplicito e `word-break` perché i percorsi Windows sono lunghi e non
+     hanno spazi dove andare a capo. */
+  .pathbox{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;
+    background:var(--panel2);border:1px solid var(--border);border-radius:10px}
+  .pathval{flex:1;font-family:var(--mono);font-size:12px;color:var(--soft);
+    user-select:text;-webkit-user-select:text;cursor:text;word-break:break-all}
 </style>
 </head>
 <body>
@@ -414,7 +421,11 @@
         </div>
         <div id="pairBox" class="hidden" style="padding:10px 0">
           <div class="desc" style="text-align:center">Scrivi questo codice nell'estensione:</div>
-          <div id="pairCode" style="font-family:'JetBrains Mono',monospace;font-size:30px;letter-spacing:10px;text-align:center;padding:8px 0;color:var(--accent)"></div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:10px">
+            <!-- selezionabile col mouse: chi non usa il pulsante lo evidenzia a mano -->
+            <div id="pairCode" style="font-family:var(--mono);font-size:30px;letter-spacing:10px;padding:8px 0;color:var(--accent);user-select:text;-webkit-user-select:text;cursor:text"></div>
+            <button class="iconbtn" id="pairCopy" title="Copia il codice">⧉</button>
+          </div>
           <div id="pairCountdown" class="desc" style="text-align:center"></div>
         </div>
         <div id="extList"></div>
@@ -638,6 +649,24 @@ function addAI(text, results, ambiguous){
   const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="mind"; wrap.appendChild(tag);
   const b=document.createElement("div"); b.className="bubble b-ai"; b.textContent=text; wrap.appendChild(b);
   (results||[]).forEach(c=> wrap.appendChild(credCard(c, ambiguous)));
+  r.appendChild(wrap); $("#chat").appendChild(r); scroll();
+}
+/* Messaggio di mind con un PERCORSO in evidenza: selezionabile col mouse e
+   con il pulsante di copia. Un percorso che non si può copiare costringe a
+   trascriverlo a mano. */
+function addAIPath(text, path){
+  const r=rowEl(""); const wrap=document.createElement("div"); wrap.style.maxWidth="88%";
+  const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="mind"; wrap.appendChild(tag);
+  const b=document.createElement("div"); b.className="bubble b-ai"; b.textContent=text; wrap.appendChild(b);
+
+  const box=document.createElement("div"); box.className="pathbox";
+  const p=document.createElement("span"); p.className="pathval"; p.textContent=path;
+  const cp=document.createElement("button"); cp.className="iconbtn"; cp.textContent="⧉";
+  cp.title="Copia il percorso";
+  cp.onclick=async()=>{ try{await navigator.clipboard.writeText(path);}catch(e){}
+    cp.textContent="✓"; setTimeout(()=>{cp.textContent="⧉";},1200); };
+  box.appendChild(p); box.appendChild(cp);
+  wrap.appendChild(box);
   r.appendChild(wrap); $("#chat").appendChild(r); scroll();
 }
 function scroll(){ const m=$("#chat"); m.scrollTop=m.scrollHeight; }
@@ -945,18 +974,17 @@ $("#saveCred").onclick=async()=>{
 
 $("#lockAgain").onclick=async()=>{ await api("/api/lock"); location.reload(); };
 
-/* ---- BACKUP ---- */
+/* ---- BACKUP ----
+   Lo scrive il SERVER, non il download del browser: cos\u00ec l'app pu\u00f2 dire dove
+   \u00e8 finito. Nella finestra pywebview un download normale sparisce in Download
+   senza che il JavaScript possa saperne il percorso. */
 $("#backupBtn").onclick=async()=>{
   try{
-    const res = await fetch("/api/backup");
-    if(!res.ok){ addAI("Backup non riuscito."); return; }
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = "vaultmind-backup.json";
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
-    addAI("Backup scaricato: un file cifrato che puoi copiare su un altro dispositivo. Per ripristinarlo, dalla schermata di blocco usa \u201cRipristina da backup\u201d e poi sblocca con questa stessa master password.");
+    const {ok,j} = await api("/api/backup_save");
+    if(!ok){ addAI(j.detail||"Backup non riuscito."); return; }
+    addAIPath("Backup salvato: un file cifrato che puoi copiare su un altro dispositivo. "
+      + "Per ripristinarlo, dalla schermata di blocco usa \u201cRipristina da backup\u201d "
+      + "e poi sblocca con questa stessa master password.", j.path);
   }catch(e){ addAI("Backup non riuscito."); }
 };
 
@@ -1505,6 +1533,12 @@ async function loadExtList(){
   });
   return exts.map(e=>e.origin);
 }
+$("#pairCopy").onclick=async()=>{
+  const c=$("#pairCode").textContent.trim();
+  if(!c) return;
+  try{ await navigator.clipboard.writeText(c); }catch(e){}
+  $("#pairCopy").textContent="✓"; setTimeout(()=>{$("#pairCopy").textContent="⧉";},1200);
+};
 $("#pairStart").onclick=async()=>{
   const {ok,j}=await api("/api/pair/start",{});
   if(!ok){ flashSet(j.detail||"Errore.","err"); return; }

@@ -587,19 +587,32 @@ def import_commit(body: ImportCommitIn):
             "count": len(S.store.entries)}
 
 
-@app.get("/api/backup")
-def backup():
-    """Restituisce il file vault CIFRATO così com'è su disco (backup portabile)."""
+@app.post("/api/backup_save")
+def backup_save():
+    """Salva il vault cifrato su disco e RESTITUISCE IL PERCORSO ESATTO.
+
+    Serve perché nella finestra pywebview un download normale finisce in
+    Download senza dirlo a nessuno: il JavaScript non può conoscere il percorso,
+    e l'utente si ritrova con "backup scaricato" senza sapere dove. Qui il file
+    lo scrive il server, che quindi sa esattamente dove sta.
+
+    Il nome porta la data: un backup non deve mai sovrascriverne uno precedente
+    in silenzio — è l'unica copia recuperabile del vault.
+    """
     _require_unlocked()
-    path = DEFAULT_VAULT
-    if not os.path.exists(path):
+    if not os.path.exists(DEFAULT_VAULT):
         raise HTTPException(status_code=404, detail="Nessun vault da esportare.")
-    data = Path(path).read_text(encoding="utf-8")
-    return PlainTextResponse(
-        data,
-        headers={"Content-Disposition": 'attachment; filename="vaultmind-backup.json"'},
-        media_type="application/json",
-    )
+    # Su Windows la cartella su disco resta "Downloads" anche in italiano;
+    # se manca (o su altri sistemi) si ripiega sulla home.
+    dest_dir = Path.home() / "Downloads"
+    if not dest_dir.is_dir():
+        dest_dir = Path.home()
+    nome = f"vaultmind-backup-{time.strftime('%Y%m%d-%H%M')}.json"
+    dest = dest_dir / nome
+    if dest.exists():                       # due backup nello stesso minuto
+        dest = dest_dir / f"vaultmind-backup-{time.strftime('%Y%m%d-%H%M%S')}.json"
+    dest.write_text(Path(DEFAULT_VAULT).read_text(encoding="utf-8"), encoding="utf-8")
+    return {"ok": True, "path": str(dest), "name": dest.name}
 
 
 @app.post("/api/restore")
