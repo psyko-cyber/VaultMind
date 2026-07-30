@@ -92,6 +92,43 @@ class WrongPassword(Exception):
     pass
 
 
+class VaultCorrupted(Exception):
+    """Il file non è un vault leggibile: JSON rotto, troncato, campi mancanti.
+
+    Distinto da WrongPassword perché le due cose chiedono all'utente azioni
+    OPPOSTE: con la password sbagliata si riprova, con un file danneggiato si
+    ripristina un backup — e riprovare la password all'infinito su un file
+    rotto è il modo peggiore di scoprirlo.
+
+    Attenzione: un fallimento del tag GCM resta `WrongPassword`, perché
+    password sbagliata e ciphertext manomesso sono crittograficamente
+    indistinguibili. Qui finisce solo ciò che si vede PRIMA di decifrare.
+    """
+    pass
+
+
+def _leggi_blob(path: str) -> dict:
+    """Legge il file del vault e verifica che abbia la forma attesa."""
+    # Cattura larga di proposito: un file danneggiato può avere QUALSIASI forma
+    # (chiavi mancanti, `null`, numeri al posto di stringhe, base64 invalido) e
+    # ognuna solleva un'eccezione diversa. Da qualunque di esse la conclusione
+    # per l'utente è una sola: "questo file non è un vault utilizzabile".
+    # Elencare i tipi uno per uno ha già lasciato passare un AttributeError.
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            blob = json.load(f)
+        salt = _b64d(blob["kdf"]["salt"])
+        nonce = _b64d(blob["nonce"])
+        ciphertext = _b64d(blob["ciphertext"])
+    except OSError:
+        raise                       # file assente o illeggibile: non è corruzione
+    except Exception as exc:
+        raise VaultCorrupted(
+            "Il file del vault non è leggibile (danneggiato o incompleto)."
+        ) from exc
+    return {"salt": salt, "nonce": nonce, "ciphertext": ciphertext}
+
+
 class VaultStore:
     """Gestisce un file vault cifrato. Tiene la chiave in RAM dopo unlock()."""
 
@@ -122,19 +159,30 @@ class VaultStore:
         self._flush()
 
     def unlock(self, master: str) -> None:
-        """Apre un vault esistente. Solleva WrongPassword se la chiave non torna."""
-        with open(self.path, "r", encoding="utf-8") as f:
-            blob = json.load(f)
-        self._salt = _b64d(blob["kdf"]["salt"])
-        key = derive_key(master, self._salt)
-        aes = AESGCM(key)
+        """Apre un vault esistente.
+
+        Solleva WrongPassword se la chiave non torna, VaultCorrupted se il file
+        non è nemmeno un vault leggibile. Non scrive MAI: un tentativo fallito
+        non deve poter danneggiare l'unica copia delle password.
+        """
+        blob = _leggi_blob(self.path)
+        salt = blob["salt"]
+        key = derive_key(master, salt)
         try:
-            plaintext = aes.decrypt(_b64d(blob["nonce"]), _b64d(blob["ciphertext"]), b"vaultmind")
-        except Exception as exc:  # tag GCM non valido => password errata o file corrotto
+            plaintext = AESGCM(key).decrypt(blob["nonce"], blob["ciphertext"], b"vaultmind")
+        except Exception as exc:  # tag GCM non valido => password errata o file manomesso
             raise WrongPassword("Master password errata o vault corrotto.") from exc
-        data = json.loads(plaintext.decode("utf-8"))
+        try:
+            data = json.loads(plaintext.decode("utf-8"))
+            entries = [Credential.from_dict(c) for c in data.get("credentials", [])]
+        except (json.JSONDecodeError, KeyError, TypeError, UnicodeDecodeError) as exc:
+            # Il tag GCM è tornato ma il contenuto non ha la forma attesa: non è
+            # un file di qualcun altro, è un vault nostro scritto male. Non si
+            # tocca niente e non si apre a metà.
+            raise VaultCorrupted("Il contenuto del vault non è leggibile.") from exc
+        self._salt = salt
         self._key = key
-        self._entries = [Credential.from_dict(c) for c in data.get("credentials", [])]
+        self._entries = entries
 
     def lock(self) -> None:
         self._key = None
@@ -148,12 +196,10 @@ class VaultStore:
         if not self.unlocked:
             raise WrongPassword("Vault bloccato.")
         # verifica la vecchia rileggendo il file con essa
-        with open(self.path, "r", encoding="utf-8") as f:
-            blob = json.load(f)
-        salt = _b64d(blob["kdf"]["salt"])
+        blob = _leggi_blob(self.path)
         try:
-            AESGCM(derive_key(old, salt)).decrypt(
-                _b64d(blob["nonce"]), _b64d(blob["ciphertext"]), b"vaultmind")
+            AESGCM(derive_key(old, blob["salt"])).decrypt(
+                blob["nonce"], blob["ciphertext"], b"vaultmind")
         except Exception as exc:
             raise WrongPassword("La master password attuale non è corretta.") from exc
         # nuova chiave con nuovo salt, poi riscrive

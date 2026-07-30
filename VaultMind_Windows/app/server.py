@@ -19,7 +19,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .crypto_store import VaultStore, WrongPassword
+from .crypto_store import VaultStore, WrongPassword, VaultCorrupted
 from .embedding import Embeddings
 from .search import SearchIndex, interpret
 from .import_parse import heuristic_extract
@@ -394,6 +394,15 @@ def unlock(body: UnlockIn):
             store.unlock(body.master)
         except WrongPassword:
             raise HTTPException(status_code=403, detail="Master password errata.")
+        except VaultCorrupted:
+            # Riprovare la password su un file danneggiato non porta da nessuna
+            # parte: va detto subito qual è la strada giusta.
+            raise HTTPException(
+                status_code=422,
+                detail="Il file del vault risulta danneggiato o incompleto. "
+                       "La password non c'entra: ripristina un backup con "
+                       "“Ripristina da backup” qui sotto.",
+            )
     else:
         # creazione del vault: qui la password non si "verifica", si FISSA.
         # Una password debole scelta per sbaglio resterebbe l'unica chiave.
