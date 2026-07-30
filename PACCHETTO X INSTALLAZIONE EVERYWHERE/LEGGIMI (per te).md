@@ -43,12 +43,12 @@ spedisci** — ogni zip viene ricontrollato per questo.
 
 ## Dopo ogni modifica al codice
 
-Chiedimi *"aggiorna il pacchetto"*:
+Tutto quello che sta qui è **generato**: non si modifica a mano.
 
-- l'installer si rigenera con `installer/build-installer.ps1` (che pretende un
-  exe più recente del codice — altrimenti si ferma e chiede di rilanciare
-  `run.bat` — e a fine compilazione **copia da solo** l'exe aggiornato qui);
-- lo zip lo rigenero dall'ultimo stato del codice.
+1. `run.bat` in `VaultMind_Windows\` — ricostruisce l'app
+2. `installer\rilascio.ps1` — rifà installer e zip **direttamente qui**
+   (si rifiuta se l'exe è più vecchio del codice, così non si consegna mai una
+   build stantia). Con `-Release` aggiorna anche la release su GitHub.
 
 ## Perché i binari non sono dentro git
 

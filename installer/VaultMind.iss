@@ -22,7 +22,7 @@
 #define MyAppVersion "6.7"
 #define MyAppExeName "VaultMind.exe"
 ; Percorso dell'exe costruito da run.bat. Prima di compilare l'installer
-; l'exe deve essere aggiornato: ci pensa build-installer.ps1.
+; l'exe deve essere aggiornato: lo verifica rilascio.ps1.
 #define MyAppSource "..\VaultMind_Windows\dist\VaultMind.exe"
 
 [Setup]
@@ -38,8 +38,13 @@ DisableProgramGroupPage=yes
 ; Per-utente: {autopf} con privilegi "lowest" diventa
 ; %LOCALAPPDATA%\Programs\VaultMind. Niente richiesta admin.
 PrivilegesRequired=lowest
-OutputDir=Output
-OutputBaseFilename=VaultMind-Setup-{#MyAppVersion}
+; Scrive DIRETTAMENTE nella cartella dei consegnabili: una copia sola, sempre
+; quella vera. Con una Output\ separata più la copia nel pacchetto si tenevano
+; 108 MB in doppio e bastava una dimenticanza per consegnare la build vecchia.
+; Nome senza versione, come gli zip: il file è sempre l'ultimo compilato, la
+; versione la dichiara l'installer stesso (e poi "App installate").
+OutputDir=..\PACCHETTO X INSTALLAZIONE EVERYWHERE
+OutputBaseFilename=VaultMind-Setup
 SetupIconFile=..\VaultMind_Windows\VaultMind.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 Compression=lzma2
