@@ -1,7 +1,13 @@
 # Pacchetto da mandare a chi testa
 
-Due consegnabili. I nomi dei file non cambiano mai: sono sempre la versione
-più recente.
+Tutto qui dentro è **generato** da `installer\rilascio.ps1`: non si modifica a
+mano. I nomi dei file non cambiano mai, sono sempre la versione più recente.
+
+**Cosa mandare, in pratica:**
+- per **email/WhatsApp** → `VaultMind-Setup.zip` (contiene installer +
+  istruzioni: un allegato solo, e passa dove i `.exe` vengono bloccati)
+- se ha accesso al **repo** → il link alla release GitHub
+- se vuole **vedere il codice** → `VaultMind-Windows.zip`
 
 ## 1. `VaultMind-Setup.exe` — quello principale (~108 MB)
 
@@ -17,6 +23,14 @@ SmartScreen (siamo senza firma), la master password che al primo avvio si
 
 La versione precisa la mostra l'installer stesso e, dopo, la voce in
 "App installate" (oggi: 6.7).
+
+**`VaultMind-Setup.zip`** è lo stesso installer più le istruzioni, in uno zip:
+WhatsApp, molte webmail e i proxy aziendali rifiutano gli allegati `.exe`.
+Si rigenera insieme a tutto il resto, quindi è sempre allineato.
+
+Chi lo riceve **installa sopra** la versione precedente: niente disinstallazione,
+il vault non viene toccato, una sola icona e una sola voce in "App installate"
+(l'`AppId` è fisso, Windows riconosce la stessa app).
 
 ## 1-bis. `VaultMind-Estensione.zip` — l'estensione per il browser (~50 KB)
 

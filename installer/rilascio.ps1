@@ -78,6 +78,22 @@ if ($LASTEXITCODE -ne 0) { Err "Compilazione dell'installer fallita."; exit 1 }
 $setup = Get-Item (Join-Path $PACCHETTO "VaultMind-Setup.exe")
 Ok ("VaultMind-Setup.exe  " + [math]::Round($setup.Length / 1MB, 1) + " MB")
 
+# --- lo stesso installer dentro uno zip, con le istruzioni ---
+# Serve per mandarlo ai soci: WhatsApp, molte webmail e i proxy aziendali
+# rifiutano gli allegati .exe, uno .zip passa. Dentro va anche il file di
+# istruzioni: un solo allegato con tutto quello che serve a chi lo riceve.
+$stageZip = Join-Path $env:TEMP "vm_setup_zip"
+if (Test-Path $stageZip) { Remove-Item $stageZip -Recurse -Force -Confirm:$false }
+New-Item -ItemType Directory -Force $stageZip | Out-Null
+Copy-Item $setup.FullName $stageZip
+Copy-Item (Join-Path $PACCHETTO "INIZIA DA QUI (per chi riceve).txt") $stageZip
+$zipSetup = Join-Path $PACCHETTO "VaultMind-Setup.zip"
+if (Test-Path $zipSetup) { Remove-Item $zipSetup -Force }
+# -Path con \* : lo zip contiene i file, non una cartella che li avvolge
+Compress-Archive -Path (Join-Path $stageZip "*") -DestinationPath $zipSetup
+Remove-Item $stageZip -Recurse -Force -Confirm:$false
+Ok ("VaultMind-Setup.zip  " + [math]::Round((Get-Item $zipSetup).Length / 1MB, 1) + " MB  (installer + istruzioni, da mandare a mano)")
+
 # ============================ 3) i due zip ================================
 Fase "3/4  Pacchetti zip"
 $stage = Join-Path $env:TEMP "vm_stage"
