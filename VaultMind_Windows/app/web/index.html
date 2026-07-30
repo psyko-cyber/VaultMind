@@ -279,6 +279,14 @@
   /* Percorso di un file salvato: da leggere E da copiare. `user-select:text`
      esplicito e `word-break` perché i percorsi Windows sono lunghi e non
      hanno spazi dove andare a capo. */
+  /* Istruzioni brevi dentro un pannello di impostazioni. Servono regole
+     proprie: `.desc` e' definita solo come discendente di .set-row, quindi
+     fuori da una riga il testo ereditava il font del body ed esplodeva. */
+  .ext-help{padding:2px 0 6px}
+  .ext-steps{margin:0;padding-left:16px;font-size:11px;color:var(--faint);line-height:1.65}
+  .ext-steps b{color:var(--soft);font-weight:600}
+  .ext-steps code{font-family:var(--mono);font-size:10px;color:var(--soft);
+    background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
   .pathbox{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;
     background:var(--panel2);border:1px solid var(--border);border-radius:10px}
   .pathval{flex:1;font-family:var(--mono);font-size:12px;color:var(--soft);
@@ -418,6 +426,16 @@
           <div><div class="lab">Chrome · Edge · Brave</div>
             <div class="desc">L'estensione legge dal vault sbloccato, in sola lettura: nessuna copia delle credenziali nel browser.</div></div>
           <button class="iconbtn ctl" id="pairStart">Associa…</button>
+        </div>
+        <!-- L'estensione è già installata accanto all'app: qui si dice DOVE,
+             perché %LOCALAPPDATA% non è un percorso che si indovina. -->
+        <div id="extFolderBox" class="hidden ext-help">
+          <ol class="ext-steps">
+            <li>Apri <code>chrome://extensions</code> e attiva <b>Modalità sviluppatore</b></li>
+            <li>Clicca <b>Carica estensione non pacchettizzata</b></li>
+            <li>Incolla questo percorso:</li>
+          </ol>
+          <div class="pathbox"><span class="pathval" id="extFolder"></span><button class="iconbtn" id="extFolderCopy" title="Copia il percorso">⧉</button></div>
         </div>
         <div id="pairBox" class="hidden" style="padding:10px 0">
           <div class="desc" style="text-align:center">Scrivi questo codice nell'estensione:</div>
@@ -1517,14 +1535,30 @@ $("#setOpenImport").onclick=()=>{ $("#setModal").classList.add("hidden"); resetI
    token di sola lettura, revocabile da questa lista. */
 let _pairTimer=null;
 const _escAttr=(s)=>esc(s).replace(/"/g,"&quot;");
+/* L'origine di un'estensione e' `chrome-extension://` + 32 caratteri: per
+   riconoscerla in una lista bastano le estremita', il resto e' rumore. */
+function _idBreve(origin){
+  const id=String(origin||"").replace(/^\w+-extension:\/\//,"").replace(/\/$/,"");
+  return id.length>16 ? id.slice(0,6)+"…"+id.slice(-4) : id;
+}
+/* Le date salvate prima erano in formato ISO: si mostrano all'italiana
+   comunque, senza dover ri-abbinare l'estensione. */
+function _dataIt(s){
+  const m=/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}:\d{2})/.exec(String(s||""));
+  return m ? `${m[3]}/${m[2]}/${m[1]} ${m[4]}` : (s||"—");
+}
 async function loadExtList(){
   const {ok,j}=await fetch("/api/pair/list").then(r=>r.json().then(d=>({ok:r.ok,j:d}))).catch(()=>({ok:false}));
   const box=$("#extList"); if(!box) return [];
   if(!ok){ box.innerHTML=""; return []; }
+  // percorso della cartella dell'estensione: c'è solo se l'app la trova
+  // accanto a sé (installer) o nel repo (sviluppo)
+  if(j.folder){ $("#extFolder").textContent=j.folder; $("#extFolderBox").classList.remove("hidden"); }
+  else { $("#extFolderBox").classList.add("hidden"); }
   const exts=j.extensions||[];
   box.innerHTML=exts.map(e=>
     `<div class="set-row"><div><div class="lab">🧩 ${esc(e.name)}</div>
-       <div class="desc">${esc(e.origin)} · abbinata il ${esc(e.created||"—")}</div></div>
+       <div class="desc">ID ${esc(_idBreve(e.origin))} · abbinata il ${esc(_dataIt(e.created))}</div></div>
        <button class="iconbtn ctl" data-revoke="${_escAttr(e.origin)}">Revoca</button></div>`).join("");
   box.querySelectorAll("[data-revoke]").forEach(b=>b.onclick=async()=>{
     await api("/api/pair/revoke",{origin:b.dataset.revoke});
@@ -1533,6 +1567,12 @@ async function loadExtList(){
   });
   return exts.map(e=>e.origin);
 }
+$("#extFolderCopy").onclick=async()=>{
+  const p=$("#extFolder").textContent.trim();
+  if(!p) return;
+  try{ await navigator.clipboard.writeText(p); }catch(e){}
+  $("#extFolderCopy").textContent="✓"; setTimeout(()=>{$("#extFolderCopy").textContent="⧉";},1200);
+};
 $("#pairCopy").onclick=async()=>{
   const c=$("#pairCode").textContent.trim();
   if(!c) return;

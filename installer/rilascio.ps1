@@ -47,7 +47,10 @@ if (-not (Test-Path $EXE)) {
   exit 1
 }
 $exeTime = (Get-Item $EXE).LastWriteTime
-$sorgenti = @(Get-ChildItem (Join-Path $WIN "app") -Recurse -File)
+# __pycache__ escluso: i .pyc nascono eseguendo l'app in sviluppo, sono sempre
+# piu' recenti dell'exe e facevano dichiarare stantia una build buona.
+$sorgenti = @(Get-ChildItem (Join-Path $WIN "app") -Recurse -File |
+              Where-Object { $_.FullName -notmatch "__pycache__" })
 foreach ($f in @("vaultmind_launcher.py","requirements.txt")) {
   $p = Join-Path $WIN $f
   if (Test-Path $p) { $sorgenti += Get-Item $p }
@@ -141,7 +144,17 @@ Copy-Item (Join-Path $REPO_DIR "extension\*") $eroot -Recurse
 [IO.File]::WriteAllText((Join-Path $eroot "COME SI INSTALLA.txt"), @"
 Estensione VaultMind per Chrome / Edge / Brave
 ==============================================
-1. Estrai questa cartella dove vuoi tenerla (non cancellarla dopo).
+
+NOTA: se hai installato VaultMind con VaultMind-Setup.exe, questo zip
+NON TI SERVE - l'estensione e' gia' sul tuo computer, installata
+insieme all'app. Il percorso da usare lo trovi nell'app:
+Impostazioni > Estensione browser, con il pulsante per copiarlo.
+
+Questo zip serve solo a chi vuole tenere l'estensione altrove, o a chi
+usa VaultMind dal sorgente (run.bat).
+
+1. Estrai questa cartella dove vuoi tenerla (non cancellarla dopo:
+   il browser la carica da li' ogni volta).
 2. Nel browser apri  chrome://extensions  e attiva "Modalita' sviluppatore".
 3. "Carica estensione non pacchettizzata" -> scegli questa cartella.
 4. Apri VaultMind e sblocca il vault.

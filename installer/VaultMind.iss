@@ -67,6 +67,13 @@ Name: "ollama"; Description: "Scarica e installa Ollama + modello llama3.2:3b (c
 [Files]
 Source: "{#MyAppSource}"; DestDir: "{app}"; Flags: ignoreversion
 Source: "..\VaultMind_Windows\VaultMind.ico"; DestDir: "{app}"; Flags: ignoreversion
+; L'estensione viaggia GIA' SPACCHETTATA: chi la vuole punta "Carica estensione
+; non pacchettizzata" qui e basta, senza scaricare ed estrarre uno zip a parte
+; (e senza il rischio di cancellare per sbaglio la cartella, che ucciderebbe
+; l'estensione). Il percorso e' stabile fra un aggiornamento e l'altro: Chrome
+; ricava l'ID di un'estensione scompattata dalla sua cartella, quindi cosi'
+; l'abbinamento al vault sopravvive agli aggiornamenti.
+Source: "..\extension\*"; DestDir: "{app}\estensione"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilename: "{app}\VaultMind.ico"; Comment: "Gestore di password 100% locale"

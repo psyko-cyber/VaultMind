@@ -128,13 +128,29 @@ function NeedsBuild(){
   if (-not (Test-Path $EXE)) { return $true }
   $exeTime = (Get-Item $EXE).LastWriteTime
   $sorgenti = @()
-  $sorgenti += Get-ChildItem (Join-Path $PSScriptRoot "app") -Recurse -File -ErrorAction SilentlyContinue
+  # __pycache__ va escluso: i .pyc sono generati eseguendo l'app, quindi sono
+  # SEMPRE piu' recenti dell'exe e facevano ricostruire a ogni avvio (2 minuti
+  # buttati) dopo ogni sessione di sviluppo.
+  $sorgenti += Get-ChildItem (Join-Path $PSScriptRoot "app") -Recurse -File -ErrorAction SilentlyContinue |
+               Where-Object { $_.FullName -notmatch "__pycache__" }
   foreach ($f in @("vaultmind_launcher.py","requirements.txt")) {
     $p = Join-Path $PSScriptRoot $f
     if (Test-Path $p) { $sorgenti += Get-Item $p }
   }
   foreach ($f in $sorgenti) { if ($f.LastWriteTime -gt $exeTime) { return $true } }
   return $false
+}
+
+# PyInstaller non puo' sostituire un exe in esecuzione: Windows lo tiene
+# bloccato e la build muore con "Accesso negato", un messaggio che non dice
+# affatto qual e' il problema. Qui l'app viene chiusa prima, cosa che ha senso:
+# run.bat la riapre comunque alla fine.
+function CloseRunningApp(){
+  $p = @(Get-Process VaultMind -ErrorAction SilentlyContinue)
+  if ($p.Count -eq 0) { return }
+  Warn "VaultMind e' aperto: lo chiudo per poter ricostruire l'applicazione."
+  $p | ForEach-Object { try { Stop-Process -Id $_.Id -Force -Confirm:$false } catch { } }
+  Start-Sleep -Milliseconds 900
 }
 
 # Ollama e' un processo a parte: se e' installato ma spento, l'assistente in
@@ -291,6 +307,7 @@ if ($mancanti) {
 if ($assenti) { Warn ("Non inclusi (non installati): " + ($assenti -join ", ")) }
 Ok ("Moduli inclusi: " + $presenti.Count + ".")
 
+CloseRunningApp
 foreach ($d in @("build","dist")) { if (Test-Path $d) { Remove-Item $d -Recurse -Force -Confirm:$false } }
 if (Test-Path "VaultMind.spec") { Remove-Item "VaultMind.spec" -Force -Confirm:$false }
 

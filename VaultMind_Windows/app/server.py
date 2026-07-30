@@ -7,6 +7,7 @@ dell'esecuzione. Nessun endpoint è esposto sulla rete: il bind è loopback.
 
 from __future__ import annotations
 import os
+import sys
 import json
 import secrets
 import hashlib
@@ -311,19 +312,40 @@ def pair_claim(body: PairClaimIn, request: Request):
         "name": (body.name.strip() or "Estensione browser")[:60],
         "origin": origin,
         "token_hash": _hash_token(token),
-        "created": time.strftime("%Y-%m-%d %H:%M"),
+        "created": time.strftime("%d/%m/%Y %H:%M"),
     })
     s["extensions"] = exts
     _save_settings(s)
     return {"ok": True, "token": token}
 
 
+def _cartella_estensione() -> Optional[str]:
+    """Dove sta la cartella da dare a "Carica estensione non pacchettizzata".
+
+    L'installer la mette accanto all'eseguibile; in sviluppo sta nel repo.
+    Serve perché l'utente altrimenti deve andarla a cercare a mano dentro
+    %LOCALAPPDATA%, che non è un posto che si indovina.
+    """
+    candidati = []
+    if getattr(sys, "frozen", False):
+        exe = Path(sys.executable)
+        candidati.append(exe.parent / "estensione")      # app installata
+        candidati.append(exe.parents[2] / "extension")   # exe in dist\, repo sopra
+    candidati.append(Path(__file__).resolve().parents[2] / "extension")  # sorgente
+    for c in candidati:
+        if (c / "manifest.json").is_file():
+            return str(c)
+    return None
+
+
 @app.get("/api/pair/list")
 def pair_list():
-    """Per le impostazioni: quali estensioni sono abbinate (mai gli hash)."""
+    """Per le impostazioni: quali estensioni sono abbinate (mai gli hash), più
+    il percorso della cartella da caricare nel browser."""
     _require_unlocked()
     return {"extensions": [{"name": e.get("name"), "origin": e.get("origin"),
-                            "created": e.get("created")} for e in _ext_registry()]}
+                            "created": e.get("created")} for e in _ext_registry()],
+            "folder": _cartella_estensione()}
 
 
 class PairRevokeIn(BaseModel):

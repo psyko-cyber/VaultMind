@@ -27,6 +27,32 @@ in chat: VaultMind funziona benissimo anche senza. Se hai la
 connessione lenta o non ti interessa, lasciala vuota.
 
 ------------------------------------------------------------
+ ESTENSIONE PER IL BROWSER (facoltativa)
+------------------------------------------------------------
+
+Serve a cercare e copiare le credenziali mentre navighi, senza
+tornare nell'app. E' GIA' INSTALLATA insieme a VaultMind: non
+devi scaricare ne' estrarre niente.
+
+Per attivarla (Chrome, Edge o Brave):
+
+1. Apri VaultMind e sblocca il vault.
+2. Menu (in alto a sinistra) > Impostazioni > Estensione browser.
+   Qui trovi il PERCORSO da usare, con un pulsante per copiarlo.
+3. Nel browser apri  chrome://extensions  e attiva in alto a
+   destra "Modalita' sviluppatore".
+4. Clicca "Carica estensione non pacchettizzata" e incolla il
+   percorso copiato al punto 2.
+5. Torna in VaultMind: Impostazioni > Estensione browser >
+   "Associa...". Compare un codice di 6 cifre.
+6. Clicca l'icona VaultMind nella barra del browser e scrivi
+   quel codice.
+
+L'estensione legge dal vault SOLO quando l'app e' aperta e
+sbloccata, in sola lettura, e non salva nessuna password nel
+browser. Puoi revocarla quando vuoi dalle Impostazioni.
+
+------------------------------------------------------------
  SE WINDOWS TI AVVISA
 ------------------------------------------------------------
 
