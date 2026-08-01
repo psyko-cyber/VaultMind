@@ -571,5 +571,61 @@ class TestIgieneCrittografica(BaseVault):
         self.assertEqual(32, len(derive_key(MASTER, salt)), "chiave a 256 bit")
 
 
+# ===========================================================================
+class TestVettoreDiProva(unittest.TestCase):
+    """Il vault d'esempio in `vettore/` è il contratto del formato: ci si
+    verifica l'implementazione dell'app Android.
+
+    Questi test lo aprono a ogni esecuzione della suite. Se qualcuno cambia il
+    formato del vault senza accorgersene, si rompono qui — cioè PRIMA che
+    l'app mobile smetta di aprire i vault degli utenti.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.dir = os.path.join(_QUI, "vettore")
+        cls.vault = os.path.join(cls.dir, "vault-esempio.json")
+        with open(os.path.join(cls.dir, "atteso.json"), encoding="utf-8") as f:
+            cls.atteso = json.load(f)
+
+    def test_il_vettore_si_apre_con_la_password_documentata(self):
+        s = VaultStore(self.vault)
+        s.unlock(self.atteso["master_password"])
+        self.assertEqual(len(self.atteso["credentials"]), len(s.entries))
+
+    def test_il_contenuto_combacia_esattamente(self):
+        """Ordine delle voci, ordine dei campi, valori, tag, critical."""
+        s = VaultStore(self.vault)
+        s.unlock(self.atteso["master_password"])
+        self.assertEqual(self.atteso["credentials"], [c.to_dict() for c in s.entries])
+
+    def test_i_parametri_dichiarati_sono_quelli_veri(self):
+        """`atteso.json` dice a chi implementa quali parametri usare: se il
+        codice li cambiasse, il documento mentirebbe."""
+        from app.crypto_store import ARGON2_TIME, ARGON2_MEMORY, ARGON2_PARALLELISM, KEY_LEN
+        k = self.atteso["kdf"]
+        self.assertEqual(ARGON2_TIME, k["time_cost"])
+        self.assertEqual(ARGON2_MEMORY, k["memory_cost_kib"])
+        self.assertEqual(ARGON2_PARALLELISM, k["parallelism"])
+        self.assertEqual(KEY_LEN, k["key_len"])
+        with open(self.vault, encoding="utf-8") as f:
+            blob = json.load(f)
+        self.assertEqual("aes-256-gcm", blob["cipher"])
+        self.assertEqual(12, len(_b64d(blob["nonce"])), "nonce da 12 byte")
+        self.assertEqual(16, len(_b64d(blob["kdf"]["salt"])), "salt da 16 byte")
+
+    def test_il_codice_2FA_di_verifica(self):
+        """Un errore nel base32 o nel contatore big-endian non si vede finché
+        qualcuno non prova ad accedere a un servizio vero."""
+        from app import totp
+        v = self.atteso["totp_di_verifica"]
+        self.assertEqual(v["codice_atteso"],
+                         totp.generate(v["secret"], t=v["unix_time"])["code"])
+
+    def test_la_password_sbagliata_fallisce_anche_sul_vettore(self):
+        with self.assertRaises(WrongPassword):
+            VaultStore(self.vault).unlock("non-e-questa")
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)
