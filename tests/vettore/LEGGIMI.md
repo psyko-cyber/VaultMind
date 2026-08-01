@@ -84,7 +84,13 @@ sono casuali: il contenuto resta identico, il file no.
 ..\..\VaultMind_Windows\.venv\Scripts\python.exe genera.py
 ```
 
-C'è un test (`test_crypto_store.py`, classe `TestVettoreDiProva`) che apre
-questo file a ogni esecuzione della suite: se qualcuno cambia il formato del
-vault senza accorgersene, quel test si rompe **prima** che l'app mobile smetta
-di funzionare.
+Due suite aprono questo file a ogni esecuzione, una per piattaforma:
+
+- **Python** — `tests\run.ps1`, classe `TestVettoreDiProva`
+- **Dart** — `mobile\costruisci.ps1 -Test`, che si rifiuta di costruire l'APK
+  se falliscono
+
+Se qualcuno cambia il formato del vault senza accorgersene, si rompono **prima**
+che l'app mobile smetta di aprire i vault degli utenti. È esattamente il motivo
+per cui il vettore esiste, e per cui deve restarne **uno solo**: due copie
+divergerebbero in silenzio.

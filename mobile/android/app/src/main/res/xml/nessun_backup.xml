@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Il vault non esce da questo telefono. Mai.
+
+  Di default Android copia i dati delle app sul Google Drive dell'utente e li
+  trasferisce sul telefono nuovo: comodo per un gioco, inaccettabile qui.
+  Il vault finirebbe nel cloud DA SOLO, distruggendo esattamente la promessa
+  su cui è costruito il prodotto — e senza che l'utente lo sappia.
+
+  `allowBackup="false"` nel manifest copre Android fino al 11; da Android 12
+  serve anche questo file (`dataExtractionRules`), che vale per il backup su
+  cloud e per il trasferimento diretto fra dispositivi.
+
+  Il modo giusto per spostare il vault resta il backup cifrato, che l'utente
+  esporta e sposta consapevolmente.
+-->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" />
+        <exclude domain="file" />
+        <exclude domain="database" />
+        <exclude domain="sharedpref" />
+        <exclude domain="external" />
+    </device-transfer>
+</data-extraction-rules>
