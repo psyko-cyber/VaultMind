@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../main.dart';
+import '../ricerca.dart';
 import '../totp.dart';
 import '../vault.dart';
 
@@ -27,42 +28,42 @@ class SchermataElenco extends StatefulWidget {
 
 class _SchermataElencoState extends State<SchermataElenco> {
   final _ricerca = TextEditingController();
+  late final IndiceRicerca _indice;
   List<Credenziale> _mostrate = const [];
+  Timer? _attesa;
 
   @override
   void initState() {
     super.initState();
+    // L'indice si costruisce una volta sola: i vettori delle voci non
+    // cambiano fra una ricerca e l'altra.
+    _indice = IndiceRicerca(widget.vault.credenziali);
     _mostrate = widget.vault.credenziali;
-    _ricerca.addListener(_filtra);
+    _ricerca.addListener(_programmaRicerca);
   }
 
   @override
   void dispose() {
+    _attesa?.cancel();
     _ricerca.dispose();
     super.dispose();
   }
 
-  /// Filtro immediato su titolo, tag ed etichette — mai sui valori: cercare
-  /// dentro le password significherebbe indicizzarle, e non si fa.
-  ///
-  /// I titoli-dominio vanno spezzati: su un vault importato da Bitwarden i
-  /// titoli SONO domini, e cercare "amazon" non deve mancare "amazon.it".
-  void _filtra() {
-    final q = _ricerca.text.trim().toLowerCase();
+  /// Con 800 voci una ricerca costa qualche decina di millisecondi: farla a
+  /// ogni singolo tasto premuto renderebbe la digitazione a scatti. Si aspetta
+  /// che l'utente smetta di scrivere per un attimo.
+  void _programmaRicerca() {
+    _attesa?.cancel();
+    _attesa = Timer(const Duration(milliseconds: 120), _cerca);
+  }
+
+  void _cerca() {
+    final q = _ricerca.text.trim();
+    if (!mounted) return;
     setState(() {
-      if (q.isEmpty) {
-        _mostrate = widget.vault.credenziali;
-        return;
-      }
-      _mostrate = widget.vault.credenziali.where((c) {
-        final pezzi = <String>[
-          c.title.toLowerCase(),
-          ...c.title.toLowerCase().split(RegExp(r'[.@\s_-]+')),
-          ...c.tags.map((t) => t.toLowerCase()),
-          ...c.fields.map((f) => f.label.toLowerCase()),
-        ];
-        return pezzi.any((p) => p.contains(q));
-      }).toList();
+      _mostrate = q.isEmpty
+          ? widget.vault.credenziali
+          : _indice.cerca(q).map((r) => r.voce).toList();
     });
   }
 
