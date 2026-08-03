@@ -40,6 +40,13 @@ kotlin {
     }
 }
 
+dependencies {
+    // Impronta digitale. Si usa direttamente la libreria di Android invece di
+    // un pacchetto Flutter: la chiave del vault va protetta dal Keystore con
+    // l'autenticazione obbligatoria, e quel controllo si fa solo di qui.
+    implementation("androidx.biometric:biometric:1.1.0")
+}
+
 flutter {
     source = "../.."
 }

@@ -95,39 +95,59 @@ class Vault {
   const Vault(this.credenziali);
 }
 
-/// Apre un vault cifrato.
-///
-/// [contenuto] è il testo del file `.json` così com'è su disco.
-/// Solleva [VaultCorrupted] se non è un vault leggibile, [WrongPassword] se
-/// la chiave non torna.
-Future<Vault> apriVault(String contenuto, String master) async {
+/// I tre pezzi del file, già decodificati.
+class _Pezzi {
   final Uint8List salt, nonce, ciphertext;
+  const _Pezzi(this.salt, this.nonce, this.ciphertext);
+}
+
+_Pezzi _leggiPezzi(String contenuto) {
   try {
     final blob = jsonDecode(contenuto) as Map<String, dynamic>;
     final kdf = blob['kdf'] as Map<String, dynamic>;
-    salt = base64.decode(kdf['salt'] as String);
-    nonce = base64.decode(blob['nonce'] as String);
-    ciphertext = base64.decode(blob['ciphertext'] as String);
+    return _Pezzi(
+      base64.decode(kdf['salt'] as String),
+      base64.decode(blob['nonce'] as String),
+      base64.decode(blob['ciphertext'] as String),
+    );
   } catch (e) {
     // Cattura larga di proposito: un file danneggiato può avere qualsiasi
     // forma (chiavi mancanti, null, base64 invalido) e ognuna solleva
     // un'eccezione diversa. Per l'utente la conclusione è una sola.
     throw const VaultCorrupted();
   }
+}
 
-  final chiave = await derivaChiave(master, salt);
+/// Deriva la chiave dalla master password, usando il salt del file.
+/// Separata perché serve anche allo sblocco con impronta: quella conserva la
+/// **chiave**, mai la password.
+Future<Uint8List> chiaveDelVault(String contenuto, String master) async =>
+    derivaChiave(master, _leggiPezzi(contenuto).salt);
+
+/// Apre un vault cifrato.
+///
+/// [contenuto] è il testo del file `.json` così com'è su disco.
+/// Solleva [VaultCorrupted] se non è un vault leggibile, [WrongPassword] se
+/// la chiave non torna.
+Future<Vault> apriVault(String contenuto, String master) async =>
+    apriVaultConChiave(contenuto, await chiaveDelVault(contenuto, master));
+
+/// Apre un vault con la chiave già derivata: è la strada dello sblocco con
+/// impronta, che salta Argon2 perché la chiave l'ha già.
+Future<Vault> apriVaultConChiave(String contenuto, Uint8List chiave) async {
+  final p = _leggiPezzi(contenuto);
 
   // Il tag GCM (16 byte) sta IN CODA al ciphertext: è la convenzione di
   // Python `cryptography`, che produce i file. Qui va separato a mano.
   const lunghezzaTag = 16;
-  if (ciphertext.length < lunghezzaTag) throw const VaultCorrupted();
-  final corpo = ciphertext.sublist(0, ciphertext.length - lunghezzaTag);
-  final tag = ciphertext.sublist(ciphertext.length - lunghezzaTag);
+  if (p.ciphertext.length < lunghezzaTag) throw const VaultCorrupted();
+  final corpo = p.ciphertext.sublist(0, p.ciphertext.length - lunghezzaTag);
+  final tag = p.ciphertext.sublist(p.ciphertext.length - lunghezzaTag);
 
   final Uint8List chiaro;
   try {
     final byte = await AesGcm.with256bits().decrypt(
-      SecretBox(corpo, nonce: nonce, mac: Mac(tag)),
+      SecretBox(corpo, nonce: p.nonce, mac: Mac(tag)),
       secretKey: SecretKey(chiave),
       aad: kAad,
     );

@@ -1,7 +1,10 @@
 /// Sblocco del vault, e import del backup quando non c'è ancora.
 library;
 
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../archivio.dart';
 import '../main.dart';
@@ -22,10 +25,12 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
   late bool _presente = widget.vaultPresente;
   bool _occupato = false;
   String? _errore;
+  bool _impronta = false;
 
   @override
   void initState() {
     super.initState();
+    _controllaImpronta();
     // L'app può essere stata aperta proprio toccando l'allegato in chat:
     // in quel caso il backup è già qui e si importa da solo, senza che
     // l'utente debba cercare niente.
@@ -44,6 +49,86 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     super.dispose();
   }
 
+  Future<void> _controllaImpronta() async {
+    // Il pulsante compare solo se l'impronta è stata davvero attivata: farlo
+    // vedere e poi dire "non è attivo" sarebbe una promessa non mantenuta.
+    final attiva = await improntaAttiva();
+    if (mounted && attiva && _presente) {
+      setState(() => _impronta = true);
+      _sbloccaConImpronta(); // si prova subito: è il gesto che ci si aspetta
+    }
+  }
+
+  Future<void> _sbloccaConImpronta() async {
+    setState(() => _errore = null);
+    try {
+      final chiaveBase64 = await improntaSblocca();
+      if (chiaveBase64 == null) return; // annullato
+      final contenuto = await leggiVault();
+      final vault = await apriVaultConChiave(contenuto, base64.decode(chiaveBase64));
+      if (!mounted) return;
+      _vaiAllElenco(vault);
+    } on PlatformException catch (e) {
+      setState(() => _errore = e.message ?? 'Sblocco con impronta non riuscito.');
+      setState(() => _impronta = false);
+    } on WrongPassword {
+      // La chiave conservata non apre più questo vault: succede se è stato
+      // importato un backup con una master password diversa.
+      await improntaDisattiva();
+      setState(() {
+        _impronta = false;
+        _errore = 'Questo vault ha una password diversa: sbloccalo a mano e riattiva l\'impronta.';
+      });
+    } catch (e) {
+      setState(() => _errore = 'Sblocco con impronta non riuscito.');
+    }
+  }
+
+  void _vaiAllElenco(Vault vault) {
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => SchermataElenco(vault: vault)),
+    );
+  }
+
+  /// Dopo uno sblocco riuscito propone l'impronta, una volta sola: è il solo
+  /// momento in cui la chiave è disponibile per essere messa al sicuro.
+  Future<void> _proponiImpronta(String contenuto, String master) async {
+    if (!await impresaDisponibile() || await improntaAttiva()) return;
+    if (!mounted) return;
+    final vuole = await showDialog<bool>(
+      context: context,
+      builder: (c) => AlertDialog(
+        backgroundColor: colorePannello,
+        title: const Text('Sbloccare con l\'impronta?'),
+        content: const Text(
+          'La prossima volta ti basterà il dito, senza riscrivere la master password.\n\n'
+          'La password non viene salvata: viene messa al sicuro la chiave del vault, '
+          'e il telefono la restituisce solo dopo aver riconosciuto la tua impronta.',
+          style: TextStyle(fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(c, false),
+            child: const Text('No, grazie', style: TextStyle(color: coloreTenue)),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(c, true),
+            style: FilledButton.styleFrom(
+                backgroundColor: coloreAccento, foregroundColor: const Color(0xFF141414)),
+            child: const Text('Attiva'),
+          ),
+        ],
+      ),
+    );
+    if (vuole != true) return;
+    try {
+      final chiave = await chiaveDelVault(contenuto, master);
+      await improntaAttivaConChiave(base64.encode(chiave));
+    } catch (e) {
+      // Se non riesce non è grave: si continua con la master password.
+    }
+  }
+
   Future<void> _sblocca() async {
     if (_password.text.isEmpty) return;
     setState(() {
@@ -52,15 +137,16 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     });
     try {
       final contenuto = await leggiVault();
-      final vault = await apriVault(contenuto, _password.text);
+      final master = _password.text;
+      final vault = await apriVault(contenuto, master);
+      if (!mounted) return;
+      await _proponiImpronta(contenuto, master);
       if (!mounted) return;
       // La password esce dalla memoria appena non serve più. Resta comunque
       // in RAM finché il campo di testo vive, ma non la si tiene un istante
       // più del necessario.
       _password.clear();
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => SchermataElenco(vault: vault)),
-      );
+      _vaiAllElenco(vault);
     } on WrongPassword {
       setState(() => _errore = 'Master password errata.');
     } on VaultCorrupted {
@@ -168,6 +254,19 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
                     style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ),
+        if (_impronta) ...[
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            onPressed: _occupato ? null : _sbloccaConImpronta,
+            icon: const Icon(Icons.fingerprint, color: coloreAccento),
+            label: const Text('Sblocca con l\'impronta',
+                style: TextStyle(color: coloreAccento)),
+            style: OutlinedButton.styleFrom(
+              side: const BorderSide(color: coloreBordo),
+              padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
+            ),
+          ),
+        ],
         const SizedBox(height: 14),
         const Text(
           'La master password è la stessa del PC: da lei si deriva la chiave, '

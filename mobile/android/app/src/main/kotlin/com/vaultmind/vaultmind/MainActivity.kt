@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.view.WindowManager
-import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -18,7 +18,9 @@ import io.flutter.plugin.common.MethodChannel
  * qui, e comunque l'"Apri con" avrebbe richiesto codice nativo lo stesso.
  * Meno dipendenze da cui dipendere, e una cosa sola da mantenere.
  */
-class MainActivity : FlutterActivity() {
+// FlutterFragmentActivity e non FlutterActivity: BiometricPrompt e' un
+// componente AndroidX e pretende una FragmentActivity per mostrarsi.
+class MainActivity : FlutterFragmentActivity() {
 
     private val canale = "vaultmind/file"
     private var richiestaInCorso: MethodChannel.Result? = null
@@ -65,6 +67,48 @@ class MainActivity : FlutterActivity() {
                     esito.success(inAttesa)
                     inAttesa = null
                 }
+
+                // Apre un indirizzo nel browser. Solo http/https: qualunque
+                // altro schema trasformerebbe un campo del vault in un modo
+                // per far eseguire cose al telefono. Stessa regola di
+                // /api/open_url sul PC.
+                "apriUrl" -> {
+                    val u = (chiamata.arguments as? String)?.trim().orEmpty()
+                    if (!u.startsWith("http://", true) && !u.startsWith("https://", true)) {
+                        esito.success(false)
+                    } else {
+                        try {
+                            startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(u)))
+                            esito.success(true)
+                        } catch (e: Exception) {
+                            esito.success(false)
+                        }
+                    }
+                }
+
+                // ---- impronta ----
+                "bioDisponibile" -> esito.success(Biometria.disponibile(this))
+                "bioAttiva" -> esito.success(Biometria.attiva(this))
+                "bioDisattiva" -> {
+                    Biometria.disattiva(this)
+                    esito.success(true)
+                }
+                "bioAttivaConChiave" -> {
+                    val chiave = chiamata.arguments as? String
+                    if (chiave == null) {
+                        esito.success(false)
+                    } else {
+                        Biometria.attivaConChiave(this, chiave) { ok, errore ->
+                            if (errore != null) esito.error("bio", errore, null) else esito.success(ok)
+                        }
+                    }
+                }
+                "bioSblocca" -> {
+                    Biometria.sbloccaEOttieniChiave(this) { chiave, errore ->
+                        if (errore != null) esito.error("bio", errore, null) else esito.success(chiave)
+                    }
+                }
+
                 else -> esito.notImplemented()
             }
         }

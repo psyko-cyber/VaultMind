@@ -38,3 +38,38 @@ void inAscoltoDiFile(void Function(String contenuto) quando) {
     return null;
   });
 }
+
+/// Apre un indirizzo nel browser. Solo `http`/`https`: il filtro sta anche
+/// dal lato Android, perché un campo del vault non deve poter far eseguire
+/// nulla al telefono. Stessa regola di `/api/open_url` sul PC.
+Future<bool> apriNelBrowser(String url) async {
+  try {
+    return await _canale.invokeMethod<bool>('apriUrl', url) ?? false;
+  } on PlatformException {
+    return false;
+  }
+}
+
+// ---------------------------------------------------------------- impronta
+
+/// Il telefono ha un lettore di impronte utilizzabile?
+Future<bool> impresaDisponibile() async =>
+    await _canale.invokeMethod<bool>('bioDisponibile') ?? false;
+
+/// L'utente ha già attivato lo sblocco con impronta?
+Future<bool> improntaAttiva() async =>
+    await _canale.invokeMethod<bool>('bioAttiva') ?? false;
+
+Future<void> improntaDisattiva() async =>
+    _canale.invokeMethod<void>('bioDisattiva');
+
+/// Attiva lo sblocco con impronta conservando la chiave del vault (in base64)
+/// cifrata dal Keystore. Restituisce `false` se l'utente annulla.
+/// Solleva [PlatformException] se qualcosa va storto davvero.
+Future<bool> improntaAttivaConChiave(String chiaveBase64) async =>
+    await _canale.invokeMethod<bool>('bioAttivaConChiave', chiaveBase64) ?? false;
+
+/// Chiede l'impronta e restituisce la chiave del vault in base64,
+/// oppure `null` se l'utente ha annullato.
+Future<String?> improntaSblocca() async =>
+    _canale.invokeMethod<String>('bioSblocca');

@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../main.dart';
+import '../ponte_file.dart';
 import '../ricerca.dart';
 import '../totp.dart';
 import '../vault.dart';
@@ -186,6 +187,21 @@ class _RigaCampoState extends State<_RigaCampo> {
   bool get _isSegreto => !_isOtp && _segreto.hasMatch(widget.campo.label);
   bool get _isUrl => _url.hasMatch(widget.campo.label.trim());
 
+  /// Il valore è davvero un indirizzo apribile? Un campo etichettato "sito"
+  /// che contiene "quello vecchio" non deve mostrare un pulsante che non
+  /// porta da nessuna parte.
+  bool get _sembraIndirizzo =>
+      RegExp(r'^https?://', caseSensitive: false).hasMatch(widget.campo.value.trim());
+
+  Future<void> _apri() async {
+    final ok = await apriNelBrowser(widget.campo.value.trim());
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Non è stato possibile aprire l\'indirizzo.'),
+      ));
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -255,6 +271,16 @@ class _RigaCampoState extends State<_RigaCampo> {
                   color: _isUrl ? const Color(0xFF6EA8FF) : coloreTesto),
             ),
           ),
+          // Se il campo è un indirizzo, si apre nel browser con un tocco:
+          // altrimenti andrebbe copiato e incollato a mano ogni volta.
+          if (_isUrl && _sembraIndirizzo)
+            IconButton(
+              iconSize: 18,
+              visualDensity: VisualDensity.compact,
+              tooltip: 'Apri nel browser',
+              icon: const Icon(Icons.open_in_new, color: Color(0xFF6EA8FF)),
+              onPressed: _apri,
+            ),
           if (_isSegreto)
             IconButton(
               iconSize: 18,
