@@ -159,3 +159,32 @@ extension ColoriTema on BuildContext {
   Color get cVerde => temaChiaro ? const Color(0xFF1B8F5A) : const Color(0xFF4CC38A);
   Color get cLink => temaChiaro ? const Color(0xFF1B4FD1) : const Color(0xFF6EA8FF);
 }
+
+/// Colori delle categorie, per la barretta a sinistra di ogni scheda.
+///
+/// Sul PC quella barra è ciano fissa; qui il colore dipende dalla categoria,
+/// così porta informazione invece di essere solo decorazione: a colpo d'occhio
+/// si distingue una voce "banca" da una "social" senza leggere il tag.
+/// I toni sono quelli della palette del PC (`--cyan`, `--green`, `--violet`…).
+const _coloriCategoria = <Color>[
+  Color(0xFF38BDF8), // ciano — il colore d'accento del PC
+  Color(0xFF34D399), // verde acqua
+  Color(0xFFA78BFA), // viola
+  Color(0xFFF472B6), // rosa
+  Color(0xFFFBBF24), // ambra
+  Color(0xFF60A5FA), // azzurro
+  Color(0xFF2DD4BF), // turchese
+  Color(0xFFFB923C), // arancio
+];
+
+/// Colore stabile per una categoria: la stessa parola dà sempre lo stesso
+/// colore, su questo telefono come su un altro. Nessuna voce senza tag resta
+/// senza colore: si ripiega sul titolo.
+Color coloreCategoria(String chiave) {
+  if (chiave.isEmpty) return _coloriCategoria.first;
+  var h = 0;
+  for (final c in chiave.toLowerCase().codeUnits) {
+    h = (h * 31 + c) & 0x7FFFFFFF;
+  }
+  return _coloriCategoria[h % _coloriCategoria.length];
+}

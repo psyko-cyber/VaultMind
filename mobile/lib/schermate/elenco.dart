@@ -188,13 +188,39 @@ class _SchedaVoce extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final rapido = _daCopiare;
+    // Il colore viene dalla categoria: la stessa parola dà sempre lo stesso
+    // colore, così l'occhio impara a riconoscerle senza leggere.
+    final colore = coloreCategoria(
+        credenziale.tags.isNotEmpty ? credenziale.tags.first : credenziale.title);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      child: Theme(
+      clipBehavior: Clip.antiAlias,
+      child: Stack(
+        children: [
+          // Barra verticale a sinistra, come sulle schede del PC.
+          Positioned(
+            left: 0,
+            top: 0,
+            bottom: 0,
+            child: Container(width: 4, color: colore),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(left: 4),
+            child: _contenuto(context, rapido, colore),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _contenuto(BuildContext context, Campo? rapido, Color colore) {
+    return Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           shape: const Border(),
           collapsedShape: const Border(),
+          leading: _Pallino(colore: colore, titolo: credenziale.title),
           title: GestureDetector(
             onLongPress: rapido == null
                 ? null
@@ -225,12 +251,43 @@ class _SchedaVoce extends StatelessWidget {
           subtitle: credenziale.tags.isEmpty
               ? null
               : Text(credenziale.tags.join(' · '),
-                  style: TextStyle(fontSize: 11, color: context.cTenue)),
+                  style: TextStyle(fontSize: 11, color: colore)),
           children: credenziale.fields
               .where((f) => f.value.trim().isNotEmpty)
               .map((f) => _RigaCampo(campo: f))
               .toList(),
         ),
+    );
+  }
+}
+
+/// Segno di riconoscimento della voce: l'iniziale su un cerchio del colore
+/// della categoria.
+///
+/// **Non** si scaricano le icone vere dei servizi: bisognerebbe chiederle a
+/// Internet, e ogni richiesta direbbe a qualcuno quali servizi usi — cioè
+/// esattamente ciò che questo prodotto promette di non fare. Vedi TODO §1.3.
+class _Pallino extends StatelessWidget {
+  final Color colore;
+  final String titolo;
+  const _Pallino({required this.colore, required this.titolo});
+
+  @override
+  Widget build(BuildContext context) {
+    final t = titolo.trim();
+    final iniziale = t.isEmpty ? '?' : t.substring(0, 1).toUpperCase();
+    return Container(
+      width: 36,
+      height: 36,
+      decoration: BoxDecoration(
+        color: colore.withValues(alpha: 0.16),
+        shape: BoxShape.circle,
+        border: Border.all(color: colore.withValues(alpha: 0.55)),
+      ),
+      child: Center(
+        child: Text(iniziale,
+            style: TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w700, color: colore)),
       ),
     );
   }
