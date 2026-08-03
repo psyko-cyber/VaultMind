@@ -204,6 +204,10 @@ try {
 Info $rel.html_url
 
 $nomi = @("VaultMind-Setup.exe", "VaultMind-Windows.zip", "VaultMind-Estensione.zip")
+# L'APK lo costruisce mobile\costruisci.ps1 -Release, che lo lascia qui. Si
+# carica se c'e': cosi' chi rilascia solo il PC non si trova un errore, e chi
+# ha appena rifatto l'app mobile non deve ricordarsi di caricarla a mano.
+if (Test-Path (Join-Path $PACCHETTO "VaultMind.apk")) { $nomi += "VaultMind.apk" }
 foreach ($a in $rel.assets) {
   if ($nomi -contains $a.name) {
     Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$GH_REPO/releases/assets/$($a.id)" -Headers $H | Out-Null

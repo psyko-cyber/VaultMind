@@ -96,6 +96,13 @@ Write-Host ""
 Ok ($apk.FullName + "  (" + [math]::Round($apk.Length / 1MB, 1) + " MB)")
 
 if ($Release) {
+  # Nel PACCHETTO insieme agli altri consegnabili, cosi' rilascio.ps1 lo
+  # trova e lo carica sulla release senza che nessuno se lo ricordi.
+  $pacchetto = Join-Path (Split-Path $PSScriptRoot -Parent) "PACCHETTO X INSTALLAZIONE EVERYWHERE"
+  if (Test-Path $pacchetto) {
+    Copy-Item $apk.FullName (Join-Path $pacchetto "VaultMind.apk") -Force
+    Ok "Copiato nel pacchetto: VaultMind.apk"
+  }
   Write-Host ""
   Info "Da mandare su WhatsApp: e' questo file."
   Info "Chi lo riceve deve autorizzare una volta l'installazione da quell'app."
