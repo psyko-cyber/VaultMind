@@ -58,3 +58,18 @@ Future<void> importaVault(String contenuto) async {
   }
   await f.writeAsString(contenuto, flush: true);
 }
+
+/// Toglie il vault da questo telefono, comprese le copie di sicurezza degli
+/// import precedenti: lasciarne una in giro vanificherebbe la scelta.
+/// Sul PC resta tutto: qui c'è solo una copia.
+Future<void> eliminaVault() async {
+  final f = await fileVault();
+  final dir = f.parent;
+  for (final e in dir.listSync()) {
+    if (e is File && e.path.split(RegExp(r'[\\/]')).last.startsWith('vault')) {
+      try {
+        await e.delete();
+      } catch (_) {}
+    }
+  }
+}

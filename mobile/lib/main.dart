@@ -11,62 +11,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'archivio.dart';
+import 'impostazioni.dart';
 import 'schermate/sblocco.dart';
+import 'tema.dart';
 
-void main() => runApp(const AppVaultMind());
-
-/// Palette "Notte e oro", la stessa dell'app Windows.
-const coloreFondo = Color(0xFF070C1A);
-const colorePannello = Color(0xFF0E1730);
-const coloreBordo = Color(0xFF1E2C4C);
-const coloreAccento = Color(0xFFE3B341);
-const coloreTesto = Color(0xFFE8ECF6);
-const coloreTenue = Color(0xFF8FA0C0);
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await caricaImpostazioni();
+  runApp(const AppVaultMind());
+}
 
 class AppVaultMind extends StatelessWidget {
   const AppVaultMind({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Barra di sistema in tinta: una striscia chiara in cima romperebbe il
-    // tema scuro su cui è costruita tutta l'app.
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: coloreFondo,
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
-
-    return MaterialApp(
-      title: 'VaultMind',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        useMaterial3: true,
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: coloreFondo,
-        colorScheme: const ColorScheme.dark(
-          primary: coloreAccento,
-          surface: colorePannello,
-          onSurface: coloreTesto,
-        ),
-        inputDecorationTheme: InputDecorationTheme(
-          filled: true,
-          fillColor: colorePannello,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: coloreBordo),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: coloreBordo),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: coloreAccento),
-          ),
-        ),
-      ),
-      home: const _Avvio(),
+    // Si riascolta a ogni cambio di tema: l'intera app si ridipinge, comprese
+    // le schermate già aperte.
+    return ValueListenableBuilder<Impostazioni>(
+      valueListenable: impostazioni,
+      builder: (_, imp, _) {
+        final dati = temaDati(imp.tema);
+        // Barra di sistema in tinta col tema: una striscia di colore diverso
+        // in cima tradisce subito che l'app non è "sua".
+        SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness:
+              dati.brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+          systemNavigationBarColor: dati.colorScheme.surface,
+          systemNavigationBarIconBrightness:
+              dati.brightness == Brightness.dark ? Brightness.light : Brightness.dark,
+        ));
+        return MaterialApp(
+          title: 'VaultMind',
+          debugShowCheckedModeBanner: false,
+          theme: dati,
+          home: const _Avvio(),
+        );
+      },
     );
   }
 }
@@ -95,8 +77,8 @@ class _AvvioState extends State<_Avvio> {
   @override
   Widget build(BuildContext context) {
     if (_esiste == null) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator(color: coloreAccento)),
+      return Scaffold(
+        body: Center(child: CircularProgressIndicator(color: context.cAccento)),
       );
     }
     return SchermataSblocco(vaultPresente: _esiste!);

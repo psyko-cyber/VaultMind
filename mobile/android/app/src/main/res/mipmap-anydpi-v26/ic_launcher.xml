@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Icona adattiva (Android 8 in poi): il sistema ritaglia il logo nella forma
+  scelta dal produttore del telefono — cerchio, goccia, squircle. Per questo
+  il soggetto sta nel 62% centrale del foreground: quello che sborda viene
+  tagliato via, e un lucchetto senza bordi non si riconosce piu'.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/sfondo_icona" />
+    <foreground android:drawable="@mipmap/ic_launcher_foreground" />
+    <monochrome android:drawable="@mipmap/ic_launcher_foreground" />
+</adaptive-icon>

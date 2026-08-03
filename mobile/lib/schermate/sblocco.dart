@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../archivio.dart';
-import '../main.dart';
+import '../tema.dart';
 import '../ponte_file.dart';
 import '../vault.dart';
 import 'elenco.dart';
@@ -98,7 +98,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     final vuole = await showDialog<bool>(
       context: context,
       builder: (c) => AlertDialog(
-        backgroundColor: colorePannello,
+        backgroundColor: context.cPannello,
         title: const Text('Sbloccare con l\'impronta?'),
         content: const Text(
           'La prossima volta ti basterà il dito, senza riscrivere la master password.\n\n'
@@ -109,12 +109,12 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(c, false),
-            child: const Text('No, grazie', style: TextStyle(color: coloreTenue)),
+            child: Text('No, grazie', style: TextStyle(color: context.cTenue)),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
             style: FilledButton.styleFrom(
-                backgroundColor: coloreAccento, foregroundColor: const Color(0xFF141414)),
+                backgroundColor: context.cAccento, foregroundColor: const Color(0xFF141414)),
             child: const Text('Attiva'),
           ),
         ],
@@ -198,14 +198,14 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
               children: [
                 Image.asset('assets/logo.png', width: 96, height: 96,
                     errorBuilder: (_, _, _) =>
-                        const Icon(Icons.shield, size: 88, color: coloreAccento)),
+                        Icon(Icons.shield, size: 88, color: context.cAccento)),
                 const SizedBox(height: 18),
                 const Text('VAULTMIND',
                     style: TextStyle(
                         fontSize: 26, letterSpacing: 6, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
-                const Text('LOCALE · OFFLINE · AES-256',
-                    style: TextStyle(fontSize: 11, letterSpacing: 2, color: coloreTenue)),
+                Text('LOCALE · OFFLINE · AES-256',
+                    style: TextStyle(fontSize: 11, letterSpacing: 2, color: context.cTenue)),
                 const SizedBox(height: 34),
                 if (_presente) ..._formSblocco() else ..._invitoImport(),
                 if (_errore != null) ...[
@@ -229,9 +229,9 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           autofocus: true,
           enabled: !_occupato,
           onSubmitted: (_) => _sblocca(),
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             labelText: 'Master password',
-            prefixIcon: Icon(Icons.lock_outline, color: coloreTenue),
+            prefixIcon: Icon(Icons.lock_outline, color: context.cTenue),
           ),
         ),
         const SizedBox(height: 16),
@@ -240,7 +240,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           child: FilledButton(
             onPressed: _occupato ? null : _sblocca,
             style: FilledButton.styleFrom(
-              backgroundColor: coloreAccento,
+              backgroundColor: context.cAccento,
               foregroundColor: const Color(0xFF141414),
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
@@ -258,27 +258,27 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           const SizedBox(height: 14),
           OutlinedButton.icon(
             onPressed: _occupato ? null : _sbloccaConImpronta,
-            icon: const Icon(Icons.fingerprint, color: coloreAccento),
-            label: const Text('Sblocca con l\'impronta',
-                style: TextStyle(color: coloreAccento)),
+            icon: Icon(Icons.fingerprint, color: context.cAccento),
+            label: Text('Sblocca con l\'impronta',
+                style: TextStyle(color: context.cAccento)),
             style: OutlinedButton.styleFrom(
-              side: const BorderSide(color: coloreBordo),
+              side: BorderSide(color: context.cBordo),
               padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
             ),
           ),
         ],
         const SizedBox(height: 14),
-        const Text(
+        Text(
           'La master password è la stessa del PC: da lei si deriva la chiave, '
           'e non viene salvata da nessuna parte.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 11.5, color: coloreTenue, height: 1.5),
+          style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.5),
         ),
         const SizedBox(height: 18),
         TextButton(
           onPressed: _occupato ? null : _importa,
-          child: const Text('Importa un altro backup',
-              style: TextStyle(color: coloreTenue, fontSize: 12.5)),
+          child: Text('Importa un altro backup',
+              style: TextStyle(color: context.cTenue, fontSize: 12.5)),
         ),
       ];
 
@@ -289,11 +289,11 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           style: TextStyle(fontSize: 14),
         ),
         const SizedBox(height: 10),
-        const Text(
+        Text(
           'Dal PC premi 💾 per salvare un backup, mandatelo (anche su WhatsApp: '
           'è cifrato, chi lo intercetta non ci fa niente) e aprilo qui.',
           textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12.5, color: coloreTenue, height: 1.55),
+          style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.55),
         ),
         const SizedBox(height: 26),
         SizedBox(
@@ -304,7 +304,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
             label: const Text('Scegli il file di backup',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: FilledButton.styleFrom(
-              backgroundColor: coloreAccento,
+              backgroundColor: context.cAccento,
               foregroundColor: const Color(0xFF141414),
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),

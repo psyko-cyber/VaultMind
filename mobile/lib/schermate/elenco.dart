@@ -6,11 +6,14 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-import '../main.dart';
+import '../impostazioni.dart';
 import '../ponte_file.dart';
 import '../ricerca.dart';
+import '../tema.dart';
 import '../totp.dart';
 import '../vault.dart';
+import 'impostazioni.dart';
+import 'sblocco.dart';
 
 /// Etichette il cui valore è un segreto: si mostrano a pallini finché non si
 /// tocca l'occhio. Un vault aperto in metropolitana non deve stampare le
@@ -32,6 +35,7 @@ class _SchermataElencoState extends State<SchermataElenco> {
   late final IndiceRicerca _indice;
   List<Credenziale> _mostrate = const [];
   Timer? _attesa;
+  Timer? _inattivita;
 
   @override
   void initState() {
@@ -41,13 +45,34 @@ class _SchermataElencoState extends State<SchermataElenco> {
     _indice = IndiceRicerca(widget.vault.credenziali);
     _mostrate = widget.vault.credenziali;
     _ricerca.addListener(_programmaRicerca);
+    _riarmaBlocco();
   }
 
   @override
   void dispose() {
     _attesa?.cancel();
+    _inattivita?.cancel();
     _ricerca.dispose();
     super.dispose();
+  }
+
+  /// Il vault si richiude da solo dopo un po' che non lo si tocca: un telefono
+  /// si lascia sul tavolo molto più facilmente di un computer.
+  void _riarmaBlocco() {
+    _inattivita?.cancel();
+    final minuti = impostazioni.value.autoBlocco;
+    if (minuti <= 0) return;
+    _inattivita = Timer(Duration(minutes: minuti), _blocca);
+  }
+
+  void _blocca() {
+    if (!mounted) return;
+    // Si torna alla schermata di sblocco, e le voci decifrate se ne vanno
+    // insieme a questa schermata: non restano in memoria.
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    Navigator.of(context).pushReplacement(
+      MaterialPageRoute(builder: (_) => const SchermataSblocco(vaultPresente: true)),
+    );
   }
 
   /// Con 800 voci una ricerca costa qualche decina di millisecondi: farla a
@@ -70,55 +95,70 @@ class _SchermataElencoState extends State<SchermataElenco> {
 
   @override
   Widget build(BuildContext context) {
-    final totali = widget.vault.credenziali.length;
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: colorePannello,
-        title: const Text('VaultMind', style: TextStyle(letterSpacing: 1.5)),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 14),
-            child: Center(
-              child: Text('$totali voci',
-                  style: const TextStyle(fontSize: 12, color: coloreTenue)),
+    return Listener(
+      // Qualsiasi tocco rimanda il blocco: si conta l'inattività vera, non il
+      // tempo trascorso.
+      onPointerDown: (_) => _riarmaBlocco(),
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('VaultMind', style: TextStyle(letterSpacing: 1.5)),
+          actions: [
+            Center(
+              child: Text('${widget.vault.credenziali.length} voci',
+                  style: TextStyle(fontSize: 12, color: context.cTenue)),
             ),
-          ),
-        ],
-      ),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
-            child: TextField(
-              controller: _ricerca,
-              decoration: InputDecoration(
-                hintText: 'Cerca…',
-                prefixIcon: const Icon(Icons.search, color: coloreTenue),
-                suffixIcon: _ricerca.text.isEmpty
-                    ? null
-                    : IconButton(
-                        icon: const Icon(Icons.clear, color: coloreTenue),
-                        onPressed: () => _ricerca.clear(),
-                      ),
+            IconButton(
+              icon: const Icon(Icons.settings_outlined),
+              tooltip: 'Impostazioni',
+              onPressed: () {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => SchermataImpostazioni(
+                      quanteVoci: widget.vault.credenziali.length),
+                )).then((_) => _riarmaBlocco());
+              },
+            ),
+            IconButton(
+              icon: const Icon(Icons.lock_outline),
+              tooltip: 'Blocca',
+              onPressed: _blocca,
+            ),
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 8),
+              child: TextField(
+                controller: _ricerca,
+                decoration: InputDecoration(
+                  hintText: 'Cerca…',
+                  prefixIcon: Icon(Icons.search, color: context.cTenue),
+                  suffixIcon: _ricerca.text.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: Icon(Icons.clear, color: context.cTenue),
+                          onPressed: () => _ricerca.clear(),
+                        ),
+                ),
               ),
             ),
-          ),
-          if (_mostrate.isEmpty)
-            const Expanded(
-              child: Center(
-                child: Text('Nessuna voce corrisponde.',
-                    style: TextStyle(color: coloreTenue)),
+            if (_mostrate.isEmpty)
+              Expanded(
+                child: Center(
+                  child: Text('Nessuna voce corrisponde.',
+                      style: TextStyle(color: context.cTenue)),
+                ),
+              )
+            else
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
+                  itemCount: _mostrate.length,
+                  itemBuilder: (_, i) => _SchedaVoce(credenziale: _mostrate[i]),
+                ),
               ),
-            )
-          else
-            Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.fromLTRB(14, 0, 14, 24),
-                itemCount: _mostrate.length,
-                itemBuilder: (_, i) => _SchedaVoce(credenziale: _mostrate[i]),
-              ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -128,40 +168,67 @@ class _SchedaVoce extends StatelessWidget {
   final Credenziale credenziale;
   const _SchedaVoce({required this.credenziale});
 
+  /// Il campo che si copia con un tocco lungo: la password, o il primo
+  /// segreto disponibile. È il gesto più frequente, e merita la via corta.
+  Campo? get _daCopiare {
+    for (final f in credenziale.fields) {
+      if (f.value.trim().isEmpty) continue;
+      if (RegExp(r'^pass', caseSensitive: false).hasMatch(f.label)) return f;
+    }
+    for (final f in credenziale.fields) {
+      if (f.value.trim().isNotEmpty &&
+          !etichettaSembraOtp(f.label) &&
+          _segreto.hasMatch(f.label)) {
+        return f;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
+    final rapido = _daCopiare;
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
-      color: colorePannello,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
-        side: const BorderSide(color: coloreBordo),
-      ),
       child: Theme(
         data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
         child: ExpansionTile(
           shape: const Border(),
           collapsedShape: const Border(),
-          title: Row(
-            children: [
-              if (credenziale.critical)
-                const Padding(
-                  padding: EdgeInsets.only(right: 6),
-                  child: Icon(Icons.star, size: 15, color: coloreAccento),
+          title: GestureDetector(
+            onLongPress: rapido == null
+                ? null
+                : () async {
+                    await Clipboard.setData(ClipboardData(text: rapido.value));
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                      content: Text('${rapido.label} di "${credenziale.title}" copiata'),
+                      duration: const Duration(seconds: 2),
+                    ));
+                    _svuotaDopo(rapido.value);
+                  },
+            child: Row(
+              children: [
+                if (credenziale.critical)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 6),
+                    child: Icon(Icons.star, size: 15, color: context.cAccento),
+                  ),
+                Expanded(
+                  child: Text(credenziale.title,
+                      style: const TextStyle(
+                          fontSize: 14.5, fontWeight: FontWeight.w600)),
                 ),
-              Expanded(
-                child: Text(credenziale.title,
-                    style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
-              ),
-            ],
+              ],
+            ),
           ),
           subtitle: credenziale.tags.isEmpty
               ? null
               : Text(credenziale.tags.join(' · '),
-                  style: const TextStyle(fontSize: 11, color: coloreTenue)),
+                  style: TextStyle(fontSize: 11, color: context.cTenue)),
           children: credenziale.fields
               .where((f) => f.value.trim().isNotEmpty)
-              .map((f) => _RigaCampo(campo: f, idVoce: credenziale.id))
+              .map((f) => _RigaCampo(campo: f))
               .toList(),
         ),
       ),
@@ -169,10 +236,20 @@ class _SchedaVoce extends StatelessWidget {
   }
 }
 
+/// Su Android gli appunti sono leggibili da altre app: un segreto non ci resta
+/// a tempo indefinito.
+void _svuotaDopo(String testo) {
+  Future.delayed(const Duration(seconds: 45), () async {
+    final attuale = await Clipboard.getData(Clipboard.kTextPlain);
+    if (attuale?.text == testo) {
+      await Clipboard.setData(const ClipboardData(text: ''));
+    }
+  });
+}
+
 class _RigaCampo extends StatefulWidget {
   final Campo campo;
-  final int idVoce;
-  const _RigaCampo({required this.campo, required this.idVoce});
+  const _RigaCampo({required this.campo});
 
   @override
   State<_RigaCampo> createState() => _RigaCampoState();
@@ -192,15 +269,6 @@ class _RigaCampoState extends State<_RigaCampo> {
   /// porta da nessuna parte.
   bool get _sembraIndirizzo =>
       RegExp(r'^https?://', caseSensitive: false).hasMatch(widget.campo.value.trim());
-
-  Future<void> _apri() async {
-    final ok = await apriNelBrowser(widget.campo.value.trim());
-    if (!ok && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Non è stato possibile aprire l\'indirizzo.'),
-      ));
-    }
-  }
 
   @override
   void initState() {
@@ -229,6 +297,15 @@ class _RigaCampoState extends State<_RigaCampo> {
     }
   }
 
+  Future<void> _apri() async {
+    final ok = await apriNelBrowser(widget.campo.value.trim());
+    if (!ok && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Non è stato possibile aprire l\'indirizzo.'),
+      ));
+    }
+  }
+
   Future<void> _copia(String testo, String cosa) async {
     await Clipboard.setData(ClipboardData(text: testo));
     if (!mounted) return;
@@ -236,14 +313,7 @@ class _RigaCampoState extends State<_RigaCampo> {
       content: Text('$cosa copiato — gli appunti si svuotano fra 45 secondi'),
       duration: const Duration(seconds: 2),
     ));
-    // Su Android gli appunti sono leggibili da altre app: un segreto non ci
-    // resta a tempo indefinito.
-    Future.delayed(const Duration(seconds: 45), () async {
-      final attuale = await Clipboard.getData(Clipboard.kTextPlain);
-      if (attuale?.text == testo) {
-        await Clipboard.setData(const ClipboardData(text: ''));
-      }
-    });
+    _svuotaDopo(testo);
   }
 
   @override
@@ -259,7 +329,7 @@ class _RigaCampoState extends State<_RigaCampo> {
             width: 84,
             child: Text(widget.campo.label,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontSize: 11, color: coloreTenue)),
+                style: TextStyle(fontSize: 11, color: context.cTenue)),
           ),
           Expanded(
             child: Text(
@@ -268,7 +338,7 @@ class _RigaCampoState extends State<_RigaCampo> {
               style: TextStyle(
                   fontSize: 12.5,
                   fontFamily: 'monospace',
-                  color: _isUrl ? const Color(0xFF6EA8FF) : coloreTesto),
+                  color: _isUrl ? context.cLink : context.cTesto),
             ),
           ),
           // Se il campo è un indirizzo, si apre nel browser con un tocco:
@@ -278,7 +348,7 @@ class _RigaCampoState extends State<_RigaCampo> {
               iconSize: 18,
               visualDensity: VisualDensity.compact,
               tooltip: 'Apri nel browser',
-              icon: const Icon(Icons.open_in_new, color: Color(0xFF6EA8FF)),
+              icon: Icon(Icons.open_in_new, color: context.cLink),
               onPressed: _apri,
             ),
           if (_isSegreto)
@@ -286,13 +356,13 @@ class _RigaCampoState extends State<_RigaCampo> {
               iconSize: 18,
               visualDensity: VisualDensity.compact,
               icon: Icon(_visibile ? Icons.visibility_off : Icons.visibility,
-                  color: coloreTenue),
+                  color: context.cTenue),
               onPressed: () => setState(() => _visibile = !_visibile),
             ),
           IconButton(
             iconSize: 18,
             visualDensity: VisualDensity.compact,
-            icon: const Icon(Icons.copy, color: coloreTenue),
+            icon: Icon(Icons.copy, color: context.cTenue),
             onPressed: () => _copia(widget.campo.value, widget.campo.label),
           ),
         ],
@@ -306,36 +376,36 @@ class _RigaCampoState extends State<_RigaCampo> {
       margin: const EdgeInsets.fromLTRB(16, 6, 16, 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF0A1124),
+        color: context.cFondo,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: coloreBordo),
+        border: Border.all(color: context.cBordo),
       ),
       child: o == null
-          ? const Text('Secret 2FA non valido (atteso base32)',
-              style: TextStyle(fontSize: 11.5, color: Color(0xFFE36868)))
+          ? Text('Secret 2FA non valido (atteso base32)',
+              style: TextStyle(fontSize: 11.5, color: context.cErrore))
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(widget.campo.label.toUpperCase(),
-                    style: const TextStyle(
-                        fontSize: 9.5, letterSpacing: 1.2, color: coloreTenue)),
+                    style: TextStyle(
+                        fontSize: 9.5, letterSpacing: 1.2, color: context.cTenue)),
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     Expanded(
                       child: Text(
                         '${o.code.substring(0, 3)} ${o.code.substring(3)}',
-                        style: const TextStyle(
+                        style: TextStyle(
                             fontSize: 26,
                             letterSpacing: 4,
                             fontFamily: 'monospace',
-                            color: Color(0xFF4CC38A)),
+                            color: context.cVerde),
                       ),
                     ),
                     Text('${o.remaining}s',
-                        style: const TextStyle(fontSize: 12, color: coloreTenue)),
+                        style: TextStyle(fontSize: 12, color: context.cTenue)),
                     IconButton(
-                      icon: const Icon(Icons.copy, color: coloreTenue),
+                      icon: Icon(Icons.copy, color: context.cTenue),
                       onPressed: () => _copia(o.code, 'Codice 2FA'),
                     ),
                   ],
@@ -344,8 +414,8 @@ class _RigaCampoState extends State<_RigaCampo> {
                 LinearProgressIndicator(
                   value: o.remaining / 30,
                   minHeight: 3,
-                  backgroundColor: coloreBordo,
-                  valueColor: const AlwaysStoppedAnimation(Color(0xFF4CC38A)),
+                  backgroundColor: context.cBordo,
+                  valueColor: AlwaysStoppedAnimation(context.cVerde),
                 ),
               ],
             ),

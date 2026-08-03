@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Blu notte del tema "Notte e oro": lo sfondo dell'icona adattiva deve
+         essere in tinta col medaglione, altrimenti il ritaglio del sistema
+         lascia un alone di colore diverso attorno. -->
+    <color name="sfondo_icona">#070C1A</color>
+</resources>
