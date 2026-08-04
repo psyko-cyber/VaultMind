@@ -1,4 +1,20 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Serve al sync sulla rete locale, e va dichiarato QUI.
+
+         Il template di Flutter mette INTERNET solo in `src/debug/` e
+         `src/profile/`, dove serve al hot reload: l'APK di rilascio nasce
+         quindi senza rete, e nessun socket si apre. Il guasto non si vede
+         nemmeno, perche' l'app e' scritta per non lamentarsi quando la rete
+         non c'e' (`Annunciatore.avvia()` torna false in silenzio, la ricerca
+         non trova niente): identico a un router che isola i dispositivi. Con
+         l'APK di debug il sync funzionava, con quello vero no.
+
+         Niente permessi di rete oltre a questo: VaultMind non chiama Internet,
+         parla solo con l'altro dispositivo in casa.
+
+         (Nel testo di questo commento niente doppi trattini: l'XML li vieta,
+         e il manifest smette di essere leggibile. Gia' pagata.) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
     <application
         android:label="VaultMind"
         android:name="${applicationName}"
