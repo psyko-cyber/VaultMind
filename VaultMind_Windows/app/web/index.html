@@ -1985,13 +1985,7 @@ async function cercaDispositivi(){
   const {ok,j} = await api("/api/sync/cerca", {});
   box.innerHTML = "";
   const lista = (ok && j.dispositivi) || [];
-  if(!lista.length){
-    const p = document.createElement("div");
-    p.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55";
-    p.textContent = "Nessun dispositivo. Controlla che l'altro sia sulla stessa rete, "
-                  + "con l'app aperta e il vault sbloccato.";
-    box.appendChild(p); return;
-  }
+  if(!lista.length){ await mostraDiagnosi(box); return; }
   lista.forEach(d=>{
     const r = document.createElement("div"); r.className = "catvoce";
     const t = document.createElement("span"); t.className = "t";
@@ -2009,6 +2003,68 @@ async function cercaDispositivi(){
     r.append(t, w, b);
     box.appendChild(r);
   });
+}
+
+/* ---- «Nessun dispositivo» non è una risposta ----
+   Quella riga sola copriva cause opposte — il firewall, un router che isola i
+   dispositivi, l'altro col vault bloccato, un permesso mancante nell'APK — e
+   il 04/08/2026 e' costata una serata a chi il codice ce l'aveva sotto mano.
+   Qui si separano i fatti che conosciamo (il sync spento, la porta occupata,
+   nessuno abbinato) dalle cose che possiamo solo suggerire di guardare. */
+async function mostraDiagnosi(box){
+  let d = {};
+  try{
+    const r = await fetch("/api/sync/diagnosi");
+    if(r.ok) d = await r.json();
+  }catch(e){}
+
+  const t = document.createElement("div");
+  t.style.cssText = "font-size:12.5px;color:var(--fg);margin-bottom:6px";
+  t.textContent = "Nessun dispositivo ha risposto.";
+  box.appendChild(t);
+
+  (d.certi || []).forEach(m=>{
+    const p = document.createElement("div");
+    p.style.cssText = "font-size:12.5px;color:#FBBF24;line-height:1.55;margin-bottom:4px";
+    p.textContent = "• " + m;
+    box.appendChild(p);
+  });
+
+  (d.da_provare || []).forEach(m=>{
+    const p = document.createElement("div");
+    p.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55;margin-bottom:4px";
+    p.textContent = "• " + m;
+    box.appendChild(p);
+  });
+
+  const b = document.createElement("button");
+  b.className = "iconbtn";
+  b.style.cssText = "margin-top:8px;padding:5px 12px;font-size:12px";
+  b.textContent = "Sistema il firewall di Windows";
+  b.addEventListener("click", ()=>sistemaFirewall(b));
+  box.appendChild(b);
+
+  if(d.ip){
+    const n = document.createElement("div");
+    n.style.cssText = "font-size:11px;color:var(--faint);margin-top:8px";
+    n.textContent = `Questo PC è ${d.ip}, in ascolto sulla porta ${d.porta_sync}.`;
+    box.appendChild(n);
+  }
+}
+
+/* Windows chiede conferma da solo la prima volta che un programma si mette in
+   ascolto — ma a chi ha chiuso quell'avviso non lo chiede mai piu', e il sync
+   resta muto per sempre. Questa e' la strada per tornare a chiederlo. */
+async function sistemaFirewall(bottone){
+  bottone.disabled = true; bottone.textContent = "Attendo la conferma di Windows…";
+  const {ok,j} = await api("/api/sync/firewall", {});
+  bottone.disabled = false; bottone.textContent = "Sistema il firewall di Windows";
+  if(!ok || !j.ok){
+    avviso((j && (j.motivo || j.detail)) || "Non è stato possibile scrivere la regola.", true);
+    return;
+  }
+  avviso("Fatto: VaultMind ora può ricevere sulla rete di casa.");
+  cercaDispositivi();
 }
 
 /* Il codice si chiede con un campo in linea, non con prompt(): la finestra

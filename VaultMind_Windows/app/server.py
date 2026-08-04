@@ -27,7 +27,7 @@ from .import_parse import heuristic_extract
 from .import_csv import parse_csv
 from .sync_app import SyncApp
 from .sync_net import RifiutoSync
-from . import sync_net
+from . import firewall, sync_net
 from . import llm
 from . import totp
 from . import transcribe
@@ -847,6 +847,42 @@ def sync_adesso():
     """
     _require_unlocked()
     return SYNC.sincronizza_tutti()
+
+
+@app.get("/api/sync/diagnosi")
+def sync_diagnosi():
+    """Perché non si trova nessuno. Chiesto quando la ricerca torna vuota.
+
+    Prima al suo posto c'era una riga sola — «Nessun dispositivo» — che copriva
+    cause opposte: il firewall, un router che isola i dispositivi, l'altro col
+    vault bloccato, un permesso mancante nell'APK. Il 04/08/2026 quella riga è
+    costata una serata a chi il codice ce l'aveva sotto mano.
+    """
+    _require_unlocked()
+    return firewall.diagnosi(
+        acceso=SYNC.acceso,
+        in_ascolto=SYNC.in_ascolto,
+        abbinati=len(SYNC.dispositivi()),
+        porta_sync=SYNC.porta_vera,
+        porta_scoperta=_PORTA_SCOPERTA,
+    )
+
+
+@app.post("/api/sync/firewall")
+def sync_firewall():
+    """Autorizza VaultMind nel firewall di Windows. Fa comparire l'UAC.
+
+    Non lo fa l'installer perché quello gira **senza** privilegi di proposito
+    (vedi il docstring di `firewall.py`): qui invece la conferma la si chiede
+    quando serve davvero, a chi ha già capito che qualcosa non va.
+    """
+    _require_unlocked()
+    esito = firewall.apri(SYNC.porta_vera, _PORTA_SCOPERTA)
+    if esito.get("ok"):
+        # Le regole nuove valgono per i socket già aperti, ma riaprirli costa
+        # niente e toglie di mezzo il dubbio.
+        SYNC.riavvia()
+    return esito
 
 
 @app.post("/api/sync/imposta")
