@@ -21,7 +21,24 @@
 /// L'ascoltatore vive **insieme alla sessione**: si apre a vault sbloccato e si
 /// chiude al blocco. Senza chiave non c'è niente da sincronizzare, e restare in
 /// ascolto sarebbe solo una porta aperta che non serve a nessuno.
+///
+/// ## Quando parte da solo
+///
+/// **A ogni modifica, non a intervalli** — stessa scelta del PC, e per le
+/// stesse ragioni: un giro periodico scambierebbe l'intero vault anche nelle
+/// ore in cui non cambia niente, e su un telefono si porterebbe via la batteria
+/// per confermare che eravamo allineati. Ci si aggancia a `Sessione`, che è un
+/// `ValueNotifier`: così nessuna schermata deve sapere che il sync esiste.
+///
+/// Chi **riceve** non rilancia (`_fondendo`). Lo scambio è simmetrico e dopo un
+/// giro sono già allineati: senza quella guardia i due si rimbalzerebbero per
+/// sempre, ognuno svegliato dalla fusione dell'altro.
+///
+/// Gli altri due momenti sono lo **sblocco** e il **ritorno in primo piano** —
+/// che è poi il rientro sulla rete di casa col telefono in tasca.
 library;
+
+import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
@@ -62,11 +79,50 @@ class EsitoSync {
   }
 }
 
+/// Com'è andato un giro completo: cercare sulla rete e allinearsi con tutti
+/// quelli che si conoscono. È quello che fa il tasto e quello che fa il sync
+/// automatico — uno solo, perché non ci siano due comportamenti da spiegare.
+class EsitoGiro {
+  final int trovati, abbinati;
+  final List<EsitoSync> esiti;
+
+  const EsitoGiro({this.trovati = 0, this.abbinati = 0, this.esiti = const []});
+
+  bool get qualcosaECambiato => esiti.any((e) => e.qualcosaECambiato);
+  int get conflitti => esiti.fold(0, (a, e) => a + e.conflitti);
+
+  /// Il primo errore, se ce n'è stato uno. Se ne mostra uno solo: tre
+  /// dispositivi che non rispondono sono lo stesso problema ripetuto.
+  String? get errore {
+    for (final e in esiti) {
+      if (e.errore != null) return e.errore;
+    }
+    return null;
+  }
+
+  /// Una riga sola per raccontarlo, o `null` se non c'è niente da dire.
+  String? get riassunto {
+    if (errore != null) return errore;
+    final mossi = esiti.where((e) => e.qualcosaECambiato).toList();
+    if (mossi.isEmpty) return null;
+    final da = mossi.first.con;
+    final testa = da.isEmpty ? '' : '$da: ';
+    return '$testa${mossi.first.riassunto}';
+  }
+}
+
 class GestoreSync extends ChangeNotifier {
   final Sessione sessione;
 
   Ascoltatore? _ascoltatore;
   Annunciatore? _annunciatore;
+
+  /// Il rinvio del sync automatico, per non partire a ogni tasto premuto.
+  Timer? _rinvio;
+
+  /// Alzata mentre si applica un vault ricevuto: le scritture di quel momento
+  /// non sono modifiche dell'utente e non devono far ripartire un sync.
+  bool _fondendo = false;
 
   String? _codice;
   DateTime _scade = DateTime.fromMillisecondsSinceEpoch(0);
@@ -150,17 +206,50 @@ class GestoreSync extends ChangeNotifier {
     final ann = Annunciatore(ctx, portaDelSync: a.portaVera);
     await ann.avvia();
     _annunciatore = ann;
+    // Da qui in poi una voce salvata si propaga da sola. `Sessione` avvisa a
+    // ogni scrittura, quindi non serve che le schermate chiamino niente.
+    sessione.addListener(_modificaLocale);
     notifyListeners();
     return true;
   }
 
   Future<void> ferma({bool pulisciCodice = true}) async {
+    sessione.removeListener(_modificaLocale);
+    // Un sync rinviato che scatta a vault chiuso non troverebbe la chiave, ma
+    // proverebbe lo stesso a farsi vivo sulla rete.
+    _rinvio?.cancel();
+    _rinvio = null;
     _annunciatore?.ferma();
     _annunciatore = null;
     await _ascoltatore?.ferma();
     _ascoltatore = null;
     if (pulisciCodice) _codice = null;
     notifyListeners();
+  }
+
+  void _modificaLocale() {
+    if (_fondendo) return;   // è la fusione che sta scrivendo, non l'utente
+    programmaSync();
+  }
+
+  /// Una modifica locale si propaga da sola, poco dopo.
+  ///
+  /// Il rinvio serve perché le modifiche arrivano a raffica — si salva una
+  /// voce, si cambia categoria, se ne salva un'altra — e ognuna farebbe
+  /// partire uno scambio dell'intero vault. Ogni chiamata sposta in avanti
+  /// quella prima, così parte **una volta sola** quando ti fermi.
+  void programmaSync({Duration ritardo = const Duration(seconds: 3)}) {
+    _rinvio?.cancel();
+    _rinvio = null;
+    if (!acceso || _ascoltatore == null) return;
+    if (_imp.fidati.isEmpty) return;   // nessuno con cui allinearsi
+    _rinvio = Timer(ritardo, () async {
+      try {
+        await sincronizzaTutti();
+      } catch (_) {
+        // il sync automatico non deve mai disturbare
+      }
+    });
   }
 
   Future<void> imposta({String? nome, bool? acceso}) async {
@@ -230,6 +319,39 @@ class GestoreSync extends ChangeNotifier {
     }
   }
 
+  /// Cerca sulla rete e si allinea con **tutti** i dispositivi già abbinati
+  /// che rispondono.
+  ///
+  /// Quelli mai abbinati vengono ignorati di proposito: abbinare richiede il
+  /// codice, e deve restare una cosa che decidi tu.
+  Future<EsitoGiro> sincronizzaTutti() async {
+    List<Trovato> trovati;
+    // Cattura larga: qui si parla con la rete, e una WiFi che cade non deve
+    // diventare un errore dell'app.
+    try {
+      trovati = await cerca();
+    } catch (_) {
+      return const EsitoGiro(
+          esiti: [EsitoSync(errore: 'La rete non è raggiungibile.')]);
+    }
+    final noti = trovati.where((t) => t.conosciuto).toList();
+    final esiti = <EsitoSync>[];
+    for (final d in noti) {
+      final e = await sincronizzaCon(d);
+      esiti.add(e.con.isEmpty
+          ? EsitoSync(
+              con: d.etichetta,
+              aggiunte: e.aggiunte,
+              aggiornate: e.aggiornate,
+              cancellate: e.cancellate,
+              conflitti: e.conflitti,
+              errore: e.errore)
+          : e);
+    }
+    return EsitoGiro(
+        trovati: trovati.length, abbinati: noti.length, esiti: esiti);
+  }
+
   /// Il cuore: prende il vault dell'altro, lo fonde col nostro e applica.
   ///
   /// Quello che arriva è cifrato con la stessa chiave che abbiamo — l'ha appena
@@ -253,7 +375,15 @@ class GestoreSync extends ChangeNotifier {
     final base = _imp.basi[idPeer];
     final f = fondi(Istantanea.da(sessione.vault), Istantanea.da(suo), base);
 
-    await sessione.applicaFusione(f.voci, f.lapidi, f.categorie);
+    // La scrittura che segue non è una modifica dell'utente: senza questa
+    // guardia farebbe partire un altro sync, e i due si rimbalzerebbero per
+    // sempre svegliandosi a vicenda.
+    _fondendo = true;
+    try {
+      await sessione.applicaFusione(f.voci, f.lapidi, f.categorie);
+    } finally {
+      _fondendo = false;
+    }
 
     // La base registra solo ciò su cui siamo d'accordo: le voci contese restano
     // fuori, così al prossimo giro risultano ancora cambiate da entrambi e il

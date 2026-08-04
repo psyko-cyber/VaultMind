@@ -10,14 +10,20 @@ import '../archivio.dart';
 import '../impostazioni.dart';
 import '../ponte_file.dart';
 import '../sessione.dart';
+import '../sync_gestore.dart';
 import '../tema.dart';
 import 'dialoghi.dart';
+import 'sincronizza.dart';
 
 class SchermataImpostazioni extends StatefulWidget {
   final Sessione sessione;
+  final GestoreSync gestoreSync;
   final int quanteVoci;
   const SchermataImpostazioni(
-      {super.key, required this.sessione, required this.quanteVoci});
+      {super.key,
+      required this.sessione,
+      required this.gestoreSync,
+      required this.quanteVoci});
 
   @override
   State<SchermataImpostazioni> createState() => _SchermataImpostazioniState();
@@ -118,12 +124,32 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                   : null,
             ),
 
+          _Sezione('Dispositivi'),
+          // Qui e non nella barra: abbinare si fa una volta sola, mentre
+          // sincronizzare si fa spesso — e infatti il tasto in alto ora
+          // sincronizza invece di aprire questa schermata.
+          ListTile(
+            leading: Icon(Icons.devices_outlined, color: context.cTenue),
+            title: const Text('Sincronizza con altri dispositivi'),
+            subtitle: Text(
+                widget.gestoreSync.fidati.isEmpty
+                    ? 'Nessuno abbinato. Serve il codice mostrato sull\'altro dispositivo.'
+                    : '${widget.gestoreSync.fidati.length} abbinati. '
+                        'Si allineano da soli quando cambia qualcosa.',
+                style: TextStyle(fontSize: 12, color: context.cTenue)),
+            onTap: () => Navigator.of(context)
+                .push(MaterialPageRoute(
+                    builder: (_) =>
+                        SchermataSincronizza(gestore: widget.gestoreSync)))
+                .then((_) => setState(() {})),
+          ),
+
           _Sezione('Vault'),
           ListTile(
             leading: Icon(Icons.info_outline, color: context.cTenue),
             title: Text('${widget.quanteVoci} voci su questo telefono'),
             subtitle: Text(
-                'Finché il sync non esiste, questa copia e quella del PC vivono separate.',
+                'Una copia completa e cifrata, che funziona anche senza rete.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
           ),
           if (imp.pinnate.isNotEmpty)
