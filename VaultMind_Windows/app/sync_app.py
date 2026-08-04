@@ -21,9 +21,26 @@ I **conflitti in sospeso** stanno solo in memoria, di proposito. Se l'app si
 chiude prima che tu abbia deciso, le voci restano com'erano e al sync successivo
 il conflitto si ripresenta identico — perché la base esclude proprio le voci
 contese. Nessuno stato da riparare a mano.
+
+## Quando parte da solo
+
+**A ogni modifica, non a intervalli.** Un giro periodico scambierebbe l'intero
+vault — un megabyte, con 800 voci — anche nelle ore in cui non cambia niente,
+e sarebbe comunque in ritardo di mezzo intervallo su quello che serve davvero:
+aggiungo una voce di là e la voglio vedere di qua. Così invece a vault fermo
+non passa un byte, e quando qualcosa cambia si allinea da sé (`programma_sync`).
+
+Chi **riceve** non rilancia. Lo scambio è simmetrico — ognuno manda il proprio
+vault e fonde in casa propria — quindi dopo un giro sono già allineati: farne
+partire un altro vorrebbe dire due dispositivi che si rimbalzano per sempre.
+
+L'altro momento è lo **sblocco**: recupera quello che è successo mentre l'app
+era chiusa. Non serve altro, perché il dispositivo che si riaccende è sempre
+quello che deve muoversi per primo.
 """
 
 from __future__ import annotations
+import json
 import threading
 import time
 from typing import Callable, Dict, List, Optional
@@ -39,10 +56,16 @@ class SyncApp:
                  leggi_impostazioni: Callable[[], dict],
                  salva_impostazioni: Callable[[dict], None],
                  porta: int = sync_net.PORTA_SYNC,
-                 porta_scoperta: int = sync_net.PORTA_SCOPERTA):
+                 porta_scoperta: int = sync_net.PORTA_SCOPERTA,
+                 dopo_fusione: Optional[Callable[[], None]] = None):
         self._store_di = store_di
         self._leggi = leggi_impostazioni
         self._salva = salva_impostazioni
+        #: Chiamata quando una fusione ha cambiato davvero il vault. Serve al
+        #: server per rifare l'indice della ricerca: senza, una voce arrivata
+        #: dal telefono finisce nel vault ma la chat non la trova, e sembra
+        #: che il sync non sia arrivato. `SyncApp` non sa cos'è un indice.
+        self._dopo_fusione = dopo_fusione
         # Porte a parametro solo per i test, che devono far convivere due
         # dispositivi finti sullo stesso computer.
         self._porta = porta
@@ -50,6 +73,12 @@ class SyncApp:
         self._ascoltatore: Optional[sync_net.Ascoltatore] = None
         self._annunciatore: Optional[sync_net.Annunciatore] = None
         self._lucchetto = threading.Lock()
+        #: Una fusione alla volta. L'ascoltatore serve ogni collegamento in un
+        #: thread suo, e da oggi anche il sync automatico chiama da fuori: due
+        #: fusioni insieme riscriverebbero il vault a vicenda.
+        self._lucchetto_fusione = threading.RLock()
+        #: Il rinvio del sync automatico, per non partire a ogni tasto premuto.
+        self._rinvio: Optional[threading.Timer] = None
 
         #: Codice di abbinamento in corso: (codice, scadenza, tentativi).
         self._codice: Optional[str] = None
@@ -62,6 +91,11 @@ class SyncApp:
         self._da_chi: Dict[str, str] = {}
         #: L'ultimo esito, da mostrare nella sezione Sincronizza.
         self.ultimo: Optional[dict] = None
+        #: Cresce di uno ogni volta che una fusione cambia il vault. È il modo
+        #: che ha l'interfaccia di **accorgersi** di quello che arriva mentre è
+        #: aperta: un vault ricevuto lo applica un thread dell'ascoltatore, e
+        #: la pagina non ne saprebbe niente fino alla riapertura dell'app.
+        self.revisione: int = 0
 
     # ----------------------------------------------------------- impostazioni
 
@@ -213,7 +247,15 @@ class SyncApp:
     def _ferma_dentro(self) -> None:
         """Chiude solo i thread. **Non tocca il codice**: `avvia()` passa di
         qui per essere ripetibile, e cancellare il codice li' voleva dire
-        buttare via quello che l'utente stava leggendo sullo schermo."""
+        buttare via quello che l'utente stava leggendo sullo schermo.
+
+        Il lucchetto ce l'ha già chi chiama, e non è rientrante: qui dentro non
+        si riprende."""
+        if self._rinvio is not None:
+            # Un sync rinviato che scatta a vault chiuso non troverebbe la
+            # chiave, ma proverebbe lo stesso a parlare sulla rete.
+            self._rinvio.cancel()
+            self._rinvio = None
         if self._annunciatore:
             self._annunciatore.ferma()
             self._annunciatore = None
@@ -235,6 +277,14 @@ class SyncApp:
     # ------------------------------------------------------------- il lavoro
 
     def cerca(self) -> List[dict]:
+        # La sonda parte sempre sulla porta di scoperta **normale**, anche
+        # quando questa istanza si annuncia altrove: è di proposito, e va
+        # lasciato così. Due istanze sullo stesso computer — cioè il modo in
+        # cui si prova il sync senza avere due macchine — si spostano con
+        # VAULTMIND_SYNC_SCOPERTA solo per non litigare sulla porta da
+        # ascoltare; se anche la domanda si spostasse, nessuna delle due
+        # sentirebbe l'altra e l'unico modo di provare il sync sparirebbe.
+        # Su una rete vera nessuno tocca quella variabile.
         ctx = self._contesto()
         if ctx is None:
             return []
@@ -254,6 +304,70 @@ class SyncApp:
         self.ultimo = esito
         return esito
 
+    def sincronizza_tutti(self) -> dict:
+        """Cerca sulla rete e si allinea con **tutti** i dispositivi già
+        abbinati che rispondono.
+
+        È la stessa cosa che fa il pulsante e che fa il sync automatico: uno
+        solo perché non ci siano due comportamenti diversi da spiegare. I
+        dispositivi mai abbinati vengono ignorati di proposito — abbinare
+        richiede il codice, e deve restare una cosa che decidi tu.
+        """
+        ctx = self._contesto()
+        if ctx is None:
+            return {"ok": False, "motivo": "Il vault è chiuso.", "esiti": []}
+        # Cattura larga: qui si parla con la rete, e una scheda che sparisce o
+        # una WiFi che cade non devono diventare un errore dell'app.
+        try:
+            trovati = self.cerca()
+        except Exception:
+            return {"ok": False, "motivo": "La rete non è raggiungibile.", "esiti": []}
+
+        noti = [d for d in trovati if d.get("conosciuto")]
+        esiti: List[dict] = []
+        for d in noti:
+            nome = d.get("nome") or "dispositivo"
+            try:
+                esito = self.sincronizza_con(d["indirizzo"], int(d["porta"]))
+                esiti.append({**esito, "con": esito.get("con") or nome})
+            except sync_net.RifiutoSync as exc:
+                esiti.append({"con": nome, "errore": str(exc)})
+            except Exception:
+                esiti.append({"con": nome,
+                              "errore": "Non è stato possibile raggiungerlo."})
+        return {"ok": True, "trovati": len(trovati), "abbinati": len(noti),
+                "esiti": esiti}
+
+    def programma_sync(self, ritardo: float = 3.0) -> None:
+        """Una modifica locale si propaga da sola, poco dopo.
+
+        Il rinvio serve perché le modifiche arrivano a raffica — si salva una
+        voce, si cambia categoria, se ne salva un'altra — e ognuna farebbe
+        partire uno scambio dell'intero vault. Ogni chiamata sposta in avanti
+        quella prima, così parte **una volta sola** quando ti fermi.
+
+        Non solleva mai: chi ha appena salvato una voce l'ha salvata, e il sync
+        che non riesce è un fatto della rete, non del salvataggio.
+        """
+        with self._lucchetto:
+            if self._rinvio is not None:
+                self._rinvio.cancel()
+                self._rinvio = None
+            if not self.acceso or self._ascoltatore is None:
+                return
+            if not (self._sez().get("dispositivi") or {}):
+                return   # nessuno con cui allinearsi: niente sonde inutili
+            t = threading.Timer(ritardo, self._sync_di_sfondo)
+            t.daemon = True
+            self._rinvio = t
+            t.start()
+
+    def _sync_di_sfondo(self) -> None:
+        try:
+            self.sincronizza_tutti()
+        except Exception:
+            pass   # il sync automatico non deve mai disturbare
+
     def ricevi_vault(self, blob: str, id_peer: str) -> dict:
         """Il cuore: prende il vault dell'altro, lo fonde col nostro e applica.
 
@@ -271,41 +385,67 @@ class SyncApp:
         except VaultCorrupted:
             return {"errore": "Il vault ricevuto non è leggibile."}
 
-        sua = merge.Istantanea(
-            entries=[Credential.from_dict(c) for c in (dati.get("credentials") or [])],
-            tombstones=list(dati.get("deleted") or []),
-            categories=list(dati.get("categories") or []),
-        )
-        mia = merge.Istantanea(entries=store.entries,
-                               tombstones=store.tombstones,
-                               categories=store.categories)
+        with self._lucchetto_fusione:
+            sua = merge.Istantanea(
+                entries=[Credential.from_dict(c) for c in (dati.get("credentials") or [])],
+                tombstones=list(dati.get("deleted") or []),
+                categories=list(dati.get("categories") or []),
+            )
+            mia = merge.Istantanea(entries=store.entries,
+                                   tombstones=store.tombstones,
+                                   categories=store.categories)
 
-        sync = self._sez()
-        base = (sync.get("basi") or {}).get(id_peer)
-        f = merge.fondi(mia, sua, base)
+            sync = self._sez()
+            base = (sync.get("basi") or {}).get(id_peer)
+            prima = _confrontabile(mia.entries, mia.tombstones, mia.categories)
+            f = merge.fondi(mia, sua, base)
 
-        store.applica_fusione(f.entries, f.tombstones, f.categories)
+            # Riscrivere solo se è cambiato qualcosa. Il sync automatico parte a
+            # ogni modifica, e quindi capita spessissimo che l'altro non abbia
+            # niente da darci: `applica_fusione` ri-cifra comunque l'INTERO
+            # vault, e sarebbe una riscrittura da un megabyte per confermare che
+            # eravamo già allineati.
+            cambiato = _confrontabile(f.entries, f.tombstones, f.categories) != prima
+            if cambiato:
+                store.applica_fusione(f.entries, f.tombstones, f.categories)
+                self.revisione += 1
 
-        # La base registra solo ciò su cui siamo d'accordo: le voci contese
-        # restano fuori, così al prossimo giro risultano ancora cambiate da
-        # entrambi e il conflitto si ripresenta invece di sparire non deciso.
-        contesi = {c.uid for c in f.conflitti}
-        sync.setdefault("basi", {})[id_peer] = {
-            c.uid: c.rev for c in f.entries if c.uid not in contesi
-        }
-        self._scrivi_sez(sync)
+            # La base registra solo ciò su cui siamo d'accordo: le voci contese
+            # restano fuori, così al prossimo giro risultano ancora cambiate da
+            # entrambi e il conflitto si ripresenta invece di sparire non deciso.
+            contesi = {c.uid for c in f.conflitti}
+            sync.setdefault("basi", {})[id_peer] = {
+                c.uid: c.rev for c in f.entries if c.uid not in contesi
+            }
+            self._scrivi_sez(sync)
 
-        self.conflitti = {c.uid: c for c in f.conflitti}
-        self._da_chi = {c.uid: id_peer for c in f.conflitti}
-        riepilogo = {
-            "aggiunte": f.riepilogo.get("aggiunte", 0),
-            "aggiornate": f.riepilogo.get("aggiornate", 0),
-            "cancellate": f.riepilogo.get("cancellate", 0),
-            "conflitti": len(f.conflitti),
-            "quando": int(time.time()),
-        }
-        self.ultimo = riepilogo
+            self.conflitti = {c.uid: c for c in f.conflitti}
+            self._da_chi = {c.uid: id_peer for c in f.conflitti}
+            riepilogo = {
+                "aggiunte": f.riepilogo.get("aggiunte", 0),
+                "aggiornate": f.riepilogo.get("aggiornate", 0),
+                "cancellate": f.riepilogo.get("cancellate", 0),
+                "conflitti": len(f.conflitti),
+                "quando": int(time.time()),
+                "con": (self._sez().get("dispositivi") or {}).get(id_peer, {}).get("nome") or "",
+            }
+            self.ultimo = riepilogo
+
+        # Fuori dal lucchetto: chi ascolta rifà l'indice della ricerca, che non
+        # ha bisogno del vault fermo e non deve trattenere il collegamento.
+        if cambiato:
+            self._avvisa()
         return riepilogo
+
+    def _avvisa(self) -> None:
+        """Dice all'app che il vault è cambiato sotto i suoi piedi. Non deve
+        poter far fallire un sync riuscito: il dato è già salvato."""
+        if self._dopo_fusione is None:
+            return
+        try:
+            self._dopo_fusione()
+        except Exception:
+            pass
 
     # ------------------------------------------------------------- conflitti
 
@@ -360,7 +500,27 @@ class SyncApp:
             self._scrivi_sez(sync)
 
         self.conflitti.pop(uid, None)
+        self.revisione += 1
         return True
+
+
+def _confrontabile(entries: List[Credential], tombstones: List[dict],
+                   categories: List[str]) -> str:
+    """Il contenuto del vault ridotto a una stringa, per rispondere a una sola
+    domanda: la fusione ha cambiato qualcosa?
+
+    Si confronta il contenuto per intero e non i soli `rev`: due voci con lo
+    stesso numero e contenuto diverso esistono — è esattamente un conflitto — e
+    dire «non è cambiato niente» proprio lì sarebbe il posto peggiore.
+    """
+    return json.dumps({
+        "e": sorted((c.to_dict() for c in entries),
+                    key=lambda d: str(d.get("uid") or "")),
+        "t": sorted(({"uid": str(t.get("uid") or ""), "rev": t.get("rev"),
+                      "mod": t.get("mod")} for t in tombstones),
+                    key=lambda d: d["uid"]),
+        "c": list(categories),
+    }, sort_keys=True, ensure_ascii=False, default=str)
 
 
 def _sommario(c: Optional[Credential]) -> Optional[dict]:

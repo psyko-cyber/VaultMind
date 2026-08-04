@@ -447,6 +447,10 @@ def unlock(body: UnlockIn):
     # c'è niente da sincronizzare, e restare in ascolto sarebbe solo una porta
     # aperta che non serve a nessuno.
     SYNC.avvia()
+    # Un giro di recupero: mentre l'app era chiusa il telefono può aver
+    # aggiunto delle voci, e nessuno gliele verrebbe a chiedere. In sottofondo,
+    # perché lo sblocco non deve aspettare la rete.
+    SYNC.programma_sync(ritardo=1.5)
     return {
         "ok": True,
         "created": created,
@@ -522,6 +526,7 @@ def add(body: AddIn):
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     _rebuild_index()
+    SYNC.programma_sync()
     return {"ok": True, "id": cred.id, "count": len(S.store.entries)}
 
 
@@ -539,6 +544,7 @@ def update(body: UpdateIn):
     if cred is None:
         raise HTTPException(status_code=404, detail="voce non trovata")
     _rebuild_index()
+    SYNC.programma_sync()
     return {"ok": True, "id": cred.id, "count": len(S.store.entries)}
 
 
@@ -628,6 +634,9 @@ def import_commit(body: ImportCommitIn):
         S.store.add_many(items)
     if body.rebuild:
         _rebuild_index()
+        # Solo alla fine dell'import, non a ogni blocco: un CSV da 800 voci
+        # arriva in decine di chiamate, e ognuna farebbe partire uno scambio.
+        SYNC.programma_sync()
     else:
         S.index_dirty = True
     return {"ok": True, "saved": len(items), "with_2fa": con_2fa,
@@ -759,11 +768,24 @@ class SetCategoryIn(BaseModel):
 _PORTA_SYNC = int(os.environ.get("VAULTMIND_SYNC_PORT", sync_net.PORTA_SYNC))
 _PORTA_SCOPERTA = int(os.environ.get("VAULTMIND_SYNC_SCOPERTA", sync_net.PORTA_SCOPERTA))
 
+def _vault_cambiato_da_fuori() -> None:
+    """Una fusione ha cambiato il vault mentre l'app era aperta.
+
+    L'indice va rifatto, altrimenti la voce arrivata dal telefono sta nel vault
+    ma la chat non la trova, e sembra che il sync non sia arrivato. Si segna e
+    basta: `_ensure_index()` lo rifà prima della prossima ricerca, e rifarlo qui
+    vorrebbe dire tenere occupato il thread dell'ascoltatore. La pagina aperta
+    se ne accorge da sola con `/api/sync/novita`.
+    """
+    S.index_dirty = True
+
+
 SYNC = SyncApp(store_di=lambda: S.store,
                leggi_impostazioni=_load_settings,
                salva_impostazioni=_save_settings,
                porta=_PORTA_SYNC,
-               porta_scoperta=_PORTA_SCOPERTA)
+               porta_scoperta=_PORTA_SCOPERTA,
+               dopo_fusione=_vault_cambiato_da_fuori)
 
 
 class SyncImpostaIn(BaseModel):
@@ -796,6 +818,35 @@ def sync_stato():
         "conflitti": len(SYNC.conflitti),
         "ultimo": SYNC.ultimo,
     }
+
+
+@app.get("/api/sync/novita")
+def sync_novita():
+    """Com'è messo il vault, in quattro numeri. La pagina lo chiede in
+    continuazione: qui dentro non si legge il disco e non si tocca la rete.
+
+    Esiste perché un vault che arriva dal telefono lo applica un thread
+    dell'ascoltatore, e la pagina aperta non ha nessun modo di saperlo. Prima
+    la voce ricevuta si vedeva solo chiudendo e riaprendo l'app.
+    """
+    _require_unlocked()
+    return {
+        "revisione": SYNC.revisione,
+        "conflitti": len(SYNC.conflitti),
+        "ultimo": SYNC.ultimo,
+    }
+
+
+@app.post("/api/sync/adesso")
+def sync_adesso():
+    """Il sync subito, con tutti i dispositivi abbinati che rispondono.
+
+    È quello che fa il pulsante nella barra. Gli stessi passi del sync
+    automatico, chiamati a mano: quando uno dei due non è più sicuro di essere
+    allineato, deve poterlo verificare senza aprire nessuna sezione.
+    """
+    _require_unlocked()
+    return SYNC.sincronizza_tutti()
 
 
 @app.post("/api/sync/imposta")
@@ -864,6 +915,8 @@ def sync_risolvi(body: SyncRisolviIn):
     if not SYNC.risolvi(body.uid, body.scelta):
         raise HTTPException(status_code=404, detail="conflitto non trovato")
     _rebuild_index()
+    # La decisione va portata all'altro: è lui che ha la versione scartata.
+    SYNC.programma_sync()
     return {"ok": True, "restanti": len(SYNC.conflitti)}
 
 
@@ -883,6 +936,7 @@ def category_add(body: CategoryIn):
         nome = S.store.add_category(body.name)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
+    SYNC.programma_sync()
     return {"ok": True, "name": nome}
 
 
@@ -896,6 +950,7 @@ def category_rename(body: CategoryRenameIn):
     if nome is None:
         raise HTTPException(status_code=404, detail="categoria non trovata")
     _rebuild_index()   # la categoria entra nell'indice della ricerca
+    SYNC.programma_sync()
     return {"ok": True, "name": nome}
 
 
@@ -907,6 +962,7 @@ def category_delete(body: CategoryIn):
     _require_unlocked()
     liberate = S.store.delete_category(body.name)
     _rebuild_index()
+    SYNC.programma_sync()
     return {"ok": True, "freed": liberate}
 
 
@@ -921,6 +977,7 @@ def set_category(body: SetCategoryIn):
         raise HTTPException(status_code=400, detail=str(exc))
     if toccate:
         _rebuild_index()
+        SYNC.programma_sync()
     return {"ok": True, "changed": toccate}
 
 
@@ -933,6 +990,7 @@ def delete_entry(cred_id: int):
         raise HTTPException(status_code=404, detail="Voce non trovata.")
     S.store.delete(cred_id)
     _rebuild_index()
+    SYNC.programma_sync()
     return {"ok": True, "count": len(S.store.entries)}
 
 
@@ -944,6 +1002,7 @@ def clear_all():
     removed = len(S.store.entries)
     S.store.clear()
     _rebuild_index()
+    SYNC.programma_sync()
     return {"ok": True, "removed": removed, "count": len(S.store.entries)}
 
 

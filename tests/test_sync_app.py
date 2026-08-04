@@ -35,14 +35,22 @@ class Dispositivo:
     def __init__(self, path: str, nome: str, porta: int = 0):
         self.store = VaultStore(path)
         self.impostazioni: dict = {}
+        #: Quante volte l'app e' stata avvisata che il vault e' cambiato sotto
+        #: i suoi piedi. Sul PC vero e' il segnale che rifa' l'indice della
+        #: ricerca e sveglia la pagina aperta.
+        self.avvisi = 0
         self.sync = SyncApp(
             store_di=lambda: self.store,
             leggi_impostazioni=lambda: self.impostazioni,
             salva_impostazioni=lambda s: self.impostazioni.update(s),
             porta=porta,
             porta_scoperta=0,   # niente scoperta: qui ci si collega a mano
+            dopo_fusione=self._avvisato,
         )
         self.sync.imposta(nome=nome)
+
+    def _avvisato(self):
+        self.avvisi += 1
 
     def titoli(self):
         return sorted(c.title for c in self.store.entries)
@@ -354,6 +362,115 @@ class TestMasterDiversa(unittest.TestCase):
         with self.assertRaises(sync_net.RifiutoSync) as e:
             due.sync.sincronizza_con("127.0.0.1", uno.sync.porta_vera, codice)
         self.assertIn("chiave", str(e.exception).lower())
+
+
+class TestAccorgersene(BaseDueDispositivi):
+    """Chi RICEVE deve sapere di aver ricevuto.
+
+    Il vault che arriva lo applica un thread dell'ascoltatore, dentro il
+    server: l'interfaccia non ne sa niente. Prima del 04/08/2026 la voce
+    arrivata dal telefono si vedeva sul PC solo chiudendo e riaprendo l'app —
+    il dato c'era gia' e veniva nascosto. Da qui passa anche l'indice della
+    ricerca, che senza avviso resta indietro e fa dire alla chat «non trovo
+    niente» su una voce che nel vault c'e'.
+    """
+
+    def test_chi_riceve_qualcosa_lo_sa(self):
+        self.tel.store.add("Slack", [{"label": "password", "value": "s"}], [])
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+
+        self.assertIn("Slack", self.pc.titoli())
+        self.assertEqual(1, self.pc.sync.revisione,
+                         "il PC ha applicato una fusione senza contarla")
+        self.assertGreaterEqual(self.pc.avvisi, 1,
+                                "l'app non e' stata avvisata: indice vecchio e pagina vecchia")
+
+    def test_un_sync_a_vuoto_non_riscrive_e_non_sveglia_nessuno(self):
+        """Il sync automatico parte a ogni modifica, quindi capita
+        continuamente che l'altro non abbia niente da darci. `applica_fusione`
+        ri-cifra l'INTERO vault: senza questo controllo sarebbe un megabyte
+        riscritto per confermare che eravamo gia' allineati, e la pagina si
+        ricaricherebbe da sola per niente."""
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+        self.pc.sync.chiudi_abbinamento()
+
+        rev = self.pc.sync.revisione
+        avvisi = self.pc.avvisi
+        with open(self.pc.store.path, "rb") as f:
+            prima = f.read()
+
+        self.pc.sync.ultimo = None     # senza, collega() non aspetta il server
+        self.collega(self.tel, self.pc)
+
+        with open(self.pc.store.path, "rb") as f:
+            self.assertEqual(prima, f.read(), "il vault e' stato riscritto per niente")
+        self.assertEqual(rev, self.pc.sync.revisione)
+        self.assertEqual(avvisi, self.pc.avvisi)
+
+    def test_anche_risolvere_un_conflitto_conta_come_cambiamento(self):
+        """La scelta cambia il vault quanto una voce in arrivo: se non
+        contasse, l'elenco aperto resterebbe con la versione scartata."""
+        self.pc.store.update(1, "Banca", [{"label": "password", "value": "pc"}], [])
+        self.tel.store.update(1, "Banca", [{"label": "password", "value": "tel"}], [])
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        esito = self.collega(self.tel, self.pc, codice)
+        self.assertEqual(1, esito["conflitti"])
+
+        uid = next(iter(self.tel.sync.conflitti))
+        prima = self.tel.sync.revisione
+        self.assertTrue(self.tel.sync.risolvi(uid, "mia"))
+        self.assertGreater(self.tel.sync.revisione, prima)
+
+
+class TestSyncSubito(BaseDueDispositivi):
+    """`sincronizza_tutti` e `programma_sync`: quello che sta dietro al
+    pulsante in barra e al sync che parte da solo."""
+
+    def test_a_vault_chiuso_non_prova_nemmeno(self):
+        self.pc.store.lock()
+        esito = self.pc.sync.sincronizza_tutti()
+        self.assertFalse(esito["ok"])
+        self.assertEqual([], esito["esiti"])
+
+    def test_senza_nessuno_abbinato_non_parte_nessuna_sonda(self):
+        """Chi non ha ancora abbinato niente non deve mettersi a chiamare
+        sulla rete a ogni voce che salva."""
+        self.assertTrue(self.pc.sync.avvia())
+        self.addCleanup(self.pc.sync.ferma)
+        self.pc.sync.programma_sync(ritardo=0.05)
+        self.assertIsNone(self.pc.sync._rinvio)
+
+    def test_il_rinvio_si_sposta_in_avanti_a_ogni_modifica(self):
+        """Le modifiche arrivano a raffica — salvi una voce, cambi categoria,
+        ne salvi un'altra — e ognuna farebbe partire uno scambio dell'intero
+        vault. Deve partirne uno solo, quando ti fermi."""
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+        self.pc.sync.chiudi_abbinamento()
+
+        self.assertTrue(self.pc.sync.avvia())
+        self.addCleanup(self.pc.sync.ferma)
+        self.pc.sync.programma_sync(ritardo=30)
+        primo = self.pc.sync._rinvio
+        self.assertIsNotNone(primo)
+        self.pc.sync.programma_sync(ritardo=30)
+        self.assertIsNot(primo, self.pc.sync._rinvio, "il rinvio non e' stato spostato")
+        self.assertFalse(primo.is_alive(), "il rinvio precedente e' rimasto in piedi")
+
+    def test_chiudere_il_vault_annulla_il_sync_rinviato(self):
+        """Un sync che scatta a vault chiuso non troverebbe la chiave, ma
+        proverebbe lo stesso a farsi vivo sulla rete."""
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+        self.pc.sync.chiudi_abbinamento()
+
+        self.assertTrue(self.pc.sync.avvia())
+        self.pc.sync.programma_sync(ritardo=30)
+        self.assertIsNotNone(self.pc.sync._rinvio)
+        self.pc.sync.ferma()
+        self.assertIsNone(self.pc.sync._rinvio)
 
 
 if __name__ == "__main__":

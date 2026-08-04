@@ -348,6 +348,9 @@
     <div class="pills">
       <span class="pill db" id="pillDb">🗄️ 0 voci</span>
       <span class="pill llm hidden" id="pillLlm">✨ LLM locale</span>
+      <!-- Compare solo quando c'è almeno un dispositivo abbinato: un pulsante
+           che non ha con chi parlare è solo una domanda in più. -->
+      <button class="iconbtn hidden" id="syncNow" title="Sincronizza ora">🔄</button>
       <button class="iconbtn" id="themeBtn" title="Tema">🎨</button>
       <button class="iconbtn" id="backupBtn" title="Backup del vault (file cifrato)">💾</button>
       <button class="iconbtn" id="lockAgain" title="Blocca">🔒</button>
@@ -759,6 +762,9 @@ async function doUnlock(){
     if(s.mic_enabled===false && $("#micBtn")) $("#micBtn").style.display="none";
     resetAutolock();
   }catch(e){}
+  // Da qui la pagina tiene d'occhio quello che arriva dagli altri dispositivi.
+  vigilaSync();
+  aggiornaTastoSync();
   if(j.created){
     addAI("Vault creato. Configuriamo subito i tuoi dati principali.");
     openOnboarding();
@@ -1782,6 +1788,108 @@ function renderDb(){
    sempre con textContent — mai con innerHTML. */
 let SYNC_TIMER = null;
 
+/* Una riga che compare in basso e se ne va da sola.
+   Serve al sync, che parla quando NON glielo hai chiesto: un alert fermerebbe
+   quello che stai facendo, e addAI() lascerebbe nella chat una riga per
+   sempre. Le cose importanti (i conflitti) restano più a lungo. */
+let _avvisoTimer = null;
+function avviso(testo, importante){
+  let box = $("#avvisoSync");
+  if(!box){
+    box = document.createElement("div");
+    box.id = "avvisoSync";
+    box.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);"
+      + "bottom:22px;z-index:60;max-width:70vw;padding:9px 16px;border-radius:9px;"
+      + "font-size:12.5px;line-height:1.5;border:1px solid var(--border);"
+      + "background:var(--bar);box-shadow:0 6px 24px rgba(0,0,0,.28);cursor:pointer";
+    box.addEventListener("click", ()=>box.classList.add("hidden"));
+    document.body.appendChild(box);
+  }
+  box.textContent = testo;
+  box.style.borderColor = importante ? "#FBBF24" : "var(--border)";
+  box.style.color = importante ? "#FBBF24" : "var(--fg)";
+  box.classList.remove("hidden");
+  clearTimeout(_avvisoTimer);
+  _avvisoTimer = setTimeout(()=>box.classList.add("hidden"), importante ? 9000 : 4000);
+}
+
+/* ---- accorgersi di quello che ARRIVA ----
+   Un vault che arriva dal telefono lo applica un thread dell'ascoltatore,
+   dentro il server: la pagina non ha nessun modo di saperlo, e prima la voce
+   ricevuta si vedeva solo chiudendo e riaprendo l'app. Si guarda un contatore,
+   non il vault: la risposta non legge il disco e non tocca la rete. */
+let SYNC_REV = null, SYNC_VIGILE = null;
+
+function mostraTastoSync(vale){
+  $("#syncNow").classList.toggle("hidden", !vale);
+}
+
+/* Allo sblocco non si è ancora aperta la sezione Sincronizza, e il pulsante
+   deve sapere lo stesso se c'è qualcuno con cui parlare. */
+async function aggiornaTastoSync(){
+  try{
+    const r = await fetch("/api/sync/stato");
+    if(!r.ok) return;
+    const j = await r.json();
+    mostraTastoSync(j.acceso && (j.dispositivi || []).length > 0);
+  }catch(e){}
+}
+
+function vigilaSync(){
+  clearInterval(SYNC_VIGILE);
+  SYNC_REV = null;                       // il primo giro fa solo da riferimento
+  SYNC_VIGILE = setInterval(controllaNovita, 5000);
+}
+
+async function controllaNovita(){
+  if($("#app").classList.contains("hidden")) return;   // vault chiuso
+  let j;
+  try{
+    const r = await fetch("/api/sync/novita");
+    if(!r.ok) return;
+    j = await r.json();
+  }catch(e){ return; }                   // la pagina non deve fare rumore per questo
+
+  aggiornaBadge(j.conflitti || 0);
+  if(SYNC_REV === null){ SYNC_REV = j.revisione; return; }
+  if(j.revisione === SYNC_REV) return;
+  SYNC_REV = j.revisione;
+
+  await loadDb();                        // l'elenco aperto era già vecchio
+  const u = j.ultimo || {};
+  const pezzi = [];
+  if(u.aggiunte) pezzi.push(`${u.aggiunte} in arrivo`);
+  if(u.aggiornate) pezzi.push(`${u.aggiornate} aggiornate`);
+  if(u.cancellate) pezzi.push(`${u.cancellate} rimosse`);
+  if(!pezzi.length && !j.conflitti) return;   // cambiato per mano nostra: zitti
+  const da = u.con ? `Da ${u.con}: ` : "";
+  if(j.conflitti) avviso(`${da}${pezzi.concat([`${j.conflitti} da decidere`]).join(" · ")}. Apri Sincronizza.`, true);
+  else avviso(`${da}${pezzi.join(" · ")}.`);
+}
+
+/* Il pulsante in barra: lo stesso lavoro del sync automatico, chiesto a mano.
+   Serve quando uno dei due non è più sicuro di essere allineato e non vuole
+   aprire nessuna sezione per verificarlo. */
+$("#syncNow").addEventListener("click", async ()=>{
+  const b = $("#syncNow");
+  if(b.disabled) return;
+  b.disabled = true; b.textContent = "…";
+  const {ok,j} = await api("/api/sync/adesso", {});
+  b.disabled = false; b.textContent = "🔄";
+  if(!ok){ avviso(j.detail || "Sincronizzazione non riuscita.", true); return; }
+  if(!j.ok){ avviso(j.motivo || "Sincronizzazione non riuscita.", true); return; }
+  if(!j.abbinati){
+    avviso("Nessun dispositivo abbinato in linea: accendi l'app sull'altro e sblocca il vault.", true);
+    return;
+  }
+  const errori = (j.esiti || []).filter(e=>e.errore);
+  if(errori.length){ avviso(errori[0].errore, true); return; }
+  await controllaNovita();
+  const mosso = (j.esiti || []).some(e=>e.aggiunte||e.aggiornate||e.cancellate||e.conflitti);
+  if(!mosso) avviso("Era già tutto allineato.");
+  await caricaSync();
+});
+
 async function openSync(){
   $("#syncModal").classList.remove("hidden");
   await caricaSync();
@@ -1801,6 +1909,7 @@ async function caricaSync(){
   if(j.codice) mostraCodice(j.codice, 120); else nascondiCodice();
   renderFidati(j.dispositivi || []);
   aggiornaBadge(j.conflitti || 0);
+  mostraTastoSync(j.acceso && (j.dispositivi || []).length > 0);
   if(j.conflitti) await caricaConflitti(); else $("#syncConflitti").classList.add("hidden");
 }
 
