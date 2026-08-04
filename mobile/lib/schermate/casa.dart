@@ -14,6 +14,7 @@ import 'package:flutter/material.dart';
 
 import '../impostazioni.dart';
 import '../sessione.dart';
+import '../sync_gestore.dart';
 import '../tema.dart';
 import '../vault.dart';
 import 'categorie.dart';
@@ -21,6 +22,7 @@ import 'chat.dart';
 import 'database.dart';
 import 'impostazioni.dart';
 import 'sblocco.dart';
+import 'sincronizza.dart';
 
 class SchermataCasa extends StatefulWidget {
   final Sessione sessione;
@@ -33,17 +35,74 @@ class SchermataCasa extends StatefulWidget {
 class _SchermataCasaState extends State<SchermataCasa> {
   int _sezione = 0;
   Timer? _inattivita;
+  late final GestoreSync _sync;
 
   @override
   void initState() {
     super.initState();
     _riarmaBlocco();
+    // Il sync vive insieme al vault aperto: si accende qui e si spegne al
+    // blocco. Senza chiave non c'è niente da sincronizzare, e restare in
+    // ascolto sarebbe solo una porta aperta che non serve a nessuno.
+    _sync = GestoreSync(widget.sessione);
+    _sync.addListener(_aggiorna);
+    _sync.avvia().then((ok) {
+      if (ok) _syncAutomatico();
+    });
   }
 
   @override
   void dispose() {
     _inattivita?.cancel();
+    _sync.removeListener(_aggiorna);
+    _sync.ferma();
+    _sync.dispose();
     super.dispose();
+  }
+
+  void _aggiorna() {
+    if (mounted) setState(() {});
+  }
+
+  /// Torni a casa, apri l'app, e i due si allineano da soli.
+  ///
+  /// **Quasi silenzioso di proposito**: se non c'è niente da decidere lascia
+  /// una riga che sparisce da sé. Si fa vivo solo per i conflitti, che sono
+  /// l'unica cosa che richiede te. Un sync automatico che chiede conferma a
+  /// ogni rientro non lo terrebbe acceso nessuno.
+  Future<void> _syncAutomatico() async {
+    try {
+      final trovati = await _sync.cerca();
+      for (final d in trovati.where((x) => x.conosciuto)) {
+        final esito = await _sync.sincronizzaCon(d);
+        if (!mounted || esito.errore != null) continue;
+        if (esito.conflitti > 0) {
+          _avviso('${d.etichetta}: ${esito.riassunto}', importante: true);
+        } else if (esito.qualcosaECambiato) {
+          _avviso('${d.etichetta}: ${esito.riassunto}');
+        }
+      }
+    } catch (_) {
+      // Il sync automatico non deve mai disturbare: se non riesce, pazienza.
+    }
+  }
+
+  void _avviso(String testo, {bool importante = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(testo),
+      duration: Duration(seconds: importante ? 6 : 3),
+      action: importante
+          ? SnackBarAction(label: 'Decidi', onPressed: _apriSync)
+          : null,
+    ));
+  }
+
+  void _apriSync() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(
+            builder: (_) => SchermataSincronizza(gestore: _sync)))
+        .then((_) => _riarmaBlocco());
   }
 
   /// Il vault si richiude da solo dopo un po' che non lo si tocca: un telefono
@@ -57,6 +116,7 @@ class _SchermataCasaState extends State<SchermataCasa> {
 
   void _blocca() {
     if (!mounted) return;
+    _sync.ferma();   // prima la porta, poi la chiave
     // Le voci decifrate se ne vanno insieme a questa schermata, e con loro la
     // chiave: dopo il blocco in memoria non resta niente di apribile.
     Navigator.of(context).popUntil((r) => r.isFirst);
@@ -80,6 +140,15 @@ class _SchermataCasaState extends State<SchermataCasa> {
               Center(
                 child: Text('${vault.credenziali.length} voci',
                     style: TextStyle(fontSize: 12, color: context.cTenue)),
+              ),
+              IconButton(
+                icon: Badge(
+                  isLabelVisible: _sync.conflitti.isNotEmpty,
+                  label: Text('${_sync.conflitti.length}'),
+                  child: const Icon(Icons.sync),
+                ),
+                tooltip: 'Sincronizza',
+                onPressed: _apriSync,
               ),
               IconButton(
                 icon: const Icon(Icons.settings_outlined),

@@ -199,7 +199,18 @@ class Trovato {
   final int porta;
   final bool abbinabile, firmata;
   final String salt;
-  const Trovato({
+
+  /// Il nome con cui lo conosciamo NOI, se è già abbinato: vince su quello che
+  /// annuncia lui, che potrebbe essere stato cambiato dall'altra parte.
+  String? nomeLocale;
+
+  /// Come chiamarlo a schermo.
+  String get etichetta => nomeLocale ?? nome;
+
+  /// L'abbiamo già abbinato?
+  bool get conosciuto => nomeLocale != null;
+
+  Trovato({
     required this.id,
     required this.nome,
     required this.indirizzo,

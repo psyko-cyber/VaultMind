@@ -45,9 +45,18 @@ class Sessione extends ValueNotifier<Vault> {
     value = nuovo; // solo a disco a posto
   }
 
-  /// Il testo cifrato del vault, per il backup da condividere. Non tocca il
-  /// file: è la stessa cifratura, con un nonce suo.
+  /// Il testo cifrato del vault, per il backup da condividere e per il sync.
+  /// Non tocca il file: è la stessa cifratura, con un nonce suo.
   Future<String> testoCifrato() => cifraVault(value, chiave);
+
+  /// Sostituisce il contenuto col risultato di una fusione, in **una sola
+  /// scrittura**: non deve esistere un momento in cui il vault è mezzo fuso.
+  Future<void> applicaFusione(
+    List<Credenziale> voci,
+    List<Lapide> lapidi,
+    List<String> categorie,
+  ) =>
+      _salva(value.con(credenziali: voci, lapidi: lapidi, categorie: categorie));
 
   // -------------------------------------------------------------- categorie
 

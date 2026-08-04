@@ -13,6 +13,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
+import 'sync_protocollo.dart';
 import 'tema.dart';
 
 class Impostazioni {
@@ -31,14 +32,56 @@ class Impostazioni {
   /// Un pin che punta a una voce cancellata altrove si ignora in silenzio.
   List<int> pinnate;
 
+  // ---- sincronizzazione ----
+  // Qui dentro **non finisce nessun segreto**, nemmeno adesso: le chiavi verso
+  // ogni dispositivo si ricavano dalla chiave del vault (`chiaveVerso`), non si
+  // salvano. Restano un identificativo, dei nomi e dei contatori.
+
+  /// Identificativo di QUESTO telefono. Casuale: il MAC address si falsifica e
+  /// Android lo randomizza per rete, quindi come serratura non regge — e come
+  /// etichetta un numero a caso va benissimo, senza dire niente su di te.
+  String idDispositivo;
+
+  /// Come si presenta agli altri dispositivi.
+  String nomeDispositivo;
+
+  /// Sync acceso? Da spento non si apre nessuna porta e non si risponde a nessuno.
+  bool syncAcceso;
+
+  /// {idPeer: nome} dei dispositivi abbinati. È un elenco di **autorizzazione**:
+  /// revocare qui chiude la porta anche a chi conosce la master password.
+  Map<String, String> fidati;
+
+  /// {idPeer: {uid: rev}} allo scorso sync riuscito con quel dispositivo.
+  ///
+  /// È ciò che permette di distinguere «sono più avanti di te» da «siamo
+  /// divergiti»: senza, ogni differenza sarebbe un conflitto. Sta qui e non nel
+  /// vault perché è un dato **derivato**, e non deve viaggiare col backup.
+  Map<String, Map<String, int>> basi;
+
   Impostazioni({
     this.tema = TemaId.notteOro,
     this.autoBlocco = 5,
     List<int>? pinnate,
-  }) : pinnate = pinnate ?? [];
+    this.idDispositivo = '',
+    this.nomeDispositivo = '',
+    this.syncAcceso = true,
+    Map<String, String>? fidati,
+    Map<String, Map<String, int>>? basi,
+  })  : pinnate = pinnate ?? [],
+        fidati = fidati ?? {},
+        basi = basi ?? {};
 
-  Map<String, dynamic> toJson() =>
-      {'tema': tema.name, 'autoBlocco': autoBlocco, 'pinnate': pinnate};
+  Map<String, dynamic> toJson() => {
+        'tema': tema.name,
+        'autoBlocco': autoBlocco,
+        'pinnate': pinnate,
+        'idDispositivo': idDispositivo,
+        'nomeDispositivo': nomeDispositivo,
+        'syncAcceso': syncAcceso,
+        'fidati': fidati,
+        'basi': basi,
+      };
 
   static Impostazioni fromJson(Map<String, dynamic> j) => Impostazioni(
         tema: TemaId.values.firstWhere(
@@ -49,13 +92,41 @@ class Impostazioni {
         pinnate: ((j['pinnate'] ?? const []) as List)
             .map((x) => (x as num).toInt())
             .toList(),
+        idDispositivo: '${j['idDispositivo'] ?? ''}',
+        nomeDispositivo: '${j['nomeDispositivo'] ?? ''}',
+        syncAcceso: j['syncAcceso'] != false,
+        fidati: {
+          for (final e in ((j['fidati'] ?? const {}) as Map).entries)
+            '${e.key}': '${e.value}'
+        },
+        basi: {
+          for (final e in ((j['basi'] ?? const {}) as Map).entries)
+            '${e.key}': {
+              for (final b in (e.value as Map).entries)
+                '${b.key}': (b.value as num).toInt()
+            }
+        },
       );
 
-  Impostazioni copia({TemaId? tema, int? autoBlocco, List<int>? pinnate}) =>
+  Impostazioni copia({
+    TemaId? tema,
+    int? autoBlocco,
+    List<int>? pinnate,
+    String? idDispositivo,
+    String? nomeDispositivo,
+    bool? syncAcceso,
+    Map<String, String>? fidati,
+    Map<String, Map<String, int>>? basi,
+  }) =>
       Impostazioni(
         tema: tema ?? this.tema,
         autoBlocco: autoBlocco ?? this.autoBlocco,
         pinnate: pinnate ?? this.pinnate,
+        idDispositivo: idDispositivo ?? this.idDispositivo,
+        nomeDispositivo: nomeDispositivo ?? this.nomeDispositivo,
+        syncAcceso: syncAcceso ?? this.syncAcceso,
+        fidati: fidati ?? this.fidati,
+        basi: basi ?? this.basi,
       );
 }
 
@@ -71,12 +142,24 @@ Future<File> _file() async {
 Future<void> caricaImpostazioni() async {
   try {
     final f = await _file();
-    if (!await f.exists()) return;
-    impostazioni.value =
-        Impostazioni.fromJson(jsonDecode(await f.readAsString()) as Map<String, dynamic>);
+    if (await f.exists()) {
+      impostazioni.value = Impostazioni.fromJson(
+          jsonDecode(await f.readAsString()) as Map<String, dynamic>);
+    }
   } catch (_) {
     // Un file di preferenze illeggibile non deve impedire di aprire il vault:
     // si riparte dai valori predefiniti.
+  }
+  // L'identità del dispositivo si crea una volta sola e poi non cambia più: se
+  // cambiasse, gli altri dispositivi lo vedrebbero come uno nuovo e l'elenco
+  // dei fidati si riempirebbe di fantasmi.
+  final i = impostazioni.value;
+  if (i.idDispositivo.isEmpty || i.nomeDispositivo.isEmpty) {
+    await salvaImpostazioni(i.copia(
+      idDispositivo: i.idDispositivo.isEmpty ? idDispositivo() : i.idDispositivo,
+      nomeDispositivo:
+          i.nomeDispositivo.isEmpty ? 'Telefono' : i.nomeDispositivo,
+    ));
   }
 }
 
