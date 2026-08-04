@@ -154,6 +154,25 @@
   .onb-sec{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px;background:var(--panel2)}
   .onb-head{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}
 
+  /* categorie: una riga per categoria, che si apre sulle sue voci */
+  .catrow{border:1px solid var(--border);border-radius:12px;background:var(--panel);margin:10px 14px}
+  .cathead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
+  .cathead .nm{font-weight:600;color:#fff;font-size:14px}
+  .cathead .cnt{font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .cathead .sp{flex:1}
+  .catrow.orfane{border-style:dashed}
+  .catbody{padding:0 14px 12px;border-top:1px solid var(--border)}
+  .catvoce{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px;color:var(--soft);
+    border-bottom:1px solid var(--border)}
+  .catvoce:last-child{border-bottom:none}
+  .catvoce .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .catvuota{font-size:12px;color:var(--faint);padding:10px 0}
+  /* scelta multipla delle voci da mettere in una categoria */
+  .pickrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);font-size:13px}
+  .pickrow:last-child{border-bottom:none}
+  .pickrow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--soft)}
+  .pickrow .w{font-size:11px;color:var(--faint);white-space:nowrap}
+
   /* tab nav */
   .tab-btn{flex:1;padding:11px;font-family:var(--disp);font-size:11px;letter-spacing:1px;text-transform:uppercase;
     color:var(--faint);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s}
@@ -339,6 +358,7 @@
   <div id="tabNav" style="display:flex;border-bottom:1px solid var(--border);background:var(--bar-soft);backdrop-filter:blur(8px)">
     <button class="tab-btn" data-tab="chat">💬 Chat</button>
     <button class="tab-btn" data-tab="db">🗄️ Database</button>
+    <button class="tab-btn" data-tab="cat">📁 Categorie</button>
   </div>
 
   <!-- MENU TEMA -->
@@ -355,6 +375,7 @@
     <div class="sep"></div>
     <button data-act="import">⇪ Importa credenziali</button>
     <button data-act="backup">💾 Backup del vault</button>
+    <button data-act="sync">🔄 Sincronizza <span id="syncBadge" class="hidden"></span></button>
     <div class="sep"></div>
     <button data-act="settings">⚙️ Impostazioni</button>
     <button data-act="lock">🔒 Blocca vault</button>
@@ -480,6 +501,20 @@
     <div id="dbEmpty" class="hidden">Nessuna voce nel vault.</div>
   </div>
 
+  <!-- CATEGORIE — raggruppamenti scelti a mano. Niente viene mai assegnato in
+       automatico: i tag di un import sono spesso parole ricavate dal titolo, e
+       raggrupparci sopra darebbe centinaia di sezioni da una voce sola. -->
+  <div id="catPanel" class="hidden">
+    <div class="db-head">
+      <div style="flex:1;font-size:12px;color:var(--faint);line-height:1.5" id="catHint"></div>
+      <div style="display:flex;gap:8px">
+        <button id="catNewBtn" class="iconbtn" title="Crea una categoria">＋ Nuova categoria</button>
+        <button id="catRefreshBtn" class="iconbtn" title="Aggiorna">↻</button>
+      </div>
+    </div>
+    <div id="catList"></div>
+  </div>
+
   <div class="chips" id="chips"></div>
 
   <div class="composer">
@@ -497,6 +532,77 @@
 </div>
 
 <!-- IMPORT MODAL -->
+<!-- SINCRONIZZAZIONE — la porta si apre solo mentre il vault è sbloccato, e non
+     è quella del server: questo parla con la rete locale, quello resta sul
+     loopback. Chi non ha la chiave di questo vault non riceve nemmeno una
+     risposta: per lui, su questa rete, VaultMind non esiste. -->
+<div id="syncModal" class="modal hidden">
+  <div class="card modalcard rise" style="width:min(94vw,620px);max-height:88vh;overflow-y:auto">
+    <div class="mhead"><span>🔄 Sincronizza</span><button id="closeSync" class="iconbtn">✕</button></div>
+
+    <div class="crit-row" style="margin-top:0">
+      <div class="txt">
+        <div class="t1">Sincronizzazione sulla rete locale</div>
+        <div class="t2" id="syncStato">…</div>
+      </div>
+      <div class="sw" id="swSync"><i></i></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <label class="lbl">Nome di questo dispositivo</label>
+      <input id="syncNome" class="field" style="font-family:var(--body)" placeholder="es. PC di casa">
+    </div>
+
+    <div id="syncConflitti" class="hidden" style="margin-top:16px"></div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button id="syncCerca" class="iconbtn">🔍 Cerca dispositivi</button>
+      <button id="syncAbbina" class="iconbtn">➕ Abbina un dispositivo</button>
+    </div>
+
+    <div id="syncCodice" class="hidden" style="margin-top:14px;padding:14px;border-radius:12px;
+         background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);text-align:center">
+      <div style="font-size:11px;letter-spacing:1.4px;color:var(--faint);text-transform:uppercase">Codice di abbinamento</div>
+      <div id="syncCodiceVal" style="font-family:var(--mono);font-size:34px;letter-spacing:8px;color:var(--accent);margin:8px 0"></div>
+      <div style="font-size:12px;color:var(--soft);line-height:1.55">
+        Scrivilo sull'altro dispositivo entro <b id="syncSecondi">120</b> secondi.<br>
+        Poi <b>controlla che le sei cifre dell'impronta siano identiche</b> sui due schermi:
+        è la verifica che nessuno si sia messo in mezzo.
+      </div>
+    </div>
+
+    <div id="syncTrovati" style="margin-top:14px"></div>
+
+    <div style="margin-top:18px">
+      <div style="font-size:11px;letter-spacing:1.4px;color:var(--faint);text-transform:uppercase;margin-bottom:8px">Dispositivi fidati</div>
+      <div id="syncFidati"></div>
+    </div>
+
+    <p class="hint" style="margin-top:16px">
+      I due dispositivi devono essere <b>sulla stessa rete</b> e con il vault <b>aperto</b>.
+      Fuori casa, una VPN verso casa (WireGuard sul router) rimette il telefono
+      dentro la rete: per il sync è identico all'essere sul divano.
+    </p>
+  </div>
+</div>
+
+<!-- SCELTA DELLE VOCI da mettere in una categoria: si parte dalla categoria e
+     si spuntano le voci, non il contrario. Su 800 voci è l'unico modo umano. -->
+<div id="pickModal" class="modal hidden">
+  <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;display:flex;flex-direction:column">
+    <div class="mhead"><span id="pickTitle">Aggiungi voci</span><button id="closePick" class="iconbtn">✕</button></div>
+    <div class="db-filter" style="margin-bottom:10px">
+      <span style="color:var(--faint)">🔍</span>
+      <input id="pickFilter" placeholder="Filtra fra le voci…" />
+    </div>
+    <div id="pickList" style="flex:1;overflow-y:auto;min-height:120px"></div>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
+      <div id="pickCount" style="flex:1;font-size:12px;color:var(--faint)"></div>
+      <button id="pickConfirm" class="btn" style="margin:0;width:auto;padding:9px 18px" disabled>Aggiungi</button>
+    </div>
+  </div>
+</div>
+
 <div id="importModal" class="modal hidden">
   <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;overflow-y:auto">
     <div class="mhead"><span>Import intelligente</span><button id="closeImport" class="iconbtn">✕</button></div>
@@ -538,6 +644,11 @@
     <div id="genPop" class="gen-pop hidden"></div>
     <input id="qrFile" type="file" accept="image/*" class="hidden" />
     <div style="margin-top:12px"><label class="lbl">Tag (separati da virgola)</label><input id="f_tags" class="field" style="font-family:var(--body)" placeholder="es. shopping, acquisti, prime"></div>
+    <!-- La categoria si SCEGLIE fra quelle esistenti: qui non si creano, per
+         non ritrovarsi una categoria nuova a ogni errore di battitura. Si
+         creano nella scheda Categorie. -->
+    <div style="margin-top:12px"><label class="lbl">Categoria</label>
+      <select id="f_category" class="field" style="font-family:var(--body)"></select></div>
     <div class="crit-row">
       <div class="txt">
         <div class="t1">⚠️ Voce critica</div>
@@ -845,7 +956,7 @@ function resetAddModal(){
   const gp=$("#genPop"); if(gp) gp.classList.add("hidden");
   $("#addModalTitle").textContent="Nuova credenziale";
   $("#saveCred").textContent="Salva nel vault";
-  $("#f_title").value=""; $("#f_tags").value="";
+  $("#f_title").value=""; $("#f_tags").value=""; popolaCategorie("");
   setSw($("#swCritical"), false); $("#critWarn").classList.add("hidden");
   $("#addFields").innerHTML="";
   $("#addFields").appendChild(addFieldRow("Email",""));
@@ -861,6 +972,7 @@ function openEdit(c){
   $("#saveCred").textContent="Salva modifiche";
   $("#f_title").value=c.title||"";
   $("#f_tags").value=(c.tags||[]).join(", ");
+  popolaCategorie(c.category||"");
   setSw($("#swCritical"), !!c.critical);
   $("#addFields").innerHTML="";
   // in modifica mostriamo TUTTI i campi (anche l'OTP, col secret, così è correggibile)
@@ -976,7 +1088,8 @@ $("#saveCred").onclick=async()=>{
     if(value.trim()) fields.push({label: label||"Valore", value});
   });
   const payload={title:$("#f_title").value, fields, tags:$("#f_tags").value,
-                 critical:$("#swCritical").classList.contains("on")};
+                 critical:$("#swCritical").classList.contains("on"),
+                 category:$("#f_category").value||""};
   let res;
   if(editId!=null){ payload.id=editId; res=await api("/api/update",payload); }
   else { res=await api("/api/add",payload); }
@@ -1467,8 +1580,10 @@ function switchTab(tab){
   $("#chat").classList.toggle("hidden", !isChat);
   $("#chips").classList.toggle("hidden", !isChat);
   document.querySelector(".composer").classList.toggle("hidden", !isChat);
-  $("#dbPanel").classList.toggle("hidden", isChat);
-  if(!isChat) loadDb();
+  $("#dbPanel").classList.toggle("hidden", tab!=="db");
+  $("#catPanel").classList.toggle("hidden", tab!=="cat");
+  if(tab==="db") loadDb();
+  if(tab==="cat") loadCats();
 }
 document.querySelectorAll(".tab-btn").forEach(b=> b.addEventListener("click", ()=> switchTab(b.dataset.tab)));
 
@@ -1481,6 +1596,7 @@ document.querySelectorAll("#mainMenu button").forEach(btn=>{
     else if(act==="db") switchTab("db");
     else if(act==="import"){ resetImport(); $("#importModal").classList.remove("hidden"); }
     else if(act==="backup") $("#backupBtn").click();
+    else if(act==="sync") openSync();
     else if(act==="lock") $("#lockAgain").click();
     else if(act==="settings") openSettings();
   });
@@ -1641,6 +1757,7 @@ async function loadDb(){
   const {ok,j} = await fetch("/api/list").then(r=>r.json().then(d=>({ok:r.ok,j:d})));
   if(!ok) return;
   DB_ENTRIES = j.entries || [];
+  CAT_LIST = j.categories || [];   // arrivano nella stessa risposta: un giro solo
   renderDb();
 }
 function renderDb(){
@@ -1658,6 +1775,484 @@ function renderDb(){
   $("#dbEmpty").classList.add("hidden");
   list.forEach(c => grid.appendChild(dbCard(c)));
 }
+
+/* ================= SINCRONIZZAZIONE =================
+   L'ascoltatore vive insieme al vault: si apre allo sblocco e si chiude al
+   blocco. I nomi dei dispositivi arrivano DALLA RETE, quindi si scrivono
+   sempre con textContent — mai con innerHTML. */
+let SYNC_TIMER = null;
+
+async function openSync(){
+  $("#syncModal").classList.remove("hidden");
+  await caricaSync();
+}
+
+async function caricaSync(){
+  const r = await fetch("/api/sync/stato");
+  if(!r.ok) return;
+  const j = await r.json();
+  setSw($("#swSync"), !!j.acceso);
+  $("#syncNome").value = j.nome || "";
+  $("#syncStato").textContent = !j.acceso
+    ? "Spenta. Nessuna porta aperta, questo dispositivo non risponde a nessuno."
+    : (j.in_ascolto
+        ? "Accesa: questo dispositivo risponde solo a chi ha la chiave di questo vault."
+        : "Accesa, ma la porta non si è aperta (forse è occupata). Il sync a mano funziona lo stesso.");
+  if(j.codice) mostraCodice(j.codice, 120); else nascondiCodice();
+  renderFidati(j.dispositivi || []);
+  aggiornaBadge(j.conflitti || 0);
+  if(j.conflitti) await caricaConflitti(); else $("#syncConflitti").classList.add("hidden");
+}
+
+function aggiornaBadge(n){
+  const b = $("#syncBadge");
+  b.textContent = n ? `(${n})` : "";
+  b.classList.toggle("hidden", !n);
+  b.style.color = "#FBBF24";
+}
+
+function renderFidati(lista){
+  const box = $("#syncFidati"); box.innerHTML = "";
+  if(!lista.length){
+    const p = document.createElement("div");
+    p.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55";
+    p.textContent = "Nessuno ancora. «Abbina un dispositivo» mostra un codice da scrivere sull'altro.";
+    box.appendChild(p); return;
+  }
+  lista.forEach(d=>{
+    const r = document.createElement("div"); r.className = "catvoce";
+    const t = document.createElement("span"); t.className = "t";
+    t.textContent = d.nome || "dispositivo";
+    const q = document.createElement("span");
+    q.style.cssText = "font-size:11px;color:var(--faint);margin-right:8px";
+    q.textContent = d.quando ? new Date(d.quando*1000).toLocaleDateString() : "";
+    const b = document.createElement("button");
+    b.className = "iconbtn"; b.textContent = "Revoca";
+    b.style.cssText = "padding:4px 10px;font-size:12px;border-color:#FCA5A5;color:#FCA5A5";
+    b.addEventListener("click", async ()=>{
+      if(!confirm(`Revocare "${d.nome}"?\n\nDa quel momento non potrà più sincronizzare senza essere abbinato di nuovo.`)) return;
+      await api("/api/sync/revoca", {id: d.id});
+      caricaSync();
+    });
+    r.append(t, q, b);
+    box.appendChild(r);
+  });
+}
+
+function mostraCodice(codice, secondi){
+  $("#syncCodice").classList.remove("hidden");
+  $("#syncCodiceVal").textContent = codice;
+  clearInterval(SYNC_TIMER);
+  let s = secondi;
+  $("#syncSecondi").textContent = s;
+  SYNC_TIMER = setInterval(()=>{
+    s--; $("#syncSecondi").textContent = Math.max(0, s);
+    if(s <= 0) nascondiCodice();
+  }, 1000);
+}
+
+function nascondiCodice(){
+  clearInterval(SYNC_TIMER); SYNC_TIMER = null;
+  $("#syncCodice").classList.add("hidden");
+}
+
+$("#syncAbbina").addEventListener("click", async ()=>{
+  const {ok,j} = await api("/api/sync/abbina_inizia", {});
+  if(!ok){ alert(j.detail || "Non è stato possibile aprire l'abbinamento."); return; }
+  mostraCodice(j.codice, j.secondi);
+  cercaDispositivi();   // l'altro di solito è già lì che aspetta
+});
+
+$("#syncCerca").addEventListener("click", cercaDispositivi);
+
+async function cercaDispositivi(){
+  const box = $("#syncTrovati");
+  box.innerHTML = "";
+  const att = document.createElement("div");
+  att.style.cssText = "font-size:12.5px;color:var(--faint)";
+  att.textContent = "Cerco sulla rete locale…";
+  box.appendChild(att);
+
+  const {ok,j} = await api("/api/sync/cerca", {});
+  box.innerHTML = "";
+  const lista = (ok && j.dispositivi) || [];
+  if(!lista.length){
+    const p = document.createElement("div");
+    p.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55";
+    p.textContent = "Nessun dispositivo. Controlla che l'altro sia sulla stessa rete, "
+                  + "con l'app aperta e il vault sbloccato.";
+    box.appendChild(p); return;
+  }
+  lista.forEach(d=>{
+    const r = document.createElement("div"); r.className = "catvoce";
+    const t = document.createElement("span"); t.className = "t";
+    t.textContent = d.nome || "dispositivo";
+    const w = document.createElement("span");
+    w.style.cssText = "font-size:11px;color:var(--faint);margin-right:8px";
+    w.textContent = d.conosciuto ? "già abbinato" : (d.abbinabile ? "pronto ad abbinarsi" : "da abbinare");
+    const b = document.createElement("button");
+    b.className = "iconbtn"; b.textContent = d.conosciuto ? "Sincronizza" : "Abbina";
+    b.style.cssText = "padding:4px 10px;font-size:12px";
+    b.addEventListener("click", ()=>{
+      if(d.conosciuto) sincronizzaCon(d, b, "");
+      else chiediCodice(r, d);
+    });
+    r.append(t, w, b);
+    box.appendChild(r);
+  });
+}
+
+/* Il codice si chiede con un campo in linea, non con prompt(): la finestra
+   nativa non garantisce quel dialogo, e resterebbe un pulsante che non fa
+   niente su un'installazione e funziona sull'altra. Stessa scelta delle
+   categorie. */
+function chiediCodice(riga, d){
+  riga.innerHTML = "";
+  const t = document.createElement("span");
+  t.style.cssText = "font-size:12.5px;color:var(--soft);margin-right:8px";
+  t.textContent = "Codice mostrato su quel dispositivo:";
+  const inp = document.createElement("input");
+  inp.className = "field"; inp.inputMode = "numeric"; inp.maxLength = 6;
+  inp.placeholder = "000000";
+  inp.style.cssText = "width:110px;padding:6px 10px;font-family:var(--mono);letter-spacing:3px";
+  const ok = document.createElement("button");
+  ok.className = "iconbtn"; ok.textContent = "Abbina";
+  ok.style.cssText = "padding:4px 10px;font-size:12px;margin-left:8px";
+  const vai = ()=>{
+    const c = inp.value.trim();
+    if(c.length === 6) sincronizzaCon(d, ok, c);
+  };
+  ok.addEventListener("click", vai);
+  inp.addEventListener("keydown", (e)=>{ if(e.key === "Enter") vai(); });
+  riga.append(t, inp, ok);
+  inp.focus();
+}
+
+async function sincronizzaCon(d, bottone, codice){
+  bottone.disabled = true; bottone.textContent = "…";
+  const {ok,j} = await api("/api/sync/ora",
+                           {indirizzo: d.indirizzo, porta: d.porta, codice: codice || ""});
+  bottone.disabled = false; bottone.textContent = "Sincronizza";
+  if(!ok){ alert(j.detail || "Sincronizzazione non riuscita."); return; }
+  const pezzi = [];
+  if(j.aggiunte) pezzi.push(`${j.aggiunte} in arrivo`);
+  if(j.aggiornate) pezzi.push(`${j.aggiornate} aggiornate`);
+  if(j.cancellate) pezzi.push(`${j.cancellate} rimosse`);
+  if(j.conflitti) pezzi.push(`${j.conflitti} da decidere`);
+  addAI(pezzi.length ? `Sincronizzato con ${j.con}: ${pezzi.join(" · ")}.`
+                     : `Sincronizzato con ${j.con}: era già tutto allineato.`);
+  await loadDb();
+  await caricaSync();
+}
+
+async function caricaConflitti(){
+  const r = await fetch("/api/sync/conflitti");
+  if(!r.ok) return;
+  const {conflitti} = await r.json();
+  const box = $("#syncConflitti");
+  box.classList.toggle("hidden", !conflitti.length);
+  box.innerHTML = "";
+  if(!conflitti.length) return;
+
+  const testa = document.createElement("div");
+  testa.className = "crit-warn";
+  testa.innerHTML = "<b>Da decidere.</b> Queste voci sono state cambiate su tutti e due i "
+                  + "dispositivi. Finché non scegli, ognuno tiene la propria: niente è andato perso.";
+  box.appendChild(testa);
+
+  conflitti.forEach(c=>{
+    const card = document.createElement("div");
+    card.style.cssText = "border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;background:var(--panel2)";
+    const t = document.createElement("div");
+    t.style.cssText = "font-weight:600;color:#fff;font-size:14px";
+    t.textContent = c.titolo;
+    const m = document.createElement("div");
+    m.style.cssText = "font-size:11.5px;color:var(--faint);margin-top:2px";
+    m.textContent = {
+      "entrambi-modificata": "modificata su tutti e due",
+      "modificata-qui-cancellata-la": "modificata qui, cancellata sull'altro",
+      "cancellata-qui-modificata-la": "cancellata qui, modificata sull'altro",
+    }[c.motivo] || c.motivo;
+    card.append(t, m);
+
+    const riga = document.createElement("div");
+    riga.style.cssText = "display:flex;gap:8px;margin-top:10px;flex-wrap:wrap";
+    riga.append(bottoneScelta(c, "mia", "Tieni la mia", c.mia),
+                bottoneScelta(c, "sua", "Tieni la sua", c.sua));
+    card.appendChild(riga);
+    box.appendChild(card);
+  });
+}
+
+function bottoneScelta(c, quale, etichetta, versione){
+  const b = document.createElement("button");
+  b.className = "iconbtn";
+  b.style.cssText = "padding:8px 12px;font-size:12.5px;text-align:left;flex:1;min-width:180px";
+  // Si mostrano le ETICHETTE dei campi, mai i valori: scegliere fra due
+  // versioni non deve costringere a farsi stampare due password sullo schermo.
+  const dettaglio = versione
+    ? `${(versione.campi||[]).join(" · ") || "nessun campo"}`
+    : "cancellata";
+  b.textContent = `${etichetta} — ${dettaglio}`;
+  b.addEventListener("click", async ()=>{
+    const {ok,j} = await api("/api/sync/risolvi", {uid: c.uid, scelta: quale});
+    if(!ok){ alert(j.detail || "Non riuscito."); return; }
+    await loadDb();
+    await caricaSync();
+  });
+  return b;
+}
+
+$("#swSync").addEventListener("click", async ()=>{
+  const acceso = !$("#swSync").classList.contains("on");
+  setSw($("#swSync"), acceso);
+  await api("/api/sync/imposta", {acceso});
+  caricaSync();
+});
+
+$("#syncNome").addEventListener("change", async ()=>{
+  await api("/api/sync/imposta", {nome: $("#syncNome").value});
+  caricaSync();
+});
+
+$("#closeSync").addEventListener("click", ()=>{
+  nascondiCodice();
+  api("/api/sync/abbina_ferma", {});   // chiudendo, la finestra si chiude davvero
+  $("#syncModal").classList.add("hidden");
+});
+
+/* Riempie il menu a tendina della scheda voce. Le categorie possono non essere
+   ancora state caricate (il modulo si apre anche dalla Chat, senza passare dal
+   Database): in quel caso si chiedono, ed è l'unico uso di /api/categories. */
+async function popolaCategorie(scelta){
+  if(!CAT_LIST.length){
+    try{
+      const r = await fetch("/api/categories");
+      if(r.ok) CAT_LIST = ((await r.json()).categories||[]).map(c=>c.name);
+    }catch(e){ /* senza categorie il menu resta con la sola voce vuota */ }
+  }
+  const sel = $("#f_category"); sel.innerHTML = "";
+  const vuota = document.createElement("option");
+  vuota.value = "";
+  vuota.textContent = CAT_LIST.length ? "Nessuna categoria"
+                                      : "Nessuna — si creano nella scheda Categorie";
+  sel.appendChild(vuota);
+  CAT_LIST.forEach(n=>{
+    const o = document.createElement("option");
+    o.value = n; o.textContent = n;
+    sel.appendChild(o);
+  });
+  sel.value = CAT_LIST.includes(scelta) ? scelta : "";
+}
+
+/* ================= CATEGORIE =================
+   Raggruppamenti scelti A MANO: l'app non assegna mai niente da sola. I tag di
+   un import sono spesso parole ricavate dal titolo (`Poste Italiane` ->
+   `italiane`), e raggrupparci sopra darebbe centinaia di sezioni da una voce
+   sola. Una voce sta in UNA categoria: metterla altrove la sposta.
+
+   I nomi delle categorie e i titoli delle voci si scrivono sempre con
+   textContent, mai con innerHTML: vengono dal vault, e un titolo con dentro
+   del markup non deve poter fare niente. */
+let CAT_LIST = [];                 // nomi, nell'ordine scelto dall'utente
+const CAT_APERTE = new Set();      // quali righe sono espanse
+
+async function loadCats(){
+  await loadDb();                  // /api/list porta voci E categorie insieme
+  renderCats();
+}
+
+const catVoci = (nome)=> DB_ENTRIES.filter(c => (c.category||"") === nome);
+
+function renderCats(){
+  const box = $("#catList"); box.innerHTML = "";
+  $("#catHint").textContent = CAT_LIST.length
+    ? "Le voci si mettono dentro col ＋ della categoria. Una voce sta in una categoria sola: metterla altrove la sposta."
+    : "Nessuna categoria ancora. Creane una — «Banche», «Lavoro» — poi col ＋ scegli quali voci metterci. Niente viene assegnato in automatico.";
+
+  CAT_LIST.forEach(n => box.appendChild(catRow(n, true)));
+  const orfane = catVoci("");
+  if(orfane.length) box.appendChild(catRow("", false));
+}
+
+function catRow(nome, vera){
+  const voci = catVoci(nome);
+  const row = document.createElement("div");
+  row.className = "catrow" + (vera ? "" : " orfane");
+
+  const head = document.createElement("div"); head.className = "cathead";
+  const freccia = document.createElement("span");
+  freccia.style.color = "var(--faint)";
+  freccia.textContent = CAT_APERTE.has(nome) ? "▾" : "▸";
+  const nm = document.createElement("span"); nm.className = "nm";
+  nm.textContent = vera ? nome : "Senza categoria";
+  const cnt = document.createElement("span"); cnt.className = "cnt";
+  cnt.textContent = voci.length === 1 ? "1 voce" : voci.length + " voci";
+  const sp = document.createElement("span"); sp.className = "sp";
+  head.append(freccia, nm, cnt, sp);
+
+  if(vera){
+    head.appendChild(catBtn("＋ Voci", "Scegli quali voci mettere qui", (e)=>{
+      e.stopPropagation(); openPick(nome);
+    }));
+    head.appendChild(catBtn("✎", "Rinomina", (e)=>{ e.stopPropagation(); rinominaCat(row, nome); }));
+    const del = catBtn("🗑", "Elimina la categoria", async (e)=>{
+      e.stopPropagation();
+      const avviso = voci.length
+        ? `Eliminare la categoria "${nome}"?\n\nLe ${voci.length} voci che contiene NON vengono eliminate: restano nel vault, senza categoria.`
+        : `Eliminare la categoria "${nome}"? È vuota.`;
+      if(!confirm(avviso)) return;
+      const {ok,j} = await api("/api/category_delete", {name:nome});
+      if(!ok){ alert(j.detail || "Non è stato possibile eliminare la categoria."); return; }
+      CAT_APERTE.delete(nome);
+      loadCats();
+    });
+    del.style.borderColor = "#FCA5A5"; del.style.color = "#FCA5A5";
+    head.appendChild(del);
+  }
+
+  head.addEventListener("click", ()=>{
+    if(CAT_APERTE.has(nome)) CAT_APERTE.delete(nome); else CAT_APERTE.add(nome);
+    renderCats();
+  });
+  row.appendChild(head);
+
+  if(CAT_APERTE.has(nome)){
+    const body = document.createElement("div"); body.className = "catbody";
+    if(!voci.length){
+      const v = document.createElement("div"); v.className = "catvuota";
+      v.textContent = vera ? "Ancora nessuna voce qui dentro." : "";
+      body.appendChild(v);
+    }
+    voci.forEach(c=>{
+      const r = document.createElement("div"); r.className = "catvoce";
+      const t = document.createElement("span"); t.className = "t"; t.textContent = c.title;
+      r.append(t);
+      if(vera){
+        r.appendChild(catBtn("✕", "Togli dalla categoria", async ()=>{
+          const {ok,j} = await api("/api/set_category", {ids:[c.id], name:""});
+          if(!ok){ alert(j.detail || "Non riuscito."); return; }
+          loadCats();
+        }));
+      }
+      body.appendChild(r);
+    });
+    row.appendChild(body);
+  }
+  return row;
+}
+
+function catBtn(testo, titolo, onclick){
+  const b = document.createElement("button");
+  b.className = "iconbtn"; b.textContent = testo; b.title = titolo;
+  b.style.padding = "5px 9px"; b.style.fontSize = "12px";
+  b.addEventListener("click", onclick);
+  return b;
+}
+
+/* Il nome si chiede con un campo in linea, non con prompt(): la finestra
+   nativa non garantisce quel dialogo, e resterebbe un pulsante che non fa
+   niente su un'installazione e funziona sull'altra. */
+function chiediNome(dove, valore, etichetta, onOk){
+  dove.innerHTML = "";
+  const box = document.createElement("div");
+  box.style.cssText = "display:flex;gap:8px;align-items:center;padding:12px 14px";
+  const inp = document.createElement("input");
+  inp.className = "field"; inp.value = valore; inp.placeholder = "es. Banche";
+  inp.style.cssText = "flex:1;padding:8px 10px;font-size:13px";
+  const ok = document.createElement("button");
+  ok.className = "iconbtn"; ok.textContent = etichetta;
+  const no = document.createElement("button");
+  no.className = "iconbtn"; no.textContent = "Annulla";
+  box.append(inp, ok, no);
+  dove.appendChild(box);
+  inp.focus(); inp.select();
+
+  const conferma = ()=>{ const v = inp.value.trim(); if(v) onOk(v); else renderCats(); };
+  ok.addEventListener("click", conferma);
+  no.addEventListener("click", ()=> renderCats());
+  inp.addEventListener("keydown", (e)=>{
+    if(e.key === "Enter") conferma();
+    if(e.key === "Escape") renderCats();
+  });
+}
+
+function rinominaCat(row, nome){
+  chiediNome(row, nome, "Salva", async (nuovo)=>{
+    const {ok,j} = await api("/api/category_rename", {old:nome, new:nuovo});
+    if(!ok){ alert(j.detail || "Non è stato possibile rinominare."); renderCats(); return; }
+    CAT_APERTE.delete(nome); CAT_APERTE.add(j.name);
+    loadCats();
+  });
+}
+
+$("#catNewBtn").addEventListener("click", ()=>{
+  const riga = document.createElement("div"); riga.className = "catrow";
+  $("#catList").prepend(riga);
+  chiediNome(riga, "", "Crea", async (nome)=>{
+    const {ok,j} = await api("/api/category_add", {name:nome});
+    if(!ok){ alert(j.detail || "Non è stato possibile creare la categoria."); renderCats(); return; }
+    CAT_APERTE.add(j.name);
+    loadCats();
+  });
+});
+$("#catRefreshBtn").addEventListener("click", loadCats);
+
+/* ---- scelta multipla delle voci da mettere in una categoria ---- */
+let PICK_CAT = "";
+const PICK_SEL = new Set();
+
+function openPick(nome){
+  PICK_CAT = nome; PICK_SEL.clear();
+  $("#pickTitle").textContent = 'Aggiungi voci a "' + nome + '"';
+  $("#pickFilter").value = "";
+  renderPick();
+  $("#pickModal").classList.remove("hidden");
+  $("#pickFilter").focus();
+}
+
+function renderPick(){
+  const f = ($("#pickFilter").value||"").trim().toLowerCase();
+  const list = f
+    ? DB_ENTRIES.filter(c => (c.title||"").toLowerCase().includes(f) ||
+                             (c.tags||[]).some(t=>t.toLowerCase().includes(f)))
+    : DB_ENTRIES;
+  const box = $("#pickList"); box.innerHTML = "";
+  list.forEach(c=>{
+    const gia = (c.category||"") === PICK_CAT;
+    const r = document.createElement("div"); r.className = "pickrow";
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = gia || PICK_SEL.has(c.id); cb.disabled = gia;
+    cb.addEventListener("change", ()=>{
+      if(cb.checked) PICK_SEL.add(c.id); else PICK_SEL.delete(c.id);
+      aggiornaPick();
+    });
+    const t = document.createElement("span"); t.className = "t"; t.textContent = c.title;
+    const w = document.createElement("span"); w.className = "w";
+    w.textContent = gia ? "già qui"
+      : (c.category ? 'da "' + c.category + '" — verrà spostata' : "senza categoria");
+    r.append(cb, t, w);
+    box.appendChild(r);
+  });
+  aggiornaPick();
+}
+
+function aggiornaPick(){
+  $("#pickCount").textContent = PICK_SEL.size
+    ? (PICK_SEL.size === 1 ? "1 voce scelta" : PICK_SEL.size + " voci scelte")
+    : "Spunta le voci da mettere qui.";
+  $("#pickConfirm").disabled = PICK_SEL.size === 0;
+}
+
+$("#pickFilter").addEventListener("input", renderPick);
+$("#closePick").addEventListener("click", ()=> $("#pickModal").classList.add("hidden"));
+$("#pickConfirm").addEventListener("click", async ()=>{
+  const {ok,j} = await api("/api/set_category", {ids:[...PICK_SEL], name:PICK_CAT});
+  if(!ok){ alert(j.detail || "Non è stato possibile spostare le voci."); return; }
+  $("#pickModal").classList.add("hidden");
+  CAT_APERTE.add(PICK_CAT);
+  loadCats();
+});
 $("#dbFilter").addEventListener("input", renderDb);
 
 function dbCard(c){

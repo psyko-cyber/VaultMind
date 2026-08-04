@@ -7,10 +7,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../archivio.dart';
+import '../sessione.dart';
 import '../tema.dart';
 import '../ponte_file.dart';
 import '../vault.dart';
-import 'elenco.dart';
+import 'casa.dart';
+import 'dialoghi.dart';
 
 class SchermataSblocco extends StatefulWidget {
   final bool vaultPresente;
@@ -65,9 +67,10 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
       final chiaveBase64 = await improntaSblocca();
       if (chiaveBase64 == null) return; // annullato
       final contenuto = await leggiVault();
-      final vault = await apriVaultConChiave(contenuto, base64.decode(chiaveBase64));
+      final chiave = base64.decode(chiaveBase64);
+      final vault = await apriVaultConChiave(contenuto, chiave);
       if (!mounted) return;
-      _vaiAllElenco(vault);
+      _vaiACasa(Sessione(vault, chiave));
     } on PlatformException catch (e) {
       setState(() => _errore = e.message ?? 'Sblocco con impronta non riuscito.');
       setState(() => _impronta = false);
@@ -84,15 +87,19 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     }
   }
 
-  void _vaiAllElenco(Vault vault) {
+  void _vaiACasa(Sessione sessione) {
     Navigator.of(context).pushReplacement(
-      MaterialPageRoute(builder: (_) => SchermataElenco(vault: vault)),
+      MaterialPageRoute(builder: (_) => SchermataCasa(sessione: sessione)),
     );
   }
 
   /// Dopo uno sblocco riuscito propone l'impronta, una volta sola: è il solo
   /// momento in cui la chiave è disponibile per essere messa al sicuro.
-  Future<void> _proponiImpronta(String contenuto, String master) async {
+  ///
+  /// Riceve la chiave già derivata. Prima se la ri-derivava da sé, e questa
+  /// schermata faceva Argon2 **due volte** a ogni sblocco: coi parametri veri
+  /// (64 MB, time cost 3) è quasi un secondo di attesa regalato.
+  Future<void> _proponiImpronta(Uint8List chiave) async {
     if (!await impresaDisponibile() || await improntaAttiva()) return;
     if (!mounted) return;
     final vuole = await showDialog<bool>(
@@ -114,7 +121,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
             style: FilledButton.styleFrom(
-                backgroundColor: context.cAccento, foregroundColor: const Color(0xFF141414)),
+                backgroundColor: context.cAccento, foregroundColor: context.cSuAccento),
             child: const Text('Attiva'),
           ),
         ],
@@ -122,7 +129,6 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     );
     if (vuole != true) return;
     try {
-      final chiave = await chiaveDelVault(contenuto, master);
       await improntaAttivaConChiave(base64.encode(chiave));
     } catch (e) {
       // Se non riesce non è grave: si continua con la master password.
@@ -138,15 +144,18 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     try {
       final contenuto = await leggiVault();
       final master = _password.text;
-      final vault = await apriVault(contenuto, master);
+      // Una sola derivazione, poi si riusa: la chiave serve ad aprire, a
+      // proporre l'impronta e — da quando il telefono scrive — a risalvare.
+      final chiave = await chiaveDelVault(contenuto, master);
+      final vault = await apriVaultConChiave(contenuto, chiave);
       if (!mounted) return;
-      await _proponiImpronta(contenuto, master);
+      await _proponiImpronta(chiave);
       if (!mounted) return;
       // La password esce dalla memoria appena non serve più. Resta comunque
       // in RAM finché il campo di testo vive, ma non la si tiene un istante
       // più del necessario.
       _password.clear();
-      _vaiAllElenco(vault);
+      _vaiACasa(Sessione(vault, chiave));
     } on WrongPassword {
       setState(() => _errore = 'Master password errata.');
     } on VaultCorrupted {
@@ -169,6 +178,15 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
   }
 
   Future<void> _salva(String contenuto) async {
+    // Da quando il telefono scrive nel vault, un backup che arriva dal PC può
+    // cancellare del lavoro fatto qui — categorie assegnate, voci aggiunte.
+    // È l'unico modo di perdere dati finché il sync non esiste, quindi si
+    // chiede invece di sovrascrivere e basta.
+    if (await modificatoInLocale()) {
+      if (!mounted) return;
+      final procedi = await confermaSovrascrittura(context);
+      if (procedi != true) return;
+    }
     try {
       await importaVault(contenuto);
       if (!mounted) return;
@@ -241,15 +259,17 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
             onPressed: _occupato ? null : _sblocca,
             style: FilledButton.styleFrom(
               backgroundColor: context.cAccento,
-              foregroundColor: const Color(0xFF141414),
+              foregroundColor: context.cSuAccento,
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
             child: _occupato
-                ? const SizedBox(
+                // Niente const: il colore viene dal tema, e in Flutter un
+                // const non può leggere il context.
+                ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: Color(0xFF141414)))
+                        strokeWidth: 2, color: context.cSuAccento))
                 : const Text('Sblocca vault',
                     style: TextStyle(fontWeight: FontWeight.w600)),
           ),
@@ -305,7 +325,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: FilledButton.styleFrom(
               backgroundColor: context.cAccento,
-              foregroundColor: const Color(0xFF141414),
+              foregroundColor: context.cSuAccento,
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
           ),

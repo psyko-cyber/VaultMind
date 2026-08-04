@@ -1,4 +1,4 @@
-"""
+r"""
 Test su crypto_store.py — la rete di sicurezza sotto al modulo che cifra il vault.
 
 Perché esistono: qui un bug non significa "l'interfaccia è brutta", significa
@@ -38,7 +38,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(_QUI), "VaultMind_Windows"))
 
 from app.crypto_store import (  # noqa: E402
     Credential, Field, VaultStore, WrongPassword, VaultCorrupted,
-    derive_key, _b64e, _b64d,
+    derive_key, uid_derivato, now_ms, TOMBSTONE_DAYS, _b64e, _b64d,
 )
 from cryptography.hazmat.primitives.ciphers.aead import AESGCM  # noqa: E402
 
@@ -324,11 +324,13 @@ class TestCompatibilita(BaseVault):
     Chi ha 800 voci dentro non le reinserisce a mano perché abbiamo aggiunto
     un campo."""
 
-    def _scrivi_vault_legacy(self, master, credentials):
+    def _scrivi_vault_legacy(self, master, credentials, **radice):
         salt = os.urandom(16)
         key = derive_key(master, salt)
         nonce = os.urandom(12)
-        payload = json.dumps({"credentials": credentials}).encode("utf-8")
+        contenuto = {"credentials": credentials}
+        contenuto.update(radice)
+        payload = json.dumps(contenuto).encode("utf-8")
         ct = AESGCM(key).encrypt(nonce, payload, b"vaultmind")
         blob = {"version": 1,
                 "kdf": {"alg": "argon2id", "salt": _b64e(salt), "time_cost": 3,
@@ -336,6 +338,16 @@ class TestCompatibilita(BaseVault):
                 "cipher": "aes-256-gcm", "nonce": _b64e(nonce), "ciphertext": _b64e(ct)}
         with open(self.path, "w", encoding="utf-8") as f:
             json.dump(blob, f)
+
+    def _leggi_in_chiaro(self, master):
+        """Il contenuto decifrato così com'è sul disco: serve a verificare
+        quali chiavi ci finiscono davvero, non quelle che il nostro lettore
+        sarebbe disposto a ricostruire."""
+        with open(self.path, encoding="utf-8") as f:
+            blob = json.load(f)
+        key = derive_key(master, _b64d(blob["kdf"]["salt"]))
+        chiaro = AESGCM(key).decrypt(_b64d(blob["nonce"]), _b64d(blob["ciphertext"]), b"vaultmind")
+        return json.loads(chiaro.decode("utf-8"))
 
     def test_vault_senza_campo_critical(self):
         """`critical` è stato aggiunto il 29/07: assente = non critica."""
@@ -367,6 +379,50 @@ class TestCompatibilita(BaseVault):
         s2.unlock(MASTER)
         self.assertEqual(["Nuova", "Vecchia"], [c.title for c in s2.entries])
         self.assertFalse(s2.get(1).critical)
+
+    def test_vault_senza_categorie(self):
+        """`category` è del 04/08/2026: assente = nessuna categoria."""
+        self._scrivi_vault_legacy(MASTER, [
+            {"id": 1, "title": "Vecchia voce", "tags": ["x"], "fields": []},
+        ])
+        s = VaultStore(self.path)
+        s.unlock(MASTER)
+        self.assertEqual([], s.categories)
+        self.assertEqual("", s.entries[0].category)
+
+    def test_un_vault_senza_categorie_non_ne_guadagna_riscrivendolo(self):
+        """Il vettore di prova non ha categorie: se una riscrittura aggiungesse
+        i campi vuoti, il contratto del formato cambierebbe per tutti senza che
+        nessuno l'abbia deciso."""
+        s = VaultStore(self.path)
+        s.create(MASTER)
+        s.add_many(VOCI)
+        chiaro = self._leggi_in_chiaro(MASTER)
+        self.assertNotIn("categories", chiaro)
+        for c in chiaro["credentials"]:
+            self.assertNotIn("category", c, f'voce "{c["title"]}"')
+
+    def test_riscrivere_non_cancella_i_campi_che_non_conosciamo(self):
+        """Il caso vero: il PC aggiunge i timestamp per il sync (TODO §2) e un
+        telefono con l'app vecchia riscrive il vault. Senza questa difesa li
+        cancellerebbe tutti, in silenzio — e il sync non se ne accorgerebbe."""
+        self._scrivi_vault_legacy(
+            MASTER,
+            [{"id": 1, "title": "Vecchia", "fields": [],
+              "modificata": "2026-08-04T10:00:00Z", "chissa": 42}],
+            schema_futuro="da non perdere",
+        )
+        s = VaultStore(self.path)
+        s.unlock(MASTER)
+        s.add("Nuova", [{"label": "p", "value": "n"}], [])  # una riscrittura
+
+        chiaro = self._leggi_in_chiaro(MASTER)
+        self.assertEqual("da non perdere", chiaro["schema_futuro"])
+        vecchia = next(c for c in chiaro["credentials"] if c["id"] == 1)
+        self.assertEqual("2026-08-04T10:00:00Z", vecchia["modificata"])
+        self.assertEqual(42, vecchia["chissa"])
+        # e le chiavi note non devono essersi duplicate dentro extra
+        self.assertEqual("Vecchia", vecchia["title"])
 
 
 # ===========================================================================
@@ -625,6 +681,391 @@ class TestVettoreDiProva(unittest.TestCase):
     def test_la_password_sbagliata_fallisce_anche_sul_vettore(self):
         with self.assertRaises(WrongPassword):
             VaultStore(self.vault).unlock("non-e-questa")
+
+
+# ===========================================================================
+class TestCategorie(BaseVault):
+    """Raggruppamenti scelti A MANO dall'utente.
+
+    Niente viene mai dedotto dai tag: su un vault importato da Bitwarden i tag
+    sono spesso parole ricavate dal titolo (`Poste Italiane` → `italiane`), e
+    raggrupparci sopra produrrebbe centinaia di sezioni da una voce sola. È
+    esattamente ciò che questa funzione deve NON fare.
+    """
+
+    def _vault(self):
+        s = VaultStore(self.path)
+        s.create(MASTER)
+        s.add_many(VOCI)
+        return s
+
+    def test_una_categoria_creata_e_ancora_vuota_sopravvive(self):
+        """Lo stato normale fra il momento in cui la crei e quello in cui la
+        riempi. Se la deducessimo dalle voci, sparirebbe proprio lì."""
+        s = self._vault()
+        s.add_category("Banche")
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertEqual(["Banche"], s2.categories)
+        self.assertEqual(0, s2.count_by_category()["Banche"])
+
+    def test_assegnare_e_riaprire(self):
+        s = self._vault()
+        s.add_category("Banche")
+        ids = [c.id for c in s.entries if c.title == "Banca Intesa"]
+        self.assertEqual(1, s.set_category(ids, "Banche"))
+
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertEqual("Banche", s2.get(ids[0]).category)
+        self.assertEqual(1, s2.count_by_category()["Banche"])
+
+    def test_una_voce_sta_in_una_categoria_sola(self):
+        """Assegnarne un'altra la SPOSTA: è la scelta fatta il 04/08, e regge
+        i conteggi (la somma delle sezioni torna col totale delle voci)."""
+        s = self._vault()
+        s.add_category("Banche")
+        s.add_category("Finanza")
+        voce = s.entries[0].id
+        s.set_category([voce], "Banche")
+        s.set_category([voce], "Finanza")
+        self.assertEqual("Finanza", s.get(voce).category)
+        self.assertEqual(0, s.count_by_category()["Banche"])
+
+    def test_assegnare_a_una_categoria_inesistente_e_un_errore(self):
+        """Se crearla al volo fosse ammesso, un errore di battitura
+        produrrebbe una categoria nuova invece di un messaggio."""
+        s = self._vault()
+        with self.assertRaises(ValueError):
+            s.set_category([s.entries[0].id], "Banhce")
+        self.assertEqual([], s.categories)
+
+    def test_nome_vuoto_toglie_la_categoria(self):
+        s = self._vault()
+        s.add_category("Banche")
+        voce = s.entries[0].id
+        s.set_category([voce], "Banche")
+        s.set_category([voce], "")
+        self.assertEqual("", s.get(voce).category)
+        self.assertEqual(["Banche"], s.categories, "la categoria resta, si svuota")
+
+    def test_le_maiuscole_non_creano_doppioni(self):
+        s = self._vault()
+        self.assertEqual("Banche", s.add_category("Banche"))
+        self.assertEqual("Banche", s.add_category("banche"))
+        self.assertEqual("Banche", s.add_category("  BANCHE  "))
+        self.assertEqual(["Banche"], s.categories)
+
+    def test_rinominare_sposta_anche_le_voci(self):
+        s = self._vault()
+        s.add_category("Banche")
+        ids = [c.id for c in s.entries[:2]]
+        s.set_category(ids, "Banche")
+        self.assertEqual("Conti correnti", s.rename_category("banche", "Conti correnti"))
+
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertEqual(["Conti correnti"], s2.categories)
+        self.assertEqual(2, s2.count_by_category()["Conti correnti"])
+
+    def test_rinominare_su_un_nome_gia_preso_e_un_errore(self):
+        s = self._vault()
+        s.add_category("Banche")
+        s.add_category("Social")
+        with self.assertRaises(ValueError):
+            s.rename_category("Banche", "social")
+
+    def test_eliminare_una_categoria_non_elimina_le_voci(self):
+        """Il punto che conta davvero: cancellare un raggruppamento non può
+        cancellare le password che raggruppava."""
+        s = self._vault()
+        s.add_category("Banche")
+        ids = [c.id for c in s.entries[:2]]
+        s.set_category(ids, "Banche")
+        quante = len(s.entries)
+
+        self.assertEqual(2, s.delete_category("Banche"))
+
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertEqual(quante, len(s2.entries), "voci sparite insieme alla categoria")
+        self.assertEqual([], s2.categories)
+        self.assertEqual("", s2.get(ids[0]).category)
+
+    def test_set_category_scrive_il_file_una_volta_sola(self):
+        """Stessa ragione di add_many: _flush() ri-cifra l'INTERO vault, e
+        riordinare 800 voci una per una vorrebbe dire 800 cifrature."""
+        s = VaultStore(self.path)
+        s.create(MASTER)
+        s.add_many([{"title": f"voce {i}", "fields": [{"label": "p", "value": str(i)}]}
+                    for i in range(50)])
+        s.add_category("Banche")
+        ids = [c.id for c in s.entries]
+        with mock.patch("app.crypto_store.os.replace", wraps=os.replace) as spia:
+            s.set_category(ids, "Banche")
+        self.assertEqual(1, spia.call_count,
+                         f"50 assegnazioni hanno prodotto {spia.call_count} scritture, attesa 1")
+
+    def test_assegnazione_che_non_cambia_nulla_non_riscrive(self):
+        s = self._vault()
+        s.add_category("Banche")
+        ids = [c.id for c in s.entries[:1]]
+        s.set_category(ids, "Banche")
+        with mock.patch("app.crypto_store.os.replace", wraps=os.replace) as spia:
+            self.assertEqual(0, s.set_category(ids, "Banche"))
+        self.assertEqual(0, spia.call_count, "ri-cifrato l'intero vault per nulla")
+
+    def test_il_conteggio_comprende_le_voci_senza_categoria(self):
+        s = self._vault()
+        s.add_category("Banche")
+        s.set_category([s.entries[0].id], "Banche")
+        conteggio = s.count_by_category()
+        self.assertEqual(1, conteggio["Banche"])
+        self.assertEqual(len(VOCI) - 1, conteggio[""])
+
+
+# ===========================================================================
+class TestScrittoDaDart(unittest.TestCase):
+    """Il contratto nel verso NUOVO: da quando il telefono scrive il vault,
+    serve la prova che il PC riapra ciò che ha scritto lui.
+
+    Il file lo produce la suite Dart (`mobile\\costruisci.ps1 -Test`) e non sta
+    in git: si rigenera a ogni esecuzione, così non diventa un secondo vettore
+    che diverge in silenzio. Se manca, questi test si dichiarano saltati —
+    non passano fingendo di aver verificato qualcosa.
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        cls.file = os.path.join(os.path.dirname(_QUI), "mobile", "build",
+                                "vault-scritto-da-dart.json")
+        with open(os.path.join(_QUI, "vettore", "atteso.json"), encoding="utf-8") as f:
+            cls.atteso = json.load(f)
+
+    def setUp(self):
+        if not os.path.exists(self.file):
+            self.skipTest("nessun vault scritto da Dart: esegui prima "
+                          "mobile\\costruisci.ps1 -Test")
+
+    def _apri(self):
+        s = VaultStore(self.file)
+        s.unlock(self.atteso["master_password"])
+        return s
+
+    def test_il_pc_riapre_quello_che_ha_scritto_il_telefono(self):
+        s = self._apri()
+        # la voce 5 il telefono l'ha cancellata: vedi il test sulle lapidi
+        attese = [c for c in self.atteso["credentials"] if c["id"] != 5]
+        self.assertEqual([c["title"] for c in attese], [c.title for c in s.entries])
+        for atteso, letta in zip(attese, s.entries):
+            self.assertEqual([(f["label"], f["value"]) for f in atteso["fields"]],
+                             [(f.label, f.value) for f in letta.fields],
+                             f'campi di "{letta.title}"')
+            self.assertEqual(atteso["critical"], letta.critical)
+            self.assertEqual(atteso["tags"], letta.tags)
+
+    def test_le_lapidi_scritte_dal_telefono_arrivano_al_pc(self):
+        """Il caso che senza lapidi perde dati: il telefono cancella una voce,
+        il PC — che ce l'ha ancora — deve sapere che è stata cancellata invece
+        di rimandarla indietro viva."""
+        s = self._apri()
+        self.assertIsNone(s.get(5))
+        lapidi = {t["uid"]: t for t in s.tombstones}
+        self.assertIn(uid_derivato(5), lapidi)
+        self.assertGreater(lapidi[uid_derivato(5)]["rev"], 1)
+
+    def test_i_contatori_scritti_dal_telefono_arrivano_al_pc(self):
+        """Le due voci spostate di categoria dal telefono devono risultare
+        modificate anche qui: è così che il sync capirà chi è più avanti."""
+        s = self._apri()
+        self.assertEqual(2, s.get(1).rev)
+        self.assertEqual("Banche", s.get(1).category)
+        self.assertGreater(s.get(1).mod, 0)
+        self.assertEqual(uid_derivato(1), s.get(1).uid,
+                         "l'uid di una voce preesistente deve restare quello ricavato")
+
+    def test_le_categorie_scritte_dal_telefono_arrivano_al_pc(self):
+        s = self._apri()
+        self.assertEqual(["Banche", "Shopping", "Vuota di proposito"], s.categories)
+        self.assertEqual("Banche", s.get(1).category)
+        self.assertEqual("Shopping", s.get(2).category)
+        self.assertEqual(0, s.count_by_category()["Vuota di proposito"],
+                         "una categoria vuota deve arrivare comunque")
+
+    def test_i_parametri_del_file_scritto_da_dart_sono_i_nostri(self):
+        with open(self.file, encoding="utf-8") as f:
+            blob = json.load(f)
+        self.assertEqual("aes-256-gcm", blob["cipher"])
+        self.assertEqual("argon2id", blob["kdf"]["alg"])
+        self.assertEqual(12, len(_b64d(blob["nonce"])), "nonce da 12 byte")
+        self.assertEqual(16, len(_b64d(blob["kdf"]["salt"])), "salt da 16 byte")
+
+
+# ===========================================================================
+class TestFondamentaSync(BaseVault):
+    """Identità delle voci, contatori e lapidi: quello su cui poggerà il sync.
+
+    Ogni test qui difende un modo concreto di **perdere dati** al primo
+    allineamento fra due dispositivi. Non sono dettagli di implementazione:
+    sono i tre incidenti classici del sync, scritti prima di avere il sync.
+    """
+
+    def _vault(self):
+        s = VaultStore(self.path)
+        s.create(MASTER)
+        s.add_many(VOCI)
+        return s
+
+    # ---- identità ----
+
+    def test_le_voci_gia_esistenti_hanno_un_uid_ricavato_dall_id(self):
+        """Il punto cruciale: due dispositivi devono dare alla STESSA voce lo
+        stesso uid, senza potersi parlare. Se fosse casuale, la voce 5 del PC e
+        la voce 5 del telefono diventerebbero due voci al primo sync."""
+        self._scrivi_legacy([{"id": 5, "title": "Vecchia", "fields": []}])
+        s = VaultStore(self.path)
+        s.unlock(MASTER)
+        self.assertEqual(uid_derivato(5), s.get(5).uid)
+        # e deve essere lo stesso su una copia aperta a parte
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertEqual(s.get(5).uid, s2.get(5).uid)
+
+    def test_una_voce_nuova_ha_un_uid_casuale(self):
+        """Al contrario: due dispositivi scollegati che aggiungono una voce
+        prendono entrambi lo stesso `id` (max+1). Se l'uid fosse ricavato da
+        lì, una delle due sparirebbe."""
+        s = self._vault()
+        nuova = s.add("Aggiunta", [{"label": "p", "value": "x"}], [])
+        self.assertNotEqual(uid_derivato(nuova.id), nuova.uid)
+        self.assertEqual(32, len(nuova.uid))
+
+    def test_due_dispositivi_che_aggiungono_non_si_scontrano(self):
+        """La simulazione del caso vero: stesso vault, due copie, una voce
+        nuova per parte. Stesso id, uid diversi — cioè due voci distinte, che
+        il merge potrà tenere entrambe."""
+        altro = os.path.join(self.dir, "copia.json")
+        s1 = self._vault()
+        shutil.copyfile(self.path, altro)
+        s2 = VaultStore(altro)
+        s2.unlock(MASTER)
+
+        a = s1.add("Dal PC", [{"label": "p", "value": "1"}], [])
+        b = s2.add("Dal telefono", [{"label": "p", "value": "2"}], [])
+        self.assertEqual(a.id, b.id, "stesso id: è proprio il caso da reggere")
+        self.assertNotEqual(a.uid, b.uid)
+
+    # ---- contatori ----
+
+    def test_rev_cresce_a_ogni_modifica(self):
+        s = self._vault()
+        voce = s.entries[0]
+        self.assertEqual(1, voce.rev)
+        s.update(voce.id, "Nuovo titolo", [{"label": "p", "value": "x"}], [])
+        self.assertEqual(2, s.get(voce.id).rev)
+        s.update(voce.id, "Ancora", [{"label": "p", "value": "x"}], [])
+        self.assertEqual(3, s.get(voce.id).rev)
+
+    def test_anche_spostare_di_categoria_e_una_modifica(self):
+        """Se non contasse, il sync non si accorgerebbe di un riordino intero:
+        800 voci spostate e nessuna che risulta cambiata."""
+        s = self._vault()
+        s.add_category("Banche")
+        voce = s.entries[0]
+        prima = voce.rev
+        s.set_category([voce.id], "Banche")
+        self.assertEqual(prima + 1, s.get(voce.id).rev)
+
+    def test_i_contatori_sopravvivono_alla_riapertura(self):
+        s = self._vault()
+        voce = s.entries[0]
+        s.update(voce.id, "Cambiata", [{"label": "p", "value": "x"}], [])
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertEqual(2, s2.get(voce.id).rev)
+        self.assertGreater(s2.get(voce.id).mod, 0)
+        self.assertEqual(voce.uid, s2.get(voce.id).uid)
+
+    # ---- lapidi ----
+
+    def test_cancellare_lascia_una_lapide(self):
+        """Senza lapide, l'altro dispositivo — che la voce ce l'ha ancora — la
+        rimanderebbe indietro, e la voce cancellata resusciterebbe."""
+        s = self._vault()
+        voce = s.entries[0]
+        s.delete(voce.id)
+
+        s2 = VaultStore(self.path)
+        s2.unlock(MASTER)
+        self.assertIsNone(s2.get(voce.id))
+        lapidi = {t["uid"]: t for t in s2.tombstones}
+        self.assertIn(voce.uid, lapidi)
+
+    def test_la_lapide_batte_la_voce_ancora_viva(self):
+        """La cancellazione è essa stessa una modifica: se la lapide avesse lo
+        stesso `rev` della copia viva, il merge non saprebbe chi è più avanti."""
+        s = self._vault()
+        voce = s.entries[0]
+        s.delete(voce.id)
+        lapide = next(t for t in s.tombstones if t["uid"] == voce.uid)
+        self.assertGreater(lapide["rev"], voce.rev)
+
+    def test_svuotare_lascia_una_lapide_per_ogni_voce(self):
+        s = self._vault()
+        quante = len(s.entries)
+        s.clear()
+        self.assertEqual(quante, len(s.tombstones))
+
+    def test_le_lapidi_troppo_vecchie_si_buttano(self):
+        s = self._vault()
+        voce = s.entries[0]
+        s.delete(voce.id)
+        # la si invecchia a mano oltre il limite, poi una riscrittura qualsiasi
+        vecchio = now_ms() - (TOMBSTONE_DAYS + 1) * 24 * 60 * 60 * 1000
+        s._tombstones[0]["mod"] = vecchio
+        s.add("Qualcosa", [{"label": "p", "value": "x"}], [])
+        self.assertEqual([], s.tombstones)
+
+    def test_una_lapide_senza_data_non_si_butta(self):
+        """Nel dubbio meglio una lapide di troppo che una voce che resuscita."""
+        s = self._vault()
+        s.delete(s.entries[0].id)
+        s._tombstones[0]["mod"] = 0
+        s.add("Qualcosa", [{"label": "p", "value": "x"}], [])
+        self.assertEqual(1, len(s.tombstones))
+
+    # ---- compatibilità ----
+
+    def _scrivi_legacy(self, credentials):
+        salt = os.urandom(16)
+        key = derive_key(MASTER, salt)
+        nonce = os.urandom(12)
+        payload = json.dumps({"credentials": credentials}).encode("utf-8")
+        ct = AESGCM(key).encrypt(nonce, payload, b"vaultmind")
+        with open(self.path, "w", encoding="utf-8") as f:
+            json.dump({"version": 1,
+                       "kdf": {"alg": "argon2id", "salt": _b64e(salt), "time_cost": 3,
+                               "memory_cost": 64 * 1024, "parallelism": 2},
+                       "cipher": "aes-256-gcm", "nonce": _b64e(nonce),
+                       "ciphertext": _b64e(ct)}, f)
+
+    def test_un_vault_mai_toccato_non_guadagna_i_campi_nuovi(self):
+        """Protegge il vettore di prova: `uid`, `rev` e `mod` non si scrivono
+        finché valgono il loro predefinito, così un vault vecchio riscritto
+        resta identico e il contratto del formato non cambia sotto i piedi."""
+        self._scrivi_legacy([{"id": 1, "title": "Vecchia", "tags": [], "fields": []}])
+        s = VaultStore(self.path)
+        s.unlock(MASTER)
+        s.add_category("Banche")  # una riscrittura che non tocca la voce
+
+        with open(self.path, encoding="utf-8") as f:
+            blob = json.load(f)
+        chiaro = json.loads(AESGCM(derive_key(MASTER, _b64d(blob["kdf"]["salt"]))).decrypt(
+            _b64d(blob["nonce"]), _b64d(blob["ciphertext"]), b"vaultmind").decode("utf-8"))
+        voce = chiaro["credentials"][0]
+        for chiave in ("uid", "rev", "mod"):
+            self.assertNotIn(chiave, voce, f"«{chiave}» scritto su una voce mai toccata")
+        self.assertNotIn("deleted", chiaro, "lista delle lapidi vuota, non va scritta")
 
 
 if __name__ == "__main__":

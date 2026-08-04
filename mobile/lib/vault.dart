@@ -10,6 +10,7 @@
 library;
 
 import 'dart:convert';
+import 'dart:math';
 import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
@@ -57,6 +58,55 @@ class Campo {
 
   factory Campo.fromJson(Map<String, dynamic> j) =>
       Campo((j['label'] ?? '') as String, (j['value'] ?? '') as String);
+
+  Map<String, dynamic> toJson() => {'label': label, 'value': value};
+}
+
+/// Le chiavi di una voce che QUESTA versione conosce. Tutte le altre vengono
+/// ricopiate tali e quali: da quando il telefono SCRIVE il vault, una versione
+/// più vecchia che incontra un campo aggiunto dopo lo cancellerebbe in silenzio
+/// al primo salvataggio. Stessa difesa di `_CRED_KEYS` in `crypto_store.py`.
+const _chiaviNote = {
+  'id', 'title', 'fields', 'tags', 'critical', 'category', 'uid', 'rev', 'mod'
+};
+
+/// Ora vera in millisecondi. Serve a MOSTRARE quando una voce è cambiata, non
+/// a decidere chi vince: due telefoni con l'orologio sfasato deciderebbero
+/// male. Per quello c'è `rev`, che è un contatore e non un orologio.
+int oraOra() => DateTime.now().millisecondsSinceEpoch;
+
+/// L'identificativo di una voce che esisteva PRIMA che gli uid esistessero.
+///
+/// Non può essere casuale: il PC e il telefono ne genererebbero due diversi
+/// per la stessa identica voce, e al primo sync quella voce diventerebbe due
+/// voci. Si ricava dal numero che la voce ha già, uguale su ogni copia dello
+/// stesso vault. Stessa regola di `uid_derivato()` in `crypto_store.py`.
+String uidDerivato(int id) => '#$id';
+
+final _casuale = Random.secure();
+
+/// uid per una voce NUOVA: casuale, perché due dispositivi scollegati che
+/// aggiungono una voce prendono entrambi lo stesso `id` (max+1).
+String uidNuovo() {
+  const cifre = '0123456789abcdef';
+  return List.generate(32, (_) => cifre[_casuale.nextInt(16)]).join();
+}
+
+/// La lapide di una voce cancellata: senza, l'altro dispositivo — che la voce
+/// ce l'ha ancora — la rimanderebbe indietro e la voce resusciterebbe.
+class Lapide {
+  final String uid;
+  final int rev;
+  final int mod;
+  const Lapide(this.uid, {required this.rev, required this.mod});
+
+  factory Lapide.fromJson(Map<String, dynamic> j) => Lapide(
+        '${j['uid'] ?? ''}',
+        rev: (j['rev'] as num?)?.toInt() ?? 1,
+        mod: (j['mod'] as num?)?.toInt() ?? 0,
+      );
+
+  Map<String, dynamic> toJson() => {'uid': uid, 'rev': rev, 'mod': mod};
 }
 
 class Credenziale {
@@ -70,29 +120,173 @@ class Credenziale {
   final bool critical;
   final List<Campo> fields;
 
-  const Credenziale({
+  /// Categoria scelta A MANO, una sola per voce. Vuota = nessuna. Non viene mai
+  /// dedotta dai tag: quelli di un import sono spesso parole prese dal titolo.
+  final String categoria;
+
+  /// Identificativo stabile e unico, che sopravvive alla copia del vault da un
+  /// dispositivo all'altro. Per le voci nate prima si ricava da [id].
+  final String uid;
+
+  /// Contatore logico: cresce di uno a ogni modifica di QUESTA voce. È lui a
+  /// dire chi è più avanti, non l'orologio.
+  final int rev;
+
+  /// Ora dell'ultima modifica, in millisecondi. Da mostrare all'utente.
+  final int mod;
+
+  /// Chiavi lette dal file ma sconosciute a questa versione (vedi [_chiaviNote]).
+  final Map<String, dynamic> extra;
+
+  Credenziale({
     required this.id,
     required this.title,
     required this.tags,
     required this.critical,
     required this.fields,
-  });
+    this.categoria = '',
+    String uid = '',
+    this.rev = 1,
+    this.mod = 0,
+    this.extra = const {},
+  }) : uid = uid.isEmpty ? uidDerivato(id) : uid;
 
   factory Credenziale.fromJson(Map<String, dynamic> j) => Credenziale(
         id: j['id'] as int,
         title: (j['title'] ?? '') as String,
         tags: ((j['tags'] ?? const []) as List).map((t) => '$t').toList(),
         critical: (j['critical'] ?? false) == true,
+        categoria: '${j['category'] ?? ''}'.trim(),
+        uid: '${j['uid'] ?? ''}',
+        rev: (j['rev'] as num?)?.toInt() ?? 1,
+        mod: (j['mod'] as num?)?.toInt() ?? 0,
         fields: ((j['fields'] ?? const []) as List)
             .map((f) => Campo.fromJson(f as Map<String, dynamic>))
             .toList(),
+        extra: {
+          for (final e in j.entries)
+            if (!_chiaviNote.contains(e.key)) e.key: e.value
+        },
+      );
+
+  Map<String, dynamic> toJson() => {
+        ...extra, // gli sconosciuti per primi: le chiavi note vincono comunque
+        'id': id,
+        'title': title,
+        'tags': tags,
+        'critical': critical,
+        'fields': fields.map((f) => f.toJson()).toList(),
+        // I campi opzionali si scrivono solo se dicono qualcosa: un vault mai
+        // toccato dopo l'aggiornamento resta identico a com'era, e il vettore
+        // di prova continua a valere. Come fa il PC.
+        if (categoria.isNotEmpty) 'category': categoria,
+        if (uid != uidDerivato(id)) 'uid': uid,
+        if (rev != 1) 'rev': rev,
+        if (mod != 0) 'mod': mod,
+      };
+
+  /// Una copia modificata. **Fa avanzare il contatore**: qualunque cambiamento
+  /// del contenuto deve risultare al sync, altrimenti un riordino di 800 voci
+  /// passerebbe per "niente è cambiato".
+  Credenziale modificata({
+    String? title,
+    List<String>? tags,
+    bool? critical,
+    List<Campo>? fields,
+    String? categoria,
+  }) =>
+      Credenziale(
+        id: id,
+        title: title ?? this.title,
+        tags: tags ?? this.tags,
+        critical: critical ?? this.critical,
+        fields: fields ?? this.fields,
+        categoria: (categoria ?? this.categoria).trim(),
+        uid: uid,
+        rev: rev + 1,
+        mod: oraOra(),
+        extra: extra,
+      );
+
+  Credenziale conCategoria(String nuova) => modificata(categoria: nuova);
+
+  /// Copia con un altro `id` e **senza** far avanzare il contatore: serve alla
+  /// fusione, quando due voci diverse si ritrovano lo stesso numero. Cambiare
+  /// il numero non è modificare la voce.
+  Credenziale conId(int nuovo) => Credenziale(
+        id: nuovo,
+        title: title,
+        tags: tags,
+        critical: critical,
+        fields: fields,
+        categoria: categoria,
+        uid: uid,
+        rev: rev,
+        mod: mod,
+        extra: extra,
       );
 }
 
 /// Il contenuto decifrato di un vault.
+///
+/// Immutabile: modificarlo significa costruirne uno nuovo con [con]. Così
+/// l'interfaccia si ridipinge sola quando il valore cambia, e non esiste il
+/// caso "ho cambiato la lista ma nessuno se n'è accorto".
 class Vault {
   final List<Credenziale> credenziali;
-  const Vault(this.credenziali);
+
+  /// Le categorie esistenti, nell'ordine scelto dall'utente. Stanno qui e non
+  /// si deducono dalle voci: una categoria appena creata è vuota, e dedurla la
+  /// farebbe sparire fra il momento in cui la crei e quello in cui la riempi.
+  final List<String> categorie;
+
+  /// Cosa è stato cancellato e quando. Vedi [Lapide].
+  final List<Lapide> lapidi;
+
+  /// Il salt del file da cui è stato aperto: serve a riscriverlo con la stessa
+  /// chiave, senza rifare Argon2 (che sul telefono costa quasi un secondo).
+  final Uint8List salt;
+
+  /// Chiavi del contenuto in chiaro sconosciute a questa versione.
+  final Map<String, dynamic> extraRadice;
+
+  const Vault(
+    this.credenziali, {
+    this.categorie = const [],
+    this.lapidi = const [],
+    required this.salt,
+    this.extraRadice = const {},
+  });
+
+  Vault con({
+    List<Credenziale>? credenziali,
+    List<String>? categorie,
+    List<Lapide>? lapidi,
+  }) =>
+      Vault(
+        credenziali ?? this.credenziali,
+        categorie: categorie ?? this.categorie,
+        lapidi: lapidi ?? this.lapidi,
+        salt: salt,
+        extraRadice: extraRadice,
+      );
+
+  /// Il vault senza la voce indicata, con la sua lapide al posto giusto.
+  ///
+  /// `rev` della lapide è quello della voce **più uno**: la cancellazione è
+  /// essa stessa una modifica, e deve battere la copia ancora viva sull'altro
+  /// dispositivo, altrimenti il sync la rimanderebbe indietro.
+  Vault senzaVoce(int id) {
+    final voce = credenziali.where((c) => c.id == id).firstOrNull;
+    if (voce == null) return this;
+    return con(
+      credenziali: credenziali.where((c) => c.id != id).toList(),
+      lapidi: [
+        ...lapidi.where((l) => l.uid != voce.uid),
+        Lapide(voce.uid, rev: voce.rev + 1, mod: oraOra()),
+      ],
+    );
+  }
 }
 
 /// I tre pezzi del file, già decodificati.
@@ -159,14 +353,91 @@ Future<Vault> apriVaultConChiave(String contenuto, Uint8List chiave) async {
   try {
     final dati = jsonDecode(utf8.decode(chiaro)) as Map<String, dynamic>;
     final voci = (dati['credentials'] ?? const []) as List;
-    return Vault(voci
-        .map((c) => Credenziale.fromJson(c as Map<String, dynamic>))
-        .toList());
+    return Vault(
+      voci.map((c) => Credenziale.fromJson(c as Map<String, dynamic>)).toList(),
+      categorie: ripulisciCategorie((dati['categories'] ?? const []) as List),
+      lapidi: ((dati['deleted'] ?? const []) as List)
+          .whereType<Map<String, dynamic>>()
+          .map(Lapide.fromJson)
+          .where((l) => l.uid.isNotEmpty)
+          .toList(),
+      salt: p.salt,
+      extraRadice: {
+        for (final e in dati.entries)
+          if (e.key != 'credentials' &&
+              e.key != 'categories' &&
+              e.key != 'deleted')
+            e.key: e.value
+      },
+    );
   } catch (e) {
     // Il tag è tornato ma il contenuto non ha la forma attesa: è un vault
     // nostro scritto male, non il file di qualcun altro.
     throw const VaultCorrupted('Il contenuto del vault non è leggibile.');
   }
+}
+
+/// Nome di categoria ripulito: spazi normalizzati, maiuscole come sono state
+/// scritte. Il confronto è senza maiuscole, la resa a schermo no: chi scrive
+/// «Banche» vuole rileggere «Banche». Stessa regola di `crypto_store.py`.
+String normalizzaCategoria(String nome) => nome.trim().split(RegExp(r'\s+')).join(' ');
+
+/// Via i vuoti e i doppioni; l'ordine è quello scelto dall'utente e resta.
+List<String> ripulisciCategorie(List<dynamic> grezze) {
+  final out = <String>[];
+  final viste = <String>{};
+  for (final c in grezze) {
+    final nome = normalizzaCategoria('$c');
+    if (nome.isNotEmpty && viste.add(nome.toLowerCase())) out.add(nome);
+  }
+  return out;
+}
+
+/// Cifra un vault e restituisce il testo del file, nella forma ESATTA prodotta
+/// dal PC — è il contratto fra le piattaforme (`tests/vettore/LEGGIMI.md`).
+///
+/// [chiave] è quella già in memoria dalla sessione: non si ripassa dalla master
+/// password, e Argon2 (quasi un secondo sul telefono) non viene rifatto.
+///
+/// Il **nonce è nuovo a ogni scrittura**, e non è un dettaglio: riusarne uno
+/// con la stessa chiave in AES-GCM non indebolisce la cifratura, la annulla —
+/// due vault cifrati con la stessa coppia si smontano a vicenda con uno XOR.
+/// Il salt invece resta quello del file, perché la chiave deriva da lui.
+Future<String> cifraVault(Vault vault, Uint8List chiave) async {
+  final contenuto = <String, dynamic>{
+    ...vault.extraRadice, // prima gli sconosciuti, poi i nostri
+    'credentials': vault.credenziali.map((c) => c.toJson()).toList(),
+    if (vault.categorie.isNotEmpty) 'categories': vault.categorie,
+    if (vault.lapidi.isNotEmpty)
+      'deleted': vault.lapidi.map((l) => l.toJson()).toList(),
+  };
+
+  final algoritmo = AesGcm.with256bits();
+  final nonce = algoritmo.newNonce();
+  final scatola = await algoritmo.encrypt(
+    utf8.encode(jsonEncode(contenuto)),
+    secretKey: SecretKey(chiave),
+    nonce: nonce,
+    aad: kAad,
+  );
+
+  // Il tag GCM va IN CODA al ciphertext: qui `cryptography` lo tiene separato,
+  // Python lo concatena. Chi legge si aspetta la forma di Python.
+  final ciphertext = Uint8List.fromList([...scatola.cipherText, ...scatola.mac.bytes]);
+
+  return jsonEncode({
+    'version': 1,
+    'kdf': {
+      'alg': 'argon2id',
+      'salt': base64.encode(vault.salt),
+      'time_cost': kArgon2TimeCost,
+      'memory_cost': kArgon2MemoryKiB,
+      'parallelism': kArgon2Parallelism,
+    },
+    'cipher': 'aes-256-gcm',
+    'nonce': base64.encode(nonce),
+    'ciphertext': base64.encode(ciphertext),
+  });
 }
 
 /// Argon2**id** — non Argon2i né Argon2d: una variante sbagliata dà una

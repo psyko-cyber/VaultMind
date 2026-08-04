@@ -163,11 +163,14 @@ def parse_csv(text: str) -> Dict:
                          if f["label"] in ("Email", "Utente", "URL")), "")
             title = cand or "voce senza titolo"
 
-        # tag automatici dal titolo se nessuno presente
-        if not tags:
-            base = "".join(ch if ch.isalnum() or ch == " " else " " for ch in title.lower())
-            tags = sorted({w for w in base.split() if len(w) >= 3})[:4]
-
+        # Nessun tag inventato: se l'export non ne porta, la voce resta senza.
+        #
+        # Prima qui si ricavavano dal titolo le parole di almeno 3 lettere, in
+        # ordine alfabetico. Il risultato erano tag che non dicevano niente —
+        # `PayPal (606)` diventava `606, paypal`, `Poste Italiane` diventava
+        # `italiane, poste` — e per giunta erano inutili alla ricerca, che il
+        # titolo lo indicizza già (spezzandolo anche sui punti dei domini).
+        # Il raggruppamento si fa con le categorie, scelte a mano.
         entries.append({"title": title, "fields": fields, "tags": tags})
 
     return {"source": source, "entries": entries}

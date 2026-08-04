@@ -6,6 +6,14 @@
 /// e scoprirlo qui costa secondi, scoprirlo sul telefono costa il vault.
 ///
 ///     flutter test
+///
+/// Il limite di tempo è alzato di proposito. Questi test derivano la chiave coi
+/// parametri VERI (Argon2id, 64 MB): `flutter test` esegue i file in parallelo,
+/// e con la macchina occupata diverse derivazioni da 64 MB insieme superano i
+/// 30 secondi che Dart concede di default. Fallivano per contesa, non per un
+/// difetto — e siccome `costruisci.ps1` si rifiuta di costruire l'APK quando i
+/// test falliscono, sembrava di aver rotto qualcosa.
+@Timeout(Duration(minutes: 3))
 library;
 
 import 'dart:convert';

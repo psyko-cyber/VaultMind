@@ -29,8 +29,12 @@ class MainActivity : FlutterFragmentActivity() {
     /** Contenuto arrivato da "Apri con", in attesa che Dart lo chieda. */
     private var inAttesa: String? = null
 
+    /** Vault cifrato in attesa che l'utente scelga dove salvarlo. */
+    private var backupDaScrivere: String? = null
+
     companion object {
         private const val CODICE_SCEGLI = 4711
+        private const val CODICE_SALVA = 4712
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -66,6 +70,30 @@ class MainActivity : FlutterFragmentActivity() {
                 "inAttesa" -> {
                     esito.success(inAttesa)
                     inAttesa = null
+                }
+
+                // Salva il backup dove decide l'utente (Storage Access
+                // Framework). Si e' scelto questo invece di condividerlo con
+                // ACTION_SEND perche' quello avrebbe richiesto un FileProvider
+                // esportato: qui non si espone niente, e da dove il file
+                // atterra l'utente lo manda dove vuole con le app che ha gia'.
+                // Il contenuto e' gia' cifrato: chi lo intercetta vede rumore.
+                "salvaBackup" -> {
+                    val a = chiamata.arguments as? Map<*, *>
+                    val testo = a?.get("contenuto") as? String
+                    val nome = a?.get("nome") as? String
+                    if (testo == null || nome == null) {
+                        esito.success(false)
+                    } else {
+                        richiestaInCorso = esito
+                        backupDaScrivere = testo
+                        val i = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                            addCategory(Intent.CATEGORY_OPENABLE)
+                            type = "application/json"
+                            putExtra(Intent.EXTRA_TITLE, nome)
+                        }
+                        startActivityForResult(i, CODICE_SALVA)
+                    }
                 }
 
                 // Apre un indirizzo nel browser. Solo http/https: qualunque
@@ -152,13 +180,37 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != CODICE_SCEGLI) return
+        if (requestCode != CODICE_SCEGLI && requestCode != CODICE_SALVA) return
         val esito = richiestaInCorso ?: return
         richiestaInCorso = null
+
+        if (requestCode == CODICE_SALVA) {
+            val testo = backupDaScrivere
+            // Il vault cifrato non resta in memoria un istante piu' del
+            // necessario, nemmeno quando l'utente annulla.
+            backupDaScrivere = null
+            if (resultCode != Activity.RESULT_OK || data?.data == null || testo == null) {
+                esito.success(false) // annullato: non e' un errore
+            } else {
+                esito.success(scriviUri(data.data!!, testo))
+            }
+            return
+        }
+
         if (resultCode != Activity.RESULT_OK || data?.data == null) {
             esito.success(null) // l'utente ha annullato: non è un errore
             return
         }
         esito.success(leggiUri(data.data!!))
+    }
+
+    private fun scriviUri(uri: Uri, testo: String): Boolean = try {
+        // "wt" tronca quello che c'era: senza, sovrascrivendo un backup piu'
+        // grande resterebbe in coda la parte vecchia e il file non si aprirebbe.
+        contentResolver.openOutputStream(uri, "wt")?.use {
+            it.write(testo.toByteArray(Charsets.UTF_8))
+        } != null
+    } catch (e: Exception) {
+        false
     }
 }

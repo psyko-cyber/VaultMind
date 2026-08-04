@@ -140,8 +140,9 @@ def heuristic_extract(text: str) -> List[Dict]:
     push()
     for e in entries:
         e.pop("_multi", None)
-        base = re.sub(r"[^\w ]", " ", e["title"].lower())
-        e["tags"] = sorted({w for w in base.split() if len(w) >= 3})[:5]
+        # Niente tag ricavati dal titolo: erano parole già presenti nel titolo,
+        # quindi inutili alla ricerca (che il titolo lo indicizza) e fuorvianti
+        # a vedersi. Stessa correzione fatta in `import_csv.py`.
     return entries
 
 

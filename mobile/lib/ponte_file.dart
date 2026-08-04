@@ -19,6 +19,22 @@ Future<String?> scegliFile() async {
   }
 }
 
+/// Salva il vault cifrato dove decide l'utente, col selettore di sistema.
+/// `false` se annulla o se la scrittura non riesce.
+///
+/// Non usa la condivisione diretta (ACTION_SEND) perché richiederebbe un
+/// FileProvider esportato: così non si espone niente, e da dove il file
+/// atterra si manda dove si vuole con le app che ci sono già.
+Future<bool> salvaBackup(String contenuto, String nome) async {
+  try {
+    return await _canale.invokeMethod<bool>(
+            'salvaBackup', {'contenuto': contenuto, 'nome': nome}) ??
+        false;
+  } on PlatformException {
+    return false;
+  }
+}
+
 /// Il file con cui l'app è stata aperta da una chat, se c'è. Si consuma:
 /// chiamarla due volte non restituisce due volte lo stesso file.
 Future<String?> fileDaApertura() async {

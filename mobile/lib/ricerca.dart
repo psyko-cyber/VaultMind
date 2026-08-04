@@ -161,7 +161,75 @@ Set<String> _tokenForti(Credenziale c) => _conAlias([
 class Risultato {
   final Credenziale voce;
   final double punteggio;
-  const Risultato(this.voce, this.punteggio);
+
+  /// I termini della query che combaciano coi token forti della voce. Servono
+  /// a decidere l'ambiguità: chi ne combacia di più è più specifico.
+  final Set<String> combaciati;
+
+  const Risultato(this.voce, this.punteggio, [this.combaciati = const {}]);
+}
+
+/// Come si risponde a una richiesta. Stessi nomi degli esiti di `/api/query`
+/// sul PC, perché è la stessa decisione.
+enum Esito {
+  /// Niente sopra la soglia: meglio dirlo che mostrare voci a caso.
+  nessuna,
+
+  /// Un vincitore chiaro.
+  una,
+
+  /// Più voci ugualmente pertinenti: si chiede quale, non si indovina.
+  ambigua,
+}
+
+class RispostaRicerca {
+  final Esito esito;
+  final List<Risultato> voci;
+  const RispostaRicerca(this.esito, this.voci);
+}
+
+/// Decide come rispondere. **Porto fedele di `interpret()` in `search.py`**:
+/// stessa regola, stesse soglie, stessi esiti — la chat del telefono deve
+/// rispondere come quella del PC, altrimenti sono due prodotti diversi.
+///
+/// La regola sull'ambiguità guarda QUANTI termini della richiesta ciascuna
+/// voce combacia: chi ne combacia di più è più specifico e vince. Si è ambigui
+/// solo quando più voci ne combaciano lo stesso numero massimo — due account
+/// "google", tre "home banking" senza il nome della banca. Un termine
+/// discriminante ("intesa") risolve da solo.
+RispostaRicerca interpreta(
+  List<Risultato> risultati, {
+  double sogliaMinima = 0.22,
+  double scartoAmbiguita = 0.14,
+  int massimoGruppo = 6,
+}) {
+  final forti = risultati.where((r) => r.punteggio >= sogliaMinima).toList();
+  if (forti.isEmpty) return const RispostaRicerca(Esito.nessuna, []);
+  if (forti.length == 1) return RispostaRicerca(Esito.una, forti);
+
+  final maxCombaciati =
+      forti.map((r) => r.combaciati.length).reduce((a, b) => a > b ? a : b);
+  if (maxCombaciati > 0) {
+    final specifiche =
+        forti.where((r) => r.combaciati.length == maxCombaciati).toList();
+    if (specifiche.length > 1) {
+      return RispostaRicerca(Esito.ambigua, specifiche.take(massimoGruppo).toList());
+    }
+    return RispostaRicerca(Esito.una, specifiche.take(1).toList());
+  }
+
+  // Nessun match lessicale: decisione puramente semantica (coseno) col gap.
+  final cima = forti.first;
+  if (cima.punteggio - forti[1].punteggio >= scartoAmbiguita) {
+    return RispostaRicerca(Esito.una, forti.take(1).toList());
+  }
+  final scelte = forti
+      .where((r) => cima.punteggio - r.punteggio < scartoAmbiguita)
+      .take(massimoGruppo)
+      .toList();
+  return scelte.length > 1
+      ? RispostaRicerca(Esito.ambigua, scelte)
+      : RispostaRicerca(Esito.una, forti.take(1).toList());
 }
 
 /// Indice costruito una volta sola dopo lo sblocco: i vettori delle voci non
@@ -212,7 +280,7 @@ class IndiceRicerca {
       for (var k = 0; k < _dimensioni; k++) {
         coseno += v[k] * qv[k];
       }
-      esiti.add(Risultato(_voci[i], coseno + _bonus(q, i)));
+      esiti.add(Risultato(_voci[i], coseno + _bonus(q, i), q.intersection(_forti[i])));
     }
     esiti.sort((a, b) => b.punteggio.compareTo(a.punteggio));
 

@@ -71,7 +71,13 @@ Ok "Java, Flutter e Android SDK pronti"
 # l'app non leggerebbe i vault dell'app Windows. Non ha senso costruire un APK
 # rotto, quindi si fermano qui.
 Fase "Test (aprono il vettore di prova, condiviso con i test Python)"
-& flutter test
+# -j 2 e non il parallelismo pieno: piu' file di test insieme derivano ognuno
+# una chiave Argon2id da 64 MB, e con la macchina occupata la memoria non
+# basta. Visto due volte: test crittografici che scadono o non finiscono senza
+# che nulla sia rotto - e siccome qui sotto l'APK non viene costruito a test
+# rossi, sembra di aver rotto qualcosa. Costa una decina di secondi in piu' e
+# toglie di mezzo un fallimento che non significa niente.
+& flutter test -j 2
 if ($LASTEXITCODE -ne 0) {
   Err "Test falliti: l'APK non viene costruito."
   exit 1

@@ -21,9 +21,24 @@ class Impostazioni {
   /// Minuti di inattività dopo i quali il vault si richiude. 0 = mai.
   int autoBlocco;
 
-  Impostazioni({this.tema = TemaId.notteOro, this.autoBlocco = 5});
+  /// Gli `id` delle voci tenute in cima all'elenco, nell'ordine in cui sono
+  /// state fissate.
+  ///
+  /// Stanno **qui e non nel vault** di proposito: un pin dice "questa mi serve
+  /// spesso *su questo dispositivo*", e non è la stessa voce sul telefono e
+  /// sul PC. Restando fuori dal vault sopravvivono anche al reimport di un
+  /// backup, e non fanno divergere il file condiviso fra le piattaforme.
+  /// Un pin che punta a una voce cancellata altrove si ignora in silenzio.
+  List<int> pinnate;
 
-  Map<String, dynamic> toJson() => {'tema': tema.name, 'autoBlocco': autoBlocco};
+  Impostazioni({
+    this.tema = TemaId.notteOro,
+    this.autoBlocco = 5,
+    List<int>? pinnate,
+  }) : pinnate = pinnate ?? [];
+
+  Map<String, dynamic> toJson() =>
+      {'tema': tema.name, 'autoBlocco': autoBlocco, 'pinnate': pinnate};
 
   static Impostazioni fromJson(Map<String, dynamic> j) => Impostazioni(
         tema: TemaId.values.firstWhere(
@@ -31,6 +46,16 @@ class Impostazioni {
           orElse: () => TemaId.notteOro,
         ),
         autoBlocco: (j['autoBlocco'] as num?)?.toInt() ?? 5,
+        pinnate: ((j['pinnate'] ?? const []) as List)
+            .map((x) => (x as num).toInt())
+            .toList(),
+      );
+
+  Impostazioni copia({TemaId? tema, int? autoBlocco, List<int>? pinnate}) =>
+      Impostazioni(
+        tema: tema ?? this.tema,
+        autoBlocco: autoBlocco ?? this.autoBlocco,
+        pinnate: pinnate ?? this.pinnate,
       );
 }
 
@@ -53,6 +78,15 @@ Future<void> caricaImpostazioni() async {
     // Un file di preferenze illeggibile non deve impedire di aprire il vault:
     // si riparte dai valori predefiniti.
   }
+}
+
+bool eFissata(int id) => impostazioni.value.pinnate.contains(id);
+
+/// Fissa la voce in cima, o la libera se c'era già.
+Future<void> cambiaFissata(int id) async {
+  final attuali = [...impostazioni.value.pinnate];
+  if (!attuali.remove(id)) attuali.add(id);
+  await salvaImpostazioni(impostazioni.value.copia(pinnate: attuali));
 }
 
 Future<void> salvaImpostazioni(Impostazioni nuove) async {

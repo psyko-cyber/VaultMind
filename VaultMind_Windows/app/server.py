@@ -25,6 +25,9 @@ from .embedding import Embeddings
 from .search import SearchIndex, interpret
 from .import_parse import heuristic_extract
 from .import_csv import parse_csv
+from .sync_app import SyncApp
+from .sync_net import RifiutoSync
+from . import sync_net
 from . import llm
 from . import totp
 from . import transcribe
@@ -62,6 +65,7 @@ class AddIn(BaseModel):
     fields: List[FieldIn] = []
     tags: str = ""
     critical: bool = False
+    category: str = ""
 
 class UpdateIn(BaseModel):
     id: int
@@ -69,6 +73,7 @@ class UpdateIn(BaseModel):
     fields: List[FieldIn] = []
     tags: str = ""
     critical: bool = False
+    category: str = ""
 
 class ImportParseIn(BaseModel):
     text: str
@@ -438,6 +443,10 @@ def unlock(body: UnlockIn):
         created = True
     S.store = store
     _rebuild_index()
+    # Il sync si apre INSIEME al vault e si chiude con lui: senza chiave non
+    # c'è niente da sincronizzare, e restare in ascolto sarebbe solo una porta
+    # aperta che non serve a nessuno.
+    SYNC.avvia()
     return {
         "ok": True,
         "created": created,
@@ -508,7 +517,10 @@ def add(body: AddIn):
     _require_unlocked()
     tags = [t.strip().lower() for t in body.tags.split(",") if t.strip()]
     fields = [{"label": f.label.strip(), "value": f.value} for f in body.fields if f.label.strip() or f.value]
-    cred = S.store.add(body.title.strip(), fields, tags, body.critical)
+    try:
+        cred = S.store.add(body.title.strip(), fields, tags, body.critical, body.category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     _rebuild_index()
     return {"ok": True, "id": cred.id, "count": len(S.store.entries)}
 
@@ -519,7 +531,11 @@ def update(body: UpdateIn):
     _require_unlocked()
     tags = [t.strip().lower() for t in body.tags.split(",") if t.strip()]
     fields = [{"label": f.label.strip(), "value": f.value} for f in body.fields if f.label.strip() or f.value]
-    cred = S.store.update(body.id, body.title.strip(), fields, tags, body.critical)
+    try:
+        cred = S.store.update(body.id, body.title.strip(), fields, tags,
+                              body.critical, body.category)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     if cred is None:
         raise HTTPException(status_code=404, detail="voce non trovata")
     _rebuild_index()
@@ -706,9 +722,206 @@ def list_entries():
             "title": c.title,
             "tags": c.tags,
             "critical": c.critical,
+            "category": c.category,
             "fields": [{"label": f.label, "value": f.value} for f in c.fields],
         })
-    return {"entries": result, "count": len(result)}
+    return {"entries": result, "count": len(result),
+            "categories": S.store.categories}
+
+
+# ---------------------------------------------------------------- categorie
+# Raggruppamenti scelti A MANO. Non si deducono mai dai tag: quelli di un
+# import sono spesso parole ricavate dal titolo, e raggrupparci sopra darebbe
+# centinaia di sezioni da una voce sola. Vivono nel vault, così viaggiano col
+# backup e il telefono se le ritrova già fatte.
+
+class CategoryIn(BaseModel):
+    name: str
+
+class CategoryRenameIn(BaseModel):
+    old: str
+    new: str
+
+class SetCategoryIn(BaseModel):
+    ids: List[int]
+    name: str = ""   # vuoto = toglie la categoria
+
+
+# -------------------------------------------------------- sincronizzazione
+# Il motore sta in sync_app/sync_net/merge: qui ci sono solo gli endpoint.
+# L'ascoltatore vive insieme al vault (vedi /api/unlock e /api/lock) e non ha
+# niente a che vedere col server FastAPI, che resta su 127.0.0.1.
+
+# Le porte si possono spostare con due variabili d'ambiente. Servono a due
+# cose: far convivere due istanze sullo stesso computer (cioè poter PROVARE il
+# sync senza avere due macchine), e cavarsela se quelle porte sono già occupate
+# da qualcos'altro. Chi non le tocca non se ne accorge.
+_PORTA_SYNC = int(os.environ.get("VAULTMIND_SYNC_PORT", sync_net.PORTA_SYNC))
+_PORTA_SCOPERTA = int(os.environ.get("VAULTMIND_SYNC_SCOPERTA", sync_net.PORTA_SCOPERTA))
+
+SYNC = SyncApp(store_di=lambda: S.store,
+               leggi_impostazioni=_load_settings,
+               salva_impostazioni=_save_settings,
+               porta=_PORTA_SYNC,
+               porta_scoperta=_PORTA_SCOPERTA)
+
+
+class SyncImpostaIn(BaseModel):
+    nome: Optional[str] = None
+    acceso: Optional[bool] = None
+
+class SyncOraIn(BaseModel):
+    indirizzo: str
+    porta: int = sync_net.PORTA_SYNC
+    codice: str = ""
+
+class SyncRevocaIn(BaseModel):
+    id: str
+
+class SyncRisolviIn(BaseModel):
+    uid: str
+    scelta: str   # "mia" | "sua"
+
+
+@app.get("/api/sync/stato")
+def sync_stato():
+    _require_unlocked()
+    return {
+        "acceso": SYNC.acceso,
+        "in_ascolto": SYNC.in_ascolto,
+        "id": SYNC.id_dispositivo,
+        "nome": SYNC.nome,
+        "dispositivi": SYNC.dispositivi(),
+        "codice": SYNC.codice_attivo(),
+        "conflitti": len(SYNC.conflitti),
+        "ultimo": SYNC.ultimo,
+    }
+
+
+@app.post("/api/sync/imposta")
+def sync_imposta(body: SyncImpostaIn):
+    _require_unlocked()
+    SYNC.imposta(nome=body.nome, acceso=body.acceso)
+    return {"ok": True, "acceso": SYNC.acceso, "nome": SYNC.nome,
+            "in_ascolto": SYNC.in_ascolto}
+
+
+@app.post("/api/sync/abbina_inizia")
+def sync_abbina_inizia():
+    """Apre la finestra di abbinamento e restituisce il codice da leggere
+    sull'altro dispositivo. Vale 120 secondi e 5 tentativi."""
+    _require_unlocked()
+    if not SYNC.in_ascolto and not SYNC.avvia():
+        raise HTTPException(status_code=409,
+                            detail="Il sync è spento: accendilo per abbinare un dispositivo.")
+    return SYNC.apri_abbinamento()
+
+
+@app.post("/api/sync/abbina_ferma")
+def sync_abbina_ferma():
+    _require_unlocked()
+    SYNC.chiudi_abbinamento()
+    return {"ok": True}
+
+
+@app.post("/api/sync/cerca")
+def sync_cerca():
+    """Chiede sulla rete locale chi ha lo stesso vault. La domanda è firmata:
+    chi non ha la chiave non sa nemmeno riconoscerla, e non risponde."""
+    _require_unlocked()
+    return {"dispositivi": SYNC.cerca()}
+
+
+@app.post("/api/sync/ora")
+def sync_ora(body: SyncOraIn):
+    _require_unlocked()
+    try:
+        return SYNC.sincronizza_con(body.indirizzo, body.porta, body.codice)
+    except RifiutoSync as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except OSError:
+        raise HTTPException(status_code=502,
+                            detail="Non è stato possibile raggiungere quel dispositivo.")
+
+
+@app.post("/api/sync/revoca")
+def sync_revoca(body: SyncRevocaIn):
+    _require_unlocked()
+    return {"ok": SYNC.revoca(body.id)}
+
+
+@app.get("/api/sync/conflitti")
+def sync_conflitti():
+    _require_unlocked()
+    return {"conflitti": SYNC.elenco_conflitti()}
+
+
+@app.post("/api/sync/risolvi")
+def sync_risolvi(body: SyncRisolviIn):
+    _require_unlocked()
+    if body.scelta not in ("mia", "sua"):
+        raise HTTPException(status_code=400, detail="scelta non valida")
+    if not SYNC.risolvi(body.uid, body.scelta):
+        raise HTTPException(status_code=404, detail="conflitto non trovato")
+    _rebuild_index()
+    return {"ok": True, "restanti": len(SYNC.conflitti)}
+
+
+@app.get("/api/categories")
+def categories():
+    _require_unlocked()
+    conteggio = S.store.count_by_category()
+    return {"categories": [{"name": c, "count": conteggio.get(c, 0)}
+                           for c in S.store.categories],
+            "uncategorized": conteggio.get("", 0)}
+
+
+@app.post("/api/category_add")
+def category_add(body: CategoryIn):
+    _require_unlocked()
+    try:
+        nome = S.store.add_category(body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return {"ok": True, "name": nome}
+
+
+@app.post("/api/category_rename")
+def category_rename(body: CategoryRenameIn):
+    _require_unlocked()
+    try:
+        nome = S.store.rename_category(body.old, body.new)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if nome is None:
+        raise HTTPException(status_code=404, detail="categoria non trovata")
+    _rebuild_index()   # la categoria entra nell'indice della ricerca
+    return {"ok": True, "name": nome}
+
+
+@app.post("/api/category_delete")
+def category_delete(body: CategoryIn):
+    """Elimina la categoria. Le voci NON si toccano: restano nel vault senza
+    categoria. Cancellare un raggruppamento non può cancellare le password che
+    raggruppava."""
+    _require_unlocked()
+    liberate = S.store.delete_category(body.name)
+    _rebuild_index()
+    return {"ok": True, "freed": liberate}
+
+
+@app.post("/api/set_category")
+def set_category(body: SetCategoryIn):
+    """Assegna la categoria a più voci con UNA sola riscrittura del vault:
+    farlo voce per voce su 200 voci significherebbe 200 cifrature."""
+    _require_unlocked()
+    try:
+        toccate = S.store.set_category(body.ids, body.name)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    if toccate:
+        _rebuild_index()
+    return {"ok": True, "changed": toccate}
 
 
 @app.delete("/api/delete/{cred_id}")
@@ -757,6 +970,7 @@ def open_url(body: OpenUrlIn):
 
 @app.post("/api/lock")
 def lock():
+    SYNC.ferma()          # prima la porta, poi la chiave
     if S.store:
         S.store.lock()
     S.store = None

@@ -1,10 +1,13 @@
-/// VaultMind per Android — v1: si consulta, non si modifica.
+/// VaultMind per Android.
 ///
-/// Perché sola lettura: se il telefono potesse anche modificare, due
-/// dispositivi produrrebbero versioni diverse della stessa voce, cioè il
-/// problema difficile del sync (TODO §3), senza avere ancora il motore per
-/// risolverlo. Meglio un vault che sul telefono si consulta e basta, finché
-/// la sincronizzazione non esiste davvero.
+/// Dal 04/08/2026 il telefono **scrive** nel vault: voci, categorie, tutto.
+/// Fino a quel giorno era in sola lettura, per non creare due versioni
+/// divergenti della stessa voce senza avere il motore per riconciliarle.
+///
+/// La divergenza resta possibile e non è ancora risolta — è il sync (TODO §2).
+/// Nel frattempo la si rende almeno visibile: reimportare un backup dal PC
+/// avvisa se qui è stato modificato qualcosa, invece di sovrascriverlo in
+/// silenzio.
 library;
 
 import 'package:flutter/material.dart';

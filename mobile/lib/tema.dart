@@ -20,6 +20,12 @@ const nomiTema = {
 ///   fondo    -> surface            pannello -> surfaceContainerHighest
 ///   accento  -> primary            testo    -> onSurface
 ///   tenue    -> onSurfaceVariant   bordo    -> outlineVariant
+///   verde    -> tertiary           (i codici 2FA)
+///
+/// I valori sono **gli stessi delle variabili CSS del PC**, non colori
+/// somiglianti: `--bg`, `--panel`, `--border`, `--accent`, `--green` in
+/// `index.html`. Il tema scuro aveva un accento blu che sul PC non esiste — lì
+/// è ciano — e le due app sembravano due prodotti diversi.
 ThemeData temaDati(TemaId id) {
   switch (id) {
     case TemaId.chiaro:
@@ -28,7 +34,8 @@ ThemeData temaDati(TemaId id) {
         fondo: const Color(0xFFF4F7FC),
         pannello: const Color(0xFFFFFFFF),
         bordo: const Color(0xFFD9E2F0),
-        accento: const Color(0xFF2B5CE6),
+        accento: const Color(0xFF0369A1),
+        verde: const Color(0xFF047857),
         testo: const Color(0xFF17203A),
         tenue: const Color(0xFF5B6B8A),
         suAccento: Colors.white,
@@ -39,10 +46,11 @@ ThemeData temaDati(TemaId id) {
         fondo: const Color(0xFF0A0E1A),
         pannello: const Color(0xFF121A2B),
         bordo: const Color(0xFF1F2A40),
-        accento: const Color(0xFF5B8DEF),
+        accento: const Color(0xFF38BDF8),
+        verde: const Color(0xFF34D399),
         testo: const Color(0xFFE8ECF6),
         tenue: const Color(0xFF8FA0C0),
-        suAccento: Colors.white,
+        suAccento: const Color(0xFF06121C),
       );
     case TemaId.notteOro:
       return _costruisci(
@@ -51,6 +59,7 @@ ThemeData temaDati(TemaId id) {
         pannello: const Color(0xFF0E1730),
         bordo: const Color(0xFF1E2C4C),
         accento: const Color(0xFFE3B341),
+        verde: const Color(0xFF4ADE80),
         testo: const Color(0xFFE8ECF6),
         tenue: const Color(0xFF8FA0C0),
         suAccento: const Color(0xFF141414),
@@ -64,6 +73,7 @@ ThemeData _costruisci({
   required Color pannello,
   required Color bordo,
   required Color accento,
+  required Color verde,
   required Color testo,
   required Color tenue,
   required Color suAccento,
@@ -74,6 +84,11 @@ ThemeData _costruisci({
     onPrimary: suAccento,
     secondary: accento,
     onSecondary: suAccento,
+    // Il verde dei codici 2FA vive in `tertiary`, che non usiamo per altro:
+    // così viaggia dentro il tema e cambia da solo, invece di essere scelto a
+    // mano guardando la luminosità come si faceva prima.
+    tertiary: verde,
+    onTertiary: suAccento,
     error: const Color(0xFFE36868),
     onError: Colors.white,
     surface: fondo,
@@ -152,39 +167,19 @@ extension ColoriTema on BuildContext {
   Color get cTesto => _s.onSurface;
   Color get cTenue => _s.onSurfaceVariant;
   Color get cErrore => _s.error;
-
-  /// Verde dei codici 2FA e azzurro dei link: restano riconoscibili in tutti
-  /// e tre i temi, ma nel tema chiaro vanno scuriti per essere leggibili.
   bool get temaChiaro => Theme.of(this).brightness == Brightness.light;
-  Color get cVerde => temaChiaro ? const Color(0xFF1B8F5A) : const Color(0xFF4CC38A);
-  Color get cLink => temaChiaro ? const Color(0xFF1B4FD1) : const Color(0xFF6EA8FF);
+
+  /// Verde dei codici 2FA: arriva dal tema (vedi `tertiary`).
+  Color get cVerde => _s.tertiary;
+
+  /// I link prendono il colore d'accento, come sul PC — dove `--cyan` e
+  /// `--accent` sono lo stesso valore in tutti e tre i temi, oro compreso.
+  Color get cLink => _s.primary;
 }
 
-/// Colori delle categorie, per la barretta a sinistra di ogni scheda.
-///
-/// Sul PC quella barra è ciano fissa; qui il colore dipende dalla categoria,
-/// così porta informazione invece di essere solo decorazione: a colpo d'occhio
-/// si distingue una voce "banca" da una "social" senza leggere il tag.
-/// I toni sono quelli della palette del PC (`--cyan`, `--green`, `--violet`…).
-const _coloriCategoria = <Color>[
-  Color(0xFF38BDF8), // ciano — il colore d'accento del PC
-  Color(0xFF34D399), // verde acqua
-  Color(0xFFA78BFA), // viola
-  Color(0xFFF472B6), // rosa
-  Color(0xFFFBBF24), // ambra
-  Color(0xFF60A5FA), // azzurro
-  Color(0xFF2DD4BF), // turchese
-  Color(0xFFFB923C), // arancio
-];
-
-/// Colore stabile per una categoria: la stessa parola dà sempre lo stesso
-/// colore, su questo telefono come su un altro. Nessuna voce senza tag resta
-/// senza colore: si ripiega sul titolo.
-Color coloreCategoria(String chiave) {
-  if (chiave.isEmpty) return _coloriCategoria.first;
-  var h = 0;
-  for (final c in chiave.toLowerCase().codeUnits) {
-    h = (h * 31 + c) & 0x7FFFFFFF;
-  }
-  return _coloriCategoria[h % _coloriCategoria.length];
-}
+// Nota (04/08/2026): qui c'era `coloreCategoria()`, che dava a ogni scheda un
+// colore diverso ricavato dalla categoria o dal tag. L'idea era di far
+// riconoscere le voci a colpo d'occhio; l'effetto vero era un elenco
+// arlecchino in cui la M di Microsoft era arancione e il tema non si vedeva
+// più. Rimosso su indicazione di Luca: le schede seguono i colori del tema,
+// come sul PC.

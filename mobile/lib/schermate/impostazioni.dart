@@ -1,9 +1,7 @@
 /// Impostazioni dell'app.
 ///
 /// Ci sono solo le cose che sul telefono hanno senso. Cambio master password,
-/// generatore, import CSV e l'assistente restano sul PC: scrivono nel vault
-/// (che qui è in sola lettura) oppure richiedono Ollama, che su Android non
-/// gira.
+/// generatore e import CSV restano sul PC.
 library;
 
 import 'package:flutter/material.dart';
@@ -11,11 +9,15 @@ import 'package:flutter/material.dart';
 import '../archivio.dart';
 import '../impostazioni.dart';
 import '../ponte_file.dart';
+import '../sessione.dart';
 import '../tema.dart';
+import 'dialoghi.dart';
 
 class SchermataImpostazioni extends StatefulWidget {
+  final Sessione sessione;
   final int quanteVoci;
-  const SchermataImpostazioni({super.key, required this.quanteVoci});
+  const SchermataImpostazioni(
+      {super.key, required this.sessione, required this.quanteVoci});
 
   @override
   State<SchermataImpostazioni> createState() => _SchermataImpostazioniState();
@@ -53,10 +55,10 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
           _Sezione('Aspetto'),
           RadioGroup<TemaId>(
             groupValue: imp.tema,
-            onChanged: (v) => salvaImpostazioni(Impostazioni(
-              tema: v ?? imp.tema,
-              autoBlocco: imp.autoBlocco,
-            )),
+            // copia() e non un Impostazioni nuovo: costruirlo da zero
+            // dimenticherebbe le voci fissate, che sono l'unico dato vero
+            // conservato qui dentro.
+            onChanged: (v) => salvaImpostazioni(imp.copia(tema: v ?? imp.tema)),
             child: Column(
               children: [
                 for (final t in TemaId.values)
@@ -90,10 +92,8 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                 DropdownMenuItem(value: 15, child: Text('15 min')),
                 DropdownMenuItem(value: 30, child: Text('30 min')),
               ],
-              onChanged: (v) => salvaImpostazioni(Impostazioni(
-                tema: imp.tema,
-                autoBlocco: v ?? imp.autoBlocco,
-              )),
+              onChanged: (v) =>
+                  salvaImpostazioni(imp.copia(autoBlocco: v ?? imp.autoBlocco)),
             ),
           ),
           if (_improntaDisponibile)
@@ -122,8 +122,30 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
           ListTile(
             leading: Icon(Icons.info_outline, color: context.cTenue),
             title: Text('${widget.quanteVoci} voci su questo telefono'),
-            subtitle: Text('In sola lettura: le modifiche si fanno sul PC.',
+            subtitle: Text(
+                'Finché il sync non esiste, questa copia e quella del PC vivono separate.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
+          ),
+          if (imp.pinnate.isNotEmpty)
+            ListTile(
+              leading: Icon(Icons.push_pin_outlined, color: context.cTenue),
+              title: Text('${imp.pinnate.length} voci fissate in cima'),
+              subtitle: Text(
+                  'Valgono solo su questo telefono: non stanno nel vault e non viaggiano col backup.',
+                  style: TextStyle(fontSize: 12, color: context.cTenue)),
+              trailing: TextButton(
+                onPressed: () => salvaImpostazioni(imp.copia(pinnate: [])),
+                child: Text('Libera tutte',
+                    style: TextStyle(color: context.cAccento, fontSize: 12.5)),
+              ),
+            ),
+          ListTile(
+            leading: Icon(Icons.save_alt, color: context.cTenue),
+            title: const Text('Salva un backup'),
+            subtitle: Text(
+                'Il vault cifrato di questo telefono, da mandare dove vuoi: chi lo intercetta vede rumore.',
+                style: TextStyle(fontSize: 12, color: context.cTenue)),
+            onTap: _backup,
           ),
           ListTile(
             leading: Icon(Icons.download_outlined, color: context.cTenue),
@@ -152,7 +174,37 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
     );
   }
 
+  /// Il backup parte dal vault **in memoria**, non dal file: se l'utente ha
+  /// appena modificato qualcosa il file è già aggiornato, ma passare dalla
+  /// sessione toglie di mezzo ogni dubbio su cosa finisce dentro.
+  Future<void> _backup() async {
+    try {
+      final quando = DateTime.now();
+      String due(int n) => n.toString().padLeft(2, '0');
+      final nome = 'vaultmind-${quando.year}${due(quando.month)}${due(quando.day)}'
+          '-${due(quando.hour)}${due(quando.minute)}.json';
+      final ok = await salvaBackup(await widget.sessione.testoCifrato(), nome);
+      if (!mounted || ok) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Backup non riuscito.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Backup non riuscito.')),
+      );
+    }
+  }
+
   Future<void> _reimporta() async {
+    // Da quando il telefono scrive, un backup che arriva da fuori può
+    // cancellare lavoro fatto qui: si chiede prima. Vedi dialoghi.dart.
+    if (await modificatoInLocale()) {
+      if (!mounted) return;
+      final procedi = await confermaSovrascrittura(context);
+      if (procedi != true) return;
+    }
+    if (!mounted) return;
     final contenuto = await scegliFile();
     if (contenuto == null) return;
     try {
