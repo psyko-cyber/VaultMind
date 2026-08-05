@@ -19,7 +19,7 @@
 ; ==========================================================================
 
 #define MyAppName "VaultMind"
-#define MyAppVersion "6.7"
+#define MyAppVersion "6.8"
 #define MyAppExeName "VaultMind.exe"
 ; Percorso dell'exe costruito da run.bat. Prima di compilare l'installer
 ; l'exe deve essere aggiornato: lo verifica rilascio.ps1.

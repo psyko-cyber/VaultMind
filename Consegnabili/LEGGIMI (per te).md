@@ -22,7 +22,7 @@ SmartScreen (siamo senza firma), la master password che al primo avvio si
 **crea** e non è recuperabile, e la spunta Ollama (~2 GB, facoltativa).
 
 La versione precisa la mostra l'installer stesso e, dopo, la voce in
-"App installate" (oggi: 6.7).
+"App installate" (oggi: 6.8).
 
 **`VaultMind-Setup.zip`** è lo stesso installer più le istruzioni, in uno zip:
 WhatsApp, molte webmail e i proxy aziendali rifiutano gli allegati `.exe`.
@@ -36,7 +36,7 @@ il vault non viene toccato, una sola icona e una sola voce in "App installate"
 
 L'estensione Chrome/Edge/Brave: cerca e copia dal vault mentre si naviga.
 Dentro c'è `COME SI INSTALLA.txt` (modalità sviluppatore, niente Web Store
-per ora). Richiede l'app **6.7 aggiornata** (build dal 29/07 sera): con un
+per ora). Richiede l'app **6.8 aggiornata** (build dal 29/07 sera): con un
 exe più vecchio l'abbinamento non esiste e l'estensione resta cieca.
 
 ## 2. `VaultMind-Windows.zip` — il ripiego (~0,3 MB)

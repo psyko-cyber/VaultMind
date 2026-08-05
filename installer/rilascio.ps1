@@ -20,7 +20,7 @@
 # ==========================================================================
 param(
   [switch]$Release,
-  [string]$Tag = "v6.7"
+  [string]$Tag = "v6.8"
 )
 $ErrorActionPreference = "Stop"
 [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
