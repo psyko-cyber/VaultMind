@@ -424,6 +424,60 @@ class TestAccorgersene(BaseDueDispositivi):
         self.assertGreater(self.tel.sync.revisione, prima)
 
 
+class TestFuoriCasa(BaseDueDispositivi):
+    """L'indirizzo ricordato: quello che fa funzionare il sync da fuori.
+
+    La scoperta e' in broadcast, e un tunnel VPN e' un collegamento
+    punto-punto instradato: i broadcast non ci passano, quindi da fuori casa
+    non si trova mai nessuno — la strada c'e', ma la domanda non arriva.
+    L'indirizzo imparato in casa pero' resta valido ATTRAVERSO il tunnel, ed e'
+    tutto quello che serve.
+    """
+
+    def test_l_indirizzo_si_impara_sincronizzando(self):
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+        self.pc.sync.chiudi_abbinamento()
+
+        d = self.tel.sync.dispositivi()[0]
+        self.assertEqual("127.0.0.1", d.get("indirizzo"))
+        self.assertEqual(self.pc.sync.porta_vera, d.get("porta"))
+
+    def test_senza_scoperta_si_va_dove_rispondeva_prima(self):
+        """Il caso vero: telefono in 4G dentro la VPN. La sonda non arriva a
+        nessuno, e il sync deve funzionare lo stesso."""
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+        self.pc.sync.chiudi_abbinamento()
+
+        self.pc.store.add("Da casa", [{"label": "p", "value": "x"}], [])
+        self.pc.sync.ultimo = None
+        esito = self.tel.sync.sincronizza_tutti()
+
+        self.assertTrue(esito["ok"])
+        self.assertEqual(0, esito["trovati"], "la scoperta non doveva trovare niente")
+        self.assertEqual(1, esito["abbinati"], "l'indirizzo ricordato non e' stato usato")
+        self.assertIn("Da casa", self.tel.titoli())
+
+    def test_non_si_tiene_traccia_di_chi_non_e_abbinato(self):
+        """L'elenco degli indirizzi segue quello dei fidati: tenere l'indirizzo
+        di un dispositivo che non ci riguarda sarebbe raccogliere dati per
+        niente, ed e' esattamente quello che questo progetto non fa."""
+        self.tel.sync._ricorda_dove("mai-visto", "10.0.0.9", 8732)
+        self.assertEqual([], self.tel.sync.dispositivi())
+
+    def test_revocare_dimentica_anche_dove_stava(self):
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.collega(self.tel, self.pc, codice)
+        self.pc.sync.chiudi_abbinamento()
+
+        id_pc = self.pc.sync.id_dispositivo
+        self.assertTrue(self.tel.sync.revoca(id_pc))
+        # e adesso un giro non deve piu' bussare a quell'indirizzo
+        esito = self.tel.sync.sincronizza_tutti()
+        self.assertEqual(0, esito["abbinati"])
+
+
 class TestSyncSubito(BaseDueDispositivi):
     """`sincronizza_tutti` e `programma_sync`: quello che sta dietro al
     pulsante in barra e al sync che parte da solo."""

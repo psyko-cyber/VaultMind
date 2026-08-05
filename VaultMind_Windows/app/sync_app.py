@@ -296,13 +296,39 @@ class SyncApp:
                 t["nome"] = noti[t["id"]].get("nome") or t["nome"]
         return trovati
 
-    def sincronizza_con(self, indirizzo: str, porta: int, codice: str = "") -> dict:
+    def sincronizza_con(self, indirizzo: str, porta: int, codice: str = "",
+                        attesa_connessione: float = sync_net.TIMEOUT_S) -> dict:
         ctx = self._contesto()
         if ctx is None:
             raise sync_net.RifiutoSync("Il vault è chiuso.")
-        esito = sync_net.sincronizza(ctx, indirizzo, porta, codice)
+        esito = sync_net.sincronizza(ctx, indirizzo, porta, codice,
+                                     attesa_connessione)
         self.ultimo = esito
+        self._ricorda_dove(str(esito.get("id") or ""), indirizzo, porta)
         return esito
+
+    def _ricorda_dove(self, id_peer: str, indirizzo: str, porta: int) -> None:
+        """Si segna l'ultimo indirizzo a cui quel dispositivo ha risposto.
+
+        È il pezzo che fa funzionare il sync **fuori casa**. La scoperta è in
+        broadcast, e un tunnel VPN è un collegamento punto-punto instradato:
+        i broadcast non ci passano, quindi da fuori non si trova mai nessuno.
+        L'indirizzo imparato in casa però resta valido *attraverso* il tunnel —
+        il PC è `192.168.5.53` sia dal divano sia dall'altra parte del mondo —
+        e ricordarlo fa ripartire il sync da solo, senza far scrivere niente
+        a nessuno.
+        """
+        if not id_peer:
+            return
+        sync = self._sez()
+        d = (sync.get("dispositivi") or {}).get(id_peer)
+        if d is None:
+            return   # non abbinato: non si tiene traccia di chi non ci riguarda
+        if d.get("indirizzo") == indirizzo and int(d.get("porta") or 0) == porta:
+            return   # già così: si evita una riscrittura delle impostazioni
+        d["indirizzo"] = indirizzo
+        d["porta"] = porta
+        self._scrivi_sez(sync)
 
     def sincronizza_tutti(self) -> dict:
         """Cerca sulla rete e si allinea con **tutti** i dispositivi già
@@ -321,22 +347,39 @@ class SyncApp:
         try:
             trovati = self.cerca()
         except Exception:
-            return {"ok": False, "motivo": "La rete non è raggiungibile.", "esiti": []}
+            trovati = []
 
         noti = [d for d in trovati if d.get("conosciuto")]
+        # Chi la scoperta non l'ha sentito, si prova dove rispondeva l'ultima
+        # volta: è così che il sync funziona attraverso una VPN, dove i
+        # broadcast non arrivano ma l'indirizzo di casa resta valido.
+        visti = {d["id"] for d in noti}
+        ricordati = []
+        for id_peer, d in (self._sez().get("dispositivi") or {}).items():
+            if id_peer in visti or not d.get("indirizzo"):
+                continue
+            ricordati.append({"id": id_peer, "nome": d.get("nome") or "dispositivo",
+                              "indirizzo": d["indirizzo"],
+                              "porta": int(d.get("porta") or self._porta)})
+
         esiti: List[dict] = []
-        for d in noti:
+        for d in noti + ricordati:
             nome = d.get("nome") or "dispositivo"
+            # Sull'indirizzo ricordato si aspetta poco: se quel dispositivo non
+            # c'è più, venti secondi a vuoto per ognuno sarebbero un'app
+            # piantata. Chi ha appena risposto sulla rete invece c'è di sicuro.
+            attesa = sync_net.TIMEOUT_S if d in noti else 3.0
             try:
-                esito = self.sincronizza_con(d["indirizzo"], int(d["porta"]))
+                esito = self.sincronizza_con(d["indirizzo"], int(d["porta"]),
+                                             attesa_connessione=attesa)
                 esiti.append({**esito, "con": esito.get("con") or nome})
             except sync_net.RifiutoSync as exc:
                 esiti.append({"con": nome, "errore": str(exc)})
             except Exception:
                 esiti.append({"con": nome,
                               "errore": "Non è stato possibile raggiungerlo."})
-        return {"ok": True, "trovati": len(trovati), "abbinati": len(noti),
-                "esiti": esiti}
+        return {"ok": True, "trovati": len(trovati),
+                "abbinati": len(noti) + len(ricordati), "esiti": esiti}
 
     def programma_sync(self, ritardo: float = 3.0) -> None:
         """Una modifica locale si propaga da sola, poco dopo.

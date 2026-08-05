@@ -279,8 +279,11 @@ class GestoreSync extends ChangeNotifier {
     final f = Map<String, String>.from(_imp.fidati)..remove(idPeer);
     final b = Map<String, Map<String, int>>.from(_imp.basi)..remove(idPeer);
     // Via anche la base: se un giorno si riabbina, si riparte prudenti invece
-    // che con una fotografia vecchia di cui non ci si può più fidare.
-    await salvaImpostazioni(_imp.copia(fidati: f, basi: b));
+    // che con una fotografia vecchia di cui non ci si può più fidare. E via
+    // l'indirizzo, altrimenti si continuerebbe a bussare a un dispositivo che
+    // si è appena deciso di non voler più.
+    final ind = Map<String, String>.from(_imp.indirizzi)..remove(idPeer);
+    await salvaImpostazioni(_imp.copia(fidati: f, basi: b, indirizzi: ind));
     notifyListeners();
     return true;
   }
@@ -297,19 +300,36 @@ class GestoreSync extends ChangeNotifier {
     return trovati;
   }
 
-  Future<EsitoSync> sincronizzaCon(Trovato d, {String codice = ''}) async {
+  Future<EsitoSync> sincronizzaCon(Trovato d,
+          {String codice = '', Duration attesa = attesaMax}) =>
+      _verso(d.indirizzo, d.porta, d.etichetta, codice: codice, attesa: attesa);
+
+  /// Sincronizza con un indirizzo scritto a mano.
+  ///
+  /// Serve quando la strada c'è ma la domanda non arriva: attraverso una VPN i
+  /// broadcast non passano — è un collegamento punto-punto instradato — e lo
+  /// stesso succede sulle reti che isolano i dispositivi fra loro. Si usa una
+  /// volta sola: da lì in poi l'indirizzo se lo ricorda l'app.
+  Future<EsitoSync> sincronizzaConIndirizzo(String indirizzo,
+          {int porta = portaSync}) =>
+      _verso(indirizzo, porta, indirizzo);
+
+  Future<EsitoSync> _verso(String indirizzo, int porta, String nome,
+      {String codice = '', Duration attesa = attesaMax}) async {
     _cifratoOra = await sessione.testoCifrato();
     try {
-      await sincronizza(_contesto(), d.indirizzo,
-          porta: d.porta, codice: codice);
-      return ultimo ?? const EsitoSync();
+      final r = await sincronizza(_contesto(), indirizzo,
+          porta: porta, codice: codice, attesaConnessione: attesa);
+      await _ricordaDove('${r['id'] ?? ''}', indirizzo, porta);
+      return ultimo ?? EsitoSync(con: nome);
     } on RifiutoSync catch (e) {
-      final esito = EsitoSync(errore: e.messaggio);
+      final esito = EsitoSync(con: nome, errore: e.messaggio);
       ultimo = esito;
       notifyListeners();
       return esito;
     } catch (e) {
       final esito = EsitoSync(
+          con: nome,
           errore: 'Non è stato possibile raggiungere quel dispositivo.');
       ultimo = esito;
       notifyListeners();
@@ -317,6 +337,28 @@ class GestoreSync extends ChangeNotifier {
     } finally {
       _cifratoOra = '';
     }
+  }
+
+  /// Si segna dove quel dispositivo ha risposto l'ultima volta. Vedi
+  /// `Impostazioni.indirizzi` per il perché.
+  Future<void> _ricordaDove(String idPeer, String indirizzo, int porta) async {
+    // Solo per chi è già abbinato: di chi non ci riguarda non si tiene traccia.
+    if (idPeer.isEmpty || !_imp.fidati.containsKey(idPeer)) return;
+    final valore = '$indirizzo:$porta';
+    if (_imp.indirizzi[idPeer] == valore) return;
+    final m = Map<String, String>.from(_imp.indirizzi)..[idPeer] = valore;
+    await salvaImpostazioni(_imp.copia(indirizzi: m));
+  }
+
+  /// «192.168.5.53:8732» → indirizzo e porta. Si taglia sull'ULTIMO due punti:
+  /// un indirizzo IPv6 ne ha parecchi, e tagliare sul primo darebbe un
+  /// indirizzo monco e una porta che non esiste.
+  static (String, int)? _dividi(String salvato) {
+    final i = salvato.lastIndexOf(':');
+    if (i <= 0) return null;
+    final p = int.tryParse(salvato.substring(i + 1));
+    if (p == null) return null;
+    return (salvato.substring(0, i), p);
   }
 
   /// Cerca sulla rete e si allinea con **tutti** i dispositivi già abbinati
@@ -331,26 +373,50 @@ class GestoreSync extends ChangeNotifier {
     try {
       trovati = await cerca();
     } catch (_) {
-      return const EsitoGiro(
-          esiti: [EsitoSync(errore: 'La rete non è raggiungibile.')]);
+      trovati = [];
     }
     final noti = trovati.where((t) => t.conosciuto).toList();
+    final visti = noti.map((t) => t.id).toSet();
     final esiti = <EsitoSync>[];
+
     for (final d in noti) {
-      final e = await sincronizzaCon(d);
-      esiti.add(e.con.isEmpty
-          ? EsitoSync(
-              con: d.etichetta,
-              aggiunte: e.aggiunte,
-              aggiornate: e.aggiornate,
-              cancellate: e.cancellate,
-              conflitti: e.conflitti,
-              errore: e.errore)
-          : e);
+      esiti.add(_conNome(await sincronizzaCon(d), d.etichetta));
     }
+
+    // Chi la scoperta non l'ha sentito, si prova dove rispondeva l'ultima
+    // volta: è così che il sync funziona attraverso una VPN, dove i broadcast
+    // non arrivano ma l'indirizzo di casa resta valido.
+    var ricordati = 0;
+    for (final e in _imp.indirizzi.entries) {
+      if (visti.contains(e.key) || !_imp.fidati.containsKey(e.key)) continue;
+      final dove = _dividi(e.value);
+      if (dove == null) continue;
+      ricordati++;
+      final nome = _imp.fidati[e.key] ?? 'dispositivo';
+      // Su un indirizzo ricordato si aspetta poco: se quel dispositivo non c'è
+      // più, venti secondi a vuoto per ognuno sarebbero un'app piantata.
+      esiti.add(_conNome(
+          await _verso(dove.$1, dove.$2, nome,
+              attesa: const Duration(seconds: 3)),
+          nome));
+    }
+
     return EsitoGiro(
-        trovati: trovati.length, abbinati: noti.length, esiti: esiti);
+        trovati: trovati.length,
+        abbinati: noti.length + ricordati,
+        esiti: esiti);
   }
+
+  /// L'esito col nome di chi c'era dall'altra parte, se non ce l'ha già.
+  EsitoSync _conNome(EsitoSync e, String nome) => e.con.isNotEmpty
+      ? e
+      : EsitoSync(
+          con: nome,
+          aggiunte: e.aggiunte,
+          aggiornate: e.aggiornate,
+          cancellate: e.cancellate,
+          conflitti: e.conflitti,
+          errore: e.errore);
 
   /// Il cuore: prende il vault dell'altro, lo fonde col nostro e applica.
   ///

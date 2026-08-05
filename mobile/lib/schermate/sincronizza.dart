@@ -24,8 +24,10 @@ class SchermataSincronizza extends StatefulWidget {
 
 class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   late final TextEditingController _nome;
+  final _indirizzo = TextEditingController();
   List<Trovato> _trovati = const [];
   bool _cerco = false;
+  bool _aManoInCorso = false;
   String? _messaggio;
 
   GestoreSync get g => widget.gestore;
@@ -42,6 +44,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   void dispose() {
     g.removeListener(_aggiorna);
     _nome.dispose();
+    _indirizzo.dispose();
     super.dispose();
   }
 
@@ -69,6 +72,57 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
     setState(() => _messaggio = esito.errore ?? 'Con ${d.etichetta}: ${esito.riassunto}');
     _cerca();
   }
+
+  /// Il collegamento all'indirizzo scritto a mano.
+  ///
+  /// Non serve il codice: qui si parla con un dispositivo **già abbinato** —
+  /// se non lo fosse verrebbe respinto, ed è giusto così. Riuscito una volta,
+  /// l'indirizzo se lo ricorda l'app e questo campo non serve mai più.
+  Future<void> _aManoVai() async {
+    final ind = _indirizzo.text.trim();
+    if (ind.isEmpty || _aManoInCorso) return;
+    setState(() {
+      _aManoInCorso = true;
+      _messaggio = null;
+    });
+    final esito = await g.sincronizzaConIndirizzo(ind);
+    if (!mounted) return;
+    setState(() {
+      _aManoInCorso = false;
+      _messaggio = esito.errore ?? 'Con ${esito.con}: ${esito.riassunto}';
+    });
+    if (esito.errore == null) _indirizzo.clear();
+  }
+
+  Widget _aMano(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(top: 12),
+        child: Row(
+          children: [
+            Expanded(
+              child: TextField(
+                controller: _indirizzo,
+                keyboardType: TextInputType.url,
+                autocorrect: false,
+                decoration: const InputDecoration(
+                  labelText: 'Indirizzo del dispositivo',
+                  hintText: '192.168.5.53',
+                  isDense: true,
+                ),
+                onSubmitted: (_) => _aManoVai(),
+              ),
+            ),
+            const SizedBox(width: 8),
+            OutlinedButton(
+              onPressed: _aManoInCorso ? null : _aManoVai,
+              style: OutlinedButton.styleFrom(
+                  side: BorderSide(color: context.cBordo),
+                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14)),
+              child: Text(_aManoInCorso ? '…' : 'Vai',
+                  style: TextStyle(color: context.cAccento)),
+            ),
+          ],
+        ),
+      );
 
   Future<void> _chiediCodice(Trovato d) async {
     // Campo in linea e non un dialogo di sistema: stessa scelta del PC, e su
@@ -209,13 +263,18 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
               child: Text(
                 _cerco
                     ? 'Cerco sulla rete locale…'
-                    : 'Nessun dispositivo. Controlla che l\'altro sia sulla stessa '
-                        'rete, con l\'app aperta e il vault sbloccato.',
+                    : 'Nessuno ha risposto. L\'altro dev\'essere sulla stessa rete, '
+                        'con l\'app aperta e il vault sbloccato.\n\n'
+                        'Se sei fuori casa con la VPN, la domanda non passa: i tunnel '
+                        'non portano i broadcast. Scrivi qui sotto l\'indirizzo del PC '
+                        '— poi l\'app se lo ricorda.',
                 style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.5),
               ),
             )
           else
             ..._trovati.map((d) => _rigaTrovato(context, d)),
+
+          if (_trovati.isEmpty && !_cerco) _aMano(context),
 
           const SizedBox(height: 18),
           _titoletto(context, 'Dispositivi fidati'),

@@ -59,6 +59,20 @@ class Impostazioni {
   /// vault perché è un dato **derivato**, e non deve viaggiare col backup.
   Map<String, Map<String, int>> basi;
 
+  /// {idPeer: "indirizzo:porta"} dell'ultima volta che quel dispositivo ha
+  /// risposto.
+  ///
+  /// È il pezzo che fa funzionare il sync **fuori casa**. La scoperta è in
+  /// broadcast, e un tunnel VPN è un collegamento punto-punto instradato: i
+  /// broadcast non ci passano, quindi da fuori la domanda non arriva a
+  /// nessuno. L'indirizzo imparato in casa però resta valido *attraverso* il
+  /// tunnel — il PC è `192.168.5.53` sia dal divano sia dall'altra parte del
+  /// mondo — e ricordarlo fa ripartire il sync da solo.
+  ///
+  /// Non è un segreto: è un indirizzo di rete privata, che non dice niente a
+  /// chi non è già dentro quella rete.
+  Map<String, String> indirizzi;
+
   Impostazioni({
     this.tema = TemaId.notteOro,
     this.autoBlocco = 5,
@@ -68,9 +82,11 @@ class Impostazioni {
     this.syncAcceso = true,
     Map<String, String>? fidati,
     Map<String, Map<String, int>>? basi,
+    Map<String, String>? indirizzi,
   })  : pinnate = pinnate ?? [],
         fidati = fidati ?? {},
-        basi = basi ?? {};
+        basi = basi ?? {},
+        indirizzi = indirizzi ?? {};
 
   Map<String, dynamic> toJson() => {
         'tema': tema.name,
@@ -81,6 +97,7 @@ class Impostazioni {
         'syncAcceso': syncAcceso,
         'fidati': fidati,
         'basi': basi,
+        'indirizzi': indirizzi,
       };
 
   static Impostazioni fromJson(Map<String, dynamic> j) => Impostazioni(
@@ -106,6 +123,10 @@ class Impostazioni {
                 '${b.key}': (b.value as num).toInt()
             }
         },
+        indirizzi: {
+          for (final e in ((j['indirizzi'] ?? const {}) as Map).entries)
+            '${e.key}': '${e.value}'
+        },
       );
 
   Impostazioni copia({
@@ -117,6 +138,7 @@ class Impostazioni {
     bool? syncAcceso,
     Map<String, String>? fidati,
     Map<String, Map<String, int>>? basi,
+    Map<String, String>? indirizzi,
   }) =>
       Impostazioni(
         tema: tema ?? this.tema,
@@ -127,6 +149,7 @@ class Impostazioni {
         syncAcceso: syncAcceso ?? this.syncAcceso,
         fidati: fidati ?? this.fidati,
         basi: basi ?? this.basi,
+        indirizzi: indirizzi ?? this.indirizzi,
       );
 }
 

@@ -525,13 +525,19 @@ class Ascoltatore {
 /// Scambio simmetrico: ognuno manda il proprio vault cifrato e fonde in casa
 /// propria. Così nessuno dei due deve fidarsi della fusione dell'altro, e un
 /// conflitto lasciato in sospeso non blocca l'altro dispositivo.
+/// `attesaConnessione` si accorcia quando l'indirizzo è **ricordato** invece
+/// che appena sentito sulla rete: un dispositivo che non c'è più farebbe
+/// aspettare venti secondi a vuoto, e chi ha toccato un pulsante penserebbe che
+/// si è piantato tutto. Una volta collegati si torna al tempo pieno, perché lì
+/// a viaggiare è il vault intero.
 Future<Map<String, dynamic>> sincronizza(
   ContestoSync ctx,
   String indirizzo, {
   int porta = portaSync,
   String codice = '',
+  Duration attesaConnessione = attesaMax,
 }) async {
-  final sock = await Socket.connect(indirizzo, porta, timeout: attesaMax);
+  final sock = await Socket.connect(indirizzo, porta, timeout: attesaConnessione);
   final c = _Canale(sock);
   try {
     final chi = await _strettaLatoClient(c, ctx, codice: codice);

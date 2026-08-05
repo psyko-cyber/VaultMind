@@ -2044,6 +2044,41 @@ async function mostraDiagnosi(box){
   b.addEventListener("click", ()=>sistemaFirewall(b));
   box.appendChild(b);
 
+  /* L'indirizzo scritto a mano. Serve quando la domanda non può arrivare pur
+     essendoci la strada: attraverso una VPN i broadcast non passano — è un
+     collegamento punto-punto instradato — e lo stesso succede sulle reti che
+     isolano i dispositivi fra loro. Una volta collegati l'indirizzo se lo
+     ricorda l'app, quindi questo campo si usa una volta sola. */
+  const riga = document.createElement("div");
+  riga.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--border)";
+  const et = document.createElement("div");
+  et.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55;margin-bottom:6px";
+  et.textContent = "Sai già dov'è? Scrivi il suo indirizzo: da una VPN la domanda "
+                 + "non passa, ma il collegamento sì. Poi l'app se lo ricorda.";
+  const inp = document.createElement("input");
+  inp.className = "field";
+  inp.placeholder = "192.168.5.53";
+  inp.style.cssText = "width:150px;padding:6px 10px;font-family:var(--mono)";
+  const vai = document.createElement("button");
+  vai.className = "iconbtn";
+  vai.style.cssText = "padding:4px 10px;font-size:12px;margin-left:8px";
+  vai.textContent = "Sincronizza";
+  const parti = async ()=>{
+    const ind = inp.value.trim();
+    if(!ind) return;
+    vai.disabled = true; vai.textContent = "…";
+    const {ok,j} = await api("/api/sync/ora", {indirizzo: ind, porta: d.porta_sync || 8732});
+    vai.disabled = false; vai.textContent = "Sincronizza";
+    if(!ok){ avviso(j.detail || "Non è stato possibile raggiungerlo.", true); return; }
+    await controllaNovita();
+    avviso(`Sincronizzato con ${j.con || ind}.`);
+    caricaSync();
+  };
+  vai.addEventListener("click", parti);
+  inp.addEventListener("keydown", e=>{ if(e.key === "Enter") parti(); });
+  riga.append(et, inp, vai);
+  box.appendChild(riga);
+
   if(d.ip){
     const n = document.createElement("div");
     n.style.cssText = "font-size:11px;color:var(--faint);margin-top:8px";
