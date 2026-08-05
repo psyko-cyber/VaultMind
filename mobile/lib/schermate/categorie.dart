@@ -122,7 +122,11 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
               : ListView(
                   padding: const EdgeInsets.fromLTRB(14, 12, 14, 96),
                   children: [
-                    if (vault.categorie.isEmpty) _invito(context),
+                    // A categorie vuote non si dice niente, come sul PC: il
+                    // pulsante per crearne una e' li', e una spiegazione che
+                    // compare solo finche' non hai fatto nulla e' la
+                    // definizione di riga che leggi una volta e poi da'
+                    // fastidio.
                     for (final cat in vault.categorie)
                       _Gruppo(
                         titolo: cat,
@@ -150,15 +154,6 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
     );
   }
 
-  Widget _invito(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(4, 8, 4, 20),
-        child: Text(
-          'Nessuna categoria ancora. Creane una — "Banche", "Lavoro" — e poi '
-          'col + dentro la categoria scegli quali voci metterci. '
-          'Niente viene assegnato in automatico.',
-          style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.55),
-        ),
-      );
 }
 
 /// Una categoria e le sue voci.
