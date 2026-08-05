@@ -14,10 +14,12 @@ vault.json
 settings.json
 *.vaultmind-backup
 
-# Pacchetto da consegnare: binari rigenerabili dal codice, inutili in git
-PACCHETTO X INSTALLAZIONE EVERYWHERE/*.zip
-PACCHETTO X INSTALLAZIONE EVERYWHERE/*.exe
-PACCHETTO X INSTALLAZIONE EVERYWHERE/*.apk
+# Consegnabili: binari rigenerabili dal codice, inutili in git.
+# I due file di istruzioni invece restano tracciati, cosi' la cartella non
+# sparisce dal repo e chi lo clona sa cosa ci va dentro.
+Consegnabili/*.zip
+Consegnabili/*.exe
+Consegnabili/*.apk
 
 # Installer compilato (installer/build-installer.ps1): rigenerabile, ~100 MB
 installer/Output/

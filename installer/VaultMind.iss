@@ -43,7 +43,7 @@ PrivilegesRequired=lowest
 ; 108 MB in doppio e bastava una dimenticanza per consegnare la build vecchia.
 ; Nome senza versione, come gli zip: il file è sempre l'ultimo compilato, la
 ; versione la dichiara l'installer stesso (e poi "App installate").
-OutputDir=..\PACCHETTO X INSTALLAZIONE EVERYWHERE
+OutputDir=..\Consegnabili
 OutputBaseFilename=VaultMind-Setup
 SetupIconFile=..\VaultMind_Windows\VaultMind.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}

@@ -8,8 +8,8 @@
 #              ->  VaultMind-Estensione.zip  (estensione browser)
 #              ->  release su GitHub          (solo con -Release)
 #
-#  Tutto finisce in "PACCHETTO X INSTALLAZIONE EVERYWHERE\": una copia sola,
-#  nessun duplicato da tenere in sincrono.
+#  Tutto finisce in "Consegnabili\": una copia sola, nessun duplicato da
+#  tenere in sincrono.
 #
 #  Uso:
 #     .\installer\rilascio.ps1              # solo i consegbabili locali
@@ -28,7 +28,7 @@ $ErrorActionPreference = "Stop"
 $REPO_DIR = Split-Path $PSScriptRoot -Parent
 $WIN      = Join-Path $REPO_DIR "VaultMind_Windows"
 $EXE      = Join-Path $WIN "dist\VaultMind.exe"
-$PACCHETTO = Join-Path $REPO_DIR "PACCHETTO X INSTALLAZIONE EVERYWHERE"
+$PACCHETTO = Join-Path $REPO_DIR "Consegnabili"
 $GH_REPO  = "psyko-cyber/VaultMind"
 
 function Ok($m){ Write-Host "  [OK] $m" -ForegroundColor Green }
@@ -174,7 +174,7 @@ Remove-Item $stage -Recurse -Force -Confirm:$false
 # ============================ 4) release su GitHub ========================
 if (-not $Release) {
   Fase "4/4  Release su GitHub: SALTATA"
-  Info "Consegnabili pronti in: PACCHETTO X INSTALLAZIONE EVERYWHERE\"
+  Info "Consegnabili pronti in: Consegnabili\"
   Info "Per pubblicarli:  .\installer\rilascio.ps1 -Release"
   Write-Host ""
   Info "Ricorda: la prova che conta e' su una macchina PULITA (VM o secondo PC)."

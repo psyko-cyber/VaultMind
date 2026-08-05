@@ -102,12 +102,17 @@ Write-Host ""
 Ok ($apk.FullName + "  (" + [math]::Round($apk.Length / 1MB, 1) + " MB)")
 
 if ($Release) {
-  # Nel PACCHETTO insieme agli altri consegnabili, cosi' rilascio.ps1 lo
-  # trova e lo carica sulla release senza che nessuno se lo ricordi.
-  $pacchetto = Join-Path (Split-Path $PSScriptRoot -Parent) "PACCHETTO X INSTALLAZIONE EVERYWHERE"
+  # In Consegnabili\ insieme agli altri, cosi' rilascio.ps1 lo trova e lo
+  # carica sulla release senza che nessuno se lo ricordi.
+  $pacchetto = Join-Path (Split-Path $PSScriptRoot -Parent) "Consegnabili"
   if (Test-Path $pacchetto) {
     Copy-Item $apk.FullName (Join-Path $pacchetto "VaultMind.apk") -Force
     Ok "Copiato nel pacchetto: VaultMind.apk"
+  } else {
+    # Se la cartella non c'e' si taceva, e rilascio.ps1 pubblicava una release
+    # senza APK senza che nessuno se ne accorgesse: il guasto piu' silenzioso
+    # possibile, perche' tutto il resto riesce.
+    Err "Cartella Consegnabili\ non trovata: l'APK NON e' stato copiato."
   }
   Write-Host ""
   Info "Da mandare su WhatsApp: e' questo file."
