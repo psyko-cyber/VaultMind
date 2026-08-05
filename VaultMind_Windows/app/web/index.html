@@ -506,7 +506,7 @@
        raggrupparci sopra darebbe centinaia di sezioni da una voce sola. -->
   <div id="catPanel" class="hidden">
     <div class="db-head">
-      <div style="flex:1;font-size:12px;color:var(--faint);line-height:1.5" id="catHint"></div>
+      <div style="flex:1"></div>
       <div style="display:flex;gap:8px">
         <button id="catNewBtn" class="iconbtn" title="Crea una categoria">＋ Nuova categoria</button>
         <button id="catRefreshBtn" class="iconbtn" title="Aggiorna">↻</button>
@@ -2252,14 +2252,12 @@ async function loadCats(){
 const catVoci = (nome)=> DB_ENTRIES.filter(c => (c.category||"") === nome);
 
 function renderCats(){
+  // Sopra l'elenco non si spiega niente. Le due righe che c'erano si leggevano
+  // una volta e poi restavano lì per sempre; e quella sulla categoria unica
+  // sul telefono non c'è mai stata, quindi le due interfacce dicevano cose
+  // diverse davanti allo stesso elenco. La regola resta scritta dove serve a
+  // chi tocca il codice: nel docstring di `categorie.dart`.
   const box = $("#catList"); box.innerHTML = "";
-  // A categorie vuote non si dice niente: il pulsante per crearne una è lì
-  // sopra, e una spiegazione che compare solo quando non hai ancora fatto
-  // nulla è la definizione di riga che si legge una volta e poi da' fastidio.
-  $("#catHint").textContent = CAT_LIST.length
-    ? "Le voci si mettono dentro col ＋ della categoria. Una voce sta in una categoria sola: metterla altrove la sposta."
-    : "";
-
   CAT_LIST.forEach(n => box.appendChild(catRow(n, true)));
   const orfane = catVoci("");
   if(orfane.length) box.appendChild(catRow("", false));

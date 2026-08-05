@@ -22,7 +22,7 @@ import unittest
 _QUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(_QUI), "VaultMind_Windows"))
 
-from app.crypto_store import VaultStore  # noqa: E402
+from app.crypto_store import VaultStore, derive_key  # noqa: E402
 from app.sync_app import SyncApp  # noqa: E402
 from app import sync_net  # noqa: E402
 
@@ -422,6 +422,117 @@ class TestAccorgersene(BaseDueDispositivi):
         prima = self.tel.sync.revisione
         self.assertTrue(self.tel.sync.risolvi(uid, "mia"))
         self.assertGreater(self.tel.sync.revisione, prima)
+
+
+class TestPrimoTravaso(unittest.TestCase):
+    """Il telefono appena installato non ha il vault: se lo fa mandare dal PC.
+
+    Sostituisce il passaggio "salva un backup, mandatelo su WhatsApp, aprilo".
+    Non c'e' nessun protocollo nuovo: durante l'abbinamento il PC risponde
+    anche a chi non firma la sonda e gli da' il `salt`, che non e' segreto. Da
+    li' il telefono ricava la STESSA chiave dalla master password, si crea un
+    vault vuoto con quel salt, e lascia che sia la fusione normale a
+    riempirlo. E' quello che fa `mobile/lib/schermate/travaso.dart`.
+    """
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="vaultmind-travaso-")
+        self.addCleanup(shutil.rmtree, self.dir, True)
+        pc = os.path.join(self.dir, "pc.json")
+        s = VaultStore(pc)
+        s.create(MASTER)
+        s.add_many([
+            {"title": "Banca", "fields": [{"label": "password", "value": "b"}]},
+            {"title": "Amazon", "fields": [{"label": "password", "value": "a"}]},
+        ])
+        self.pc = Dispositivo(pc, "PC", porta=0)
+        self.pc.store.unlock(MASTER)
+
+    def _telefono_appena_installato(self, master: str = MASTER) -> Dispositivo:
+        """Quello che fa il telefono: salt dalla scoperta, chiave dalla master
+        password, e un vault VUOTO con quel salt. Vuoto davvero — nessuna voce
+        e **nessuna lapide**."""
+        salt = self.pc.store.salt
+        path = os.path.join(self.dir, "telefono.json")
+        st = VaultStore(path)
+        st.create(master)
+        st._salt = salt
+        st._key = derive_key(master, salt)
+        st._flush()
+        d = Dispositivo(path, "Telefono", porta=0)
+        d.store.unlock(master)
+        return d
+
+    def _aspetta_il_pc(self):
+        for _ in range(60):
+            if self.pc.sync.ultimo:
+                return
+            time.sleep(0.05)
+
+    def test_il_vault_arriva_e_il_pc_non_perde_niente(self):
+        tel = self._telefono_appena_installato()
+        self.assertEqual([], tel.titoli(), "il telefono doveva partire vuoto")
+
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.assertTrue(self.pc.sync.avvia())
+        self.addCleanup(self.pc.sync.ferma)
+        esito = tel.sync.sincronizza_con("127.0.0.1", self.pc.sync.porta_vera, codice)
+        self._aspetta_il_pc()
+
+        self.assertTrue(esito["ok"])
+        self.assertEqual(["Amazon", "Banca"], tel.titoli())
+        # Il punto che conta piu' di tutti: il PC e' il vault VERO, e uno
+        # sbaglio qui lo svuoterebbe da un dispositivo appena installato.
+        self.assertEqual(["Amazon", "Banca"], self.pc.titoli())
+        self.assertEqual([], self.pc.store.tombstones)
+        self.assertEqual(0, self.pc.sync.revisione,
+                         "il PC non doveva avere niente da applicare")
+
+    def test_la_chiave_si_ricava_dal_salt_senza_avere_il_vault(self):
+        """Il cuore del travaso: due file diversi, nessuna copia passata a
+        mano, e la stessa chiave — perche' il salt viaggia in chiaro (non e'
+        un segreto) e la master password non viaggia affatto."""
+        tel = self._telefono_appena_installato()
+        self.assertEqual(self.pc.store.salt, tel.store.salt)
+        self.assertEqual(self.pc.store.chiave, tel.store.chiave)
+
+    def test_una_master_diversa_non_apre_e_non_porta_via_niente(self):
+        tel = self._telefono_appena_installato(master="quella-sbagliata")
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.assertTrue(self.pc.sync.avvia())
+        self.addCleanup(self.pc.sync.ferma)
+
+        with self.assertRaises(sync_net.RifiutoSync):
+            tel.sync.sincronizza_con("127.0.0.1", self.pc.sync.porta_vera, codice)
+
+        self.assertEqual([], tel.titoli())
+        self.assertEqual(["Amazon", "Banca"], self.pc.titoli())
+
+    def test_svuotare_un_vault_NON_e_un_modo_di_partire_da_zero(self):
+        """Perche' `travaso.dart` costruisce un vault vuoto invece di svuotarne
+        uno gia' esistente: `clear()` lascia una **lapide per ogni voce**, e le
+        lapidi al primo sync vincono sulle voci vive. Un telefono che partisse
+        cosi' cancellerebbe il vault del PC, che e' l'unica copia vera.
+
+        Il test pretende il disastro apposta: se un domani qualcuno
+        "semplificasse" il travaso riusando `clear()`, questo resta a dire
+        perche' non si fa."""
+        copia = os.path.join(self.dir, "sbagliato.json")
+        shutil.copyfile(self.pc.store.path, copia)
+        tel = Dispositivo(copia, "Telefono", porta=0)
+        tel.store.unlock(MASTER)
+        tel.store.clear()
+        self.assertEqual(2, len(tel.store.tombstones), "clear() lascia lapidi")
+
+        codice = self.pc.sync.apri_abbinamento()["codice"]
+        self.assertTrue(self.pc.sync.avvia())
+        self.addCleanup(self.pc.sync.ferma)
+        tel.sync.sincronizza_con("127.0.0.1", self.pc.sync.porta_vera, codice)
+        self._aspetta_il_pc()
+
+        self.assertEqual([], self.pc.titoli(),
+                         "se questo non fosse vero, il commento in travaso.dart "
+                         "sarebbe una paura infondata e andrebbe tolto")
 
 
 class TestFuoriCasa(BaseDueDispositivi):

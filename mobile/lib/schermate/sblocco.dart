@@ -13,6 +13,7 @@ import '../ponte_file.dart';
 import '../vault.dart';
 import 'casa.dart';
 import 'dialoghi.dart';
+import 'travaso.dart';
 
 class SchermataSblocco extends StatefulWidget {
   final bool vaultPresente;
@@ -302,6 +303,11 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         ),
       ];
 
+  /// Il travaso via rete è il primo pulsante e il file è il secondo, non per
+  /// gusto: passare da WhatsApp funziona ma è un passaggio da spiegare, e
+  /// ogni passaggio da spiegare è qualcuno che si ferma. Il file resta perché
+  /// fuori casa è l'unica strada: il salt arriva dalla scoperta, che è in
+  /// broadcast e in una VPN non passa.
   List<Widget> _invitoImport() => [
         const Text(
           'Su questo telefono non c\'è ancora nessun vault.',
@@ -310,8 +316,8 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         ),
         const SizedBox(height: 10),
         Text(
-          'Dal PC premi 💾 per salvare un backup, mandatelo (anche su WhatsApp: '
-          'è cifrato, chi lo intercetta non ci fa niente) e aprilo qui.',
+          'Se il PC è acceso sulla stessa WiFi, il vault arriva da lì: '
+          'niente file da mandarsi.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.55),
         ),
@@ -319,15 +325,27 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
-            onPressed: _importa,
-            icon: const Icon(Icons.file_open_outlined),
-            label: const Text('Scegli il file di backup',
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const SchermataTravaso())),
+            icon: const Icon(Icons.wifi_tethering),
+            label: const Text('Ricevi il vault dal PC',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: FilledButton.styleFrom(
               backgroundColor: context.cAccento,
               foregroundColor: context.cSuAccento,
               padding: const EdgeInsets.symmetric(vertical: 15),
             ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        OutlinedButton.icon(
+          onPressed: _importa,
+          icon: Icon(Icons.file_open_outlined, color: context.cAccento),
+          label: Text('Ho un file di backup',
+              style: TextStyle(color: context.cAccento)),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: context.cBordo),
+            padding: const EdgeInsets.symmetric(vertical: 13),
           ),
         ),
       ];
