@@ -29,10 +29,84 @@ async function apiFetch(path, body) {
 }
 
 /* ---------- viste ---------- */
+const VISTE = ["viewOff", "viewLocked", "viewPair", "viewMain"];
+
 function show(id) {
-  ["viewOff", "viewLocked", "viewPair", "viewMain"].forEach(v =>
-    $("#" + v).classList.toggle("hidden", v !== id));
+  VISTE.forEach(v => $("#" + v).classList.toggle("hidden", v !== id));
+  $("#viewImpostazioni").classList.add("hidden");
 }
+
+/* ---------- tema ----------
+ * Gli stessi tre dell'app e del telefono, con gli stessi nomi. La scelta sta
+ * in chrome.storage insieme al token: e' una preferenza del browser, non un
+ * dato del vault, e infatti non esce mai da qui.
+ *
+ * Le pastiglie di colore sono scritte a mano e non lette dal CSS: servono a
+ * far riconoscere il tema PRIMA di sceglierlo, quindi devono mostrare i colori
+ * di quel tema mentre sei ancora in un altro. */
+const TEMI = [
+  { id: "dark",  nome: "Scuro",       colori: ["#0A0E1A", "#121A2B", "#38BDF8"] },
+  { id: "light", nome: "Chiaro",      colori: ["#F4F7FC", "#FFFFFF", "#0369A1"] },
+  { id: "night", nome: "Notte e oro", colori: ["#070C1A", "#0E1730", "#E3B341"] },
+];
+
+function temaValido(id) { return TEMI.some(t => t.id === id); }
+
+async function caricaTema() {
+  const t = (await chrome.storage.local.get("vm_tema")).vm_tema;
+  if (temaValido(t)) document.body.dataset.tema = t;
+}
+
+async function scegliTema(id) {
+  if (!temaValido(id)) return;
+  document.body.dataset.tema = id;
+  await chrome.storage.local.set({ vm_tema: id });
+  renderTemi();
+}
+
+function renderTemi() {
+  const box = $("#temi");
+  box.innerHTML = "";
+  const attivo = document.body.dataset.tema;
+  TEMI.forEach(t => {
+    const b = document.createElement("button");
+    b.className = "tema" + (t.id === attivo ? " sel" : "");
+    const pall = document.createElement("span");
+    pall.className = "pall";
+    t.colori.forEach(c => {
+      const i = document.createElement("i");
+      i.style.background = c;
+      pall.appendChild(i);
+    });
+    const nome = document.createElement("span");
+    nome.textContent = t.nome;
+    b.append(pall, nome);
+    if (t.id === attivo) {
+      const s = document.createElement("span");
+      s.className = "segno";
+      s.textContent = "✓";
+      b.appendChild(s);
+    }
+    b.addEventListener("click", () => scegliTema(t.id));
+    box.appendChild(b);
+  });
+}
+
+/* Da quale vista si e' entrati nelle impostazioni: si torna li'. Senza,
+ * chiudendole da "vault bloccato" ci si ritrovava sulla ricerca vuota. */
+let VISTA_PREC = "viewMain";
+
+$("#impBtn").addEventListener("click", () => {
+  VISTA_PREC = VISTE.find(v => !$("#" + v).classList.contains("hidden")) || "viewMain";
+  VISTE.forEach(v => $("#" + v).classList.add("hidden"));
+  $("#viewImpostazioni").classList.remove("hidden");
+  renderTemi();
+});
+
+$("#impChiudi").addEventListener("click", () => {
+  $("#viewImpostazioni").classList.add("hidden");
+  $("#" + VISTA_PREC).classList.remove("hidden");
+});
 
 function toast(msg) {
   const t = $("#toast");
@@ -52,6 +126,7 @@ async function copia(v, label) {
 
 /* ---------- avvio ---------- */
 async function init() {
+  await caricaTema();
   TOKEN = (await chrome.storage.local.get("vm_token")).vm_token || null;
   $("#stato").textContent = "";
   if (!TOKEN) { show("viewPair"); return; }

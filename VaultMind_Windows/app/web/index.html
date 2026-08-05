@@ -102,9 +102,6 @@
   .pickbtn{margin-top:8px;width:100%;text-align:left;border-radius:10px;padding:8px 12px;
     background:rgba(34,211,238,.08);border:1px solid var(--cyan);color:var(--cyan)}
 
-  .chips{max-width:680px;width:100%;margin:0 auto;padding:0 20px 8px;display:flex;flex-wrap:wrap;gap:8px}
-  .chip{font-size:12px;padding:6px 12px;border-radius:999px;background:var(--panel);border:1px solid var(--border);color:var(--soft)}
-  .chip:hover{filter:brightness(1.25)}
 
   .composer{border-top:1px solid var(--border);background:var(--bar);backdrop-filter:blur(8px)}
   .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:13px 20px 16px;display:flex;align-items:center;gap:8px}
@@ -518,7 +515,6 @@
     <div id="catList"></div>
   </div>
 
-  <div class="chips" id="chips"></div>
 
   <div class="composer">
     <div class="inner">
@@ -698,7 +694,6 @@ window.fetch = (url, opts) => {
 
 const api = (path, body)=>fetch(path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body||{})}).then(r=>r.json().then(j=>({ok:r.ok,j})));
 
-const CHIPS = ["i miei account google","pin della cie","wifi ufficio","home banking","codice 2fa google"];
 
 /* ---- LOCK ---- */
 /* Al primo avvio il vault non esiste ancora: la schermata non deve CHIEDERE una
@@ -753,7 +748,6 @@ async function doUnlock(){
   window.AUDIO_READY = !!j.audio_ready;
   if(!j.audio_ready){ $("#micBtn").style.opacity=".5"; }
   if(j.llm) $("#pillLlm").classList.remove("hidden");
-  renderChips();
   switchTab("chat");
   // carica impostazioni: applica auto-lock, default generatore, microfono
   try{
@@ -922,12 +916,6 @@ async function send(){
 }
 $("#sendBtn").addEventListener("click", send);
 $("#q").addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
-
-function renderChips(){
-  const box=$("#chips"); box.innerHTML="";
-  CHIPS.forEach(c=>{ const b=document.createElement("button"); b.className="chip"; b.textContent=c;
-    b.onclick=()=>{ $("#q").value=c; $("#q").focus(); }; box.appendChild(b); });
-}
 
 /* ---- ADD MODAL (campi dinamici) ---- */
 function addFieldRow(label, value){
@@ -1584,7 +1572,6 @@ function switchTab(tab){
   document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===tab));
   const isChat = tab==="chat";
   $("#chat").classList.toggle("hidden", !isChat);
-  $("#chips").classList.toggle("hidden", !isChat);
   document.querySelector(".composer").classList.toggle("hidden", !isChat);
   $("#dbPanel").classList.toggle("hidden", tab!=="db");
   $("#catPanel").classList.toggle("hidden", tab!=="cat");
@@ -2266,9 +2253,12 @@ const catVoci = (nome)=> DB_ENTRIES.filter(c => (c.category||"") === nome);
 
 function renderCats(){
   const box = $("#catList"); box.innerHTML = "";
+  // A categorie vuote non si dice niente: il pulsante per crearne una è lì
+  // sopra, e una spiegazione che compare solo quando non hai ancora fatto
+  // nulla è la definizione di riga che si legge una volta e poi da' fastidio.
   $("#catHint").textContent = CAT_LIST.length
     ? "Le voci si mettono dentro col ＋ della categoria. Una voce sta in una categoria sola: metterla altrove la sposta."
-    : "Nessuna categoria ancora. Creane una — «Banche», «Lavoro» — poi col ＋ scegli quali voci metterci. Niente viene assegnato in automatico.";
+    : "";
 
   CAT_LIST.forEach(n => box.appendChild(catRow(n, true)));
   const orfane = catVoci("");
