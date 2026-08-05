@@ -43,7 +43,7 @@ void main() {
       nome: 'Telefono di prova',
       chiaveVault: List<int>.generate(32, (i) => i), // la stessa del server
       fidati: fidati,
-      leggiVaultCifrato: () => 'vault-scritto-dal-dart',
+      leggiVaultCifrato: () async => 'vault-scritto-dal-dart',
       riceviVault: (b, i) async {
         ricevuti.add([b, i]);
         return {'ricevuto': true};

@@ -66,8 +66,14 @@ class ContestoSync {
   /// abbinamento chiusa.
   final Map<String, String> fidati;
 
-  /// Il vault cifrato da mandare all'altro.
-  final String Function() leggiVaultCifrato;
+  /// Il vault cifrato da mandare all'altro, **chiesto al momento**.
+  ///
+  /// Asincrona perché cifrare lo è, e tenerne una copia pronta era il bug del
+  /// 05/08/2026: la copia veniva preparata solo quando il telefono CHIAMAVA,
+  /// quindi quando era lui a rispondere mandava una stringa vuota e il PC
+  /// diceva «il vault ricevuto non è leggibile». Invisibile finché il PC non
+  /// ha imparato a chiamare per primo.
+  final Future<String> Function() leggiVaultCifrato;
 
   /// Riceve il vault dell'altro e lo fonde. Torna un riepilogo per l'utente.
   final Future<Map<String, dynamic>> Function(String blob, String idPeer) riceviVault;
@@ -502,7 +508,7 @@ class Ascoltatore {
       // Da qui si parla con un dispositivo che ha dimostrato di avere la chiave
       // di QUESTO vault. Quello che viaggia è comunque cifrato: in chiaro non
       // passa niente, nemmeno adesso.
-      c.scrivi({'tipo': 'vault', 'blob': ctx.leggiVaultCifrato()});
+      c.scrivi({'tipo': 'vault', 'blob': await ctx.leggiVaultCifrato()});
       final suo = await c.leggi();
       if (suo['tipo'] == 'vault') {
         ultimo = await ctx.riceviVault('${suo['blob'] ?? ''}', idPeer);
@@ -545,7 +551,7 @@ Future<Map<String, dynamic>> sincronizza(
     if (suo['tipo'] != 'vault') {
       throw const RifiutoSync('L\'altro dispositivo non ha mandato il vault.');
     }
-    c.scrivi({'tipo': 'vault', 'blob': ctx.leggiVaultCifrato()});
+    c.scrivi({'tipo': 'vault', 'blob': await ctx.leggiVaultCifrato()});
     final esito = await ctx.riceviVault('${suo['blob'] ?? ''}', chi['id']!);
     return {'ok': true, 'con': chi['nome'], 'id': chi['id'], ...esito};
   } finally {

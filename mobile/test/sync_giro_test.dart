@@ -14,10 +14,92 @@
 ///     ..\costruisci.ps1 -Test
 library;
 
+import 'dart:typed_data';
+
 import 'package:flutter_test/flutter_test.dart';
+import 'package:vaultmind/impostazioni.dart';
+import 'package:vaultmind/sessione.dart';
 import 'package:vaultmind/sync_gestore.dart';
+import 'package:vaultmind/sync_protocollo.dart';
+import 'package:vaultmind/sync_rete.dart';
+import 'package:vaultmind/vault.dart';
 
 void main() {
+  /// Il difetto del 05/08/2026, e il motivo per cui era rimasto nascosto.
+  ///
+  /// Il telefono preparava il proprio vault cifrato solo quando era LUI a
+  /// chiamare. Quando rispondeva — cioè da quando il PC ha imparato a
+  /// chiamare per primo — mandava una stringa vuota, e di là compariva «il
+  /// vault ricevuto non è leggibile». Nessun test poteva vederlo: quelli di
+  /// `sync_rete` usano un contesto finto con un blob costante, che è valido
+  /// in tutte e due i ruoli. Serviva il `GestoreSync` vero, nel ruolo di
+  /// server.
+  group('il vault da mandare', () {
+    final chiave = Uint8List.fromList(List<int>.generate(32, (i) => i * 7 % 251));
+    final salt = Uint8List.fromList(List<int>.filled(16, 3));
+
+    Sessione sessioneConUnaVoce() => Sessione(
+          Vault([
+            Credenziale(
+              id: 1,
+              title: 'Banca',
+              tags: const [],
+              critical: false,
+              fields: const [Campo('password', 'segreta')],
+            ),
+          ], salt: salt),
+          chiave,
+        );
+
+    test('lo manda anche quando è lui a RISPONDERE, non solo a chiamare',
+        () async {
+      final sessione = sessioneConUnaVoce();
+      // Il PC dev'essere già fra i fidati, altrimenti verrebbe respinto prima
+      // di arrivare allo scambio dei vault — e il difetto resterebbe coperto.
+      final finto = ContestoSync(
+        idDispositivo: idDispositivo(),
+        nome: 'PC',
+        chiaveVault: chiave,
+        leggiVaultCifrato: () async => await cifraVault(Vault(const [], salt: salt), chiave),
+        riceviVault: (_, _) async => {},
+      );
+      await salvaImpostazioni(impostazioni.value.copia(
+        idDispositivo: 'telefono-di-prova',
+        nomeDispositivo: 'Telefono',
+        syncAcceso: true,
+        fidati: {finto.idDispositivo: 'PC'},
+      ));
+
+      final g = GestoreSync(sessione, porta: 0);
+      expect(await g.avvia(), isTrue, reason: 'l\'ascoltatore non si è aperto');
+      addTearDown(() async {
+        await g.ferma();
+        g.dispose();
+      });
+
+      String? arrivato;
+      final ctxRicevente = ContestoSync(
+        idDispositivo: finto.idDispositivo,
+        nome: 'PC',
+        chiaveVault: chiave,
+        leggiVaultCifrato: finto.leggiVaultCifrato,
+        riceviVault: (b, _) async {
+          arrivato = b;
+          return {};
+        },
+      );
+
+      await sincronizza(ctxRicevente, '127.0.0.1', porta: g.portaVera);
+
+      expect(arrivato, isNotNull, reason: 'il telefono non ha mandato niente');
+      expect(arrivato, isNotEmpty,
+          reason: 'ha mandato una stringa vuota: è esattamente il difetto');
+      // E dev'essere un vault vero, non una stringa qualsiasi: si riapre.
+      final riletto = await apriVaultConChiave(arrivato!, chiave);
+      expect(riletto.credenziali.map((c) => c.title), ['Banca']);
+    });
+  });
+
   group('EsitoGiro', () {
     test('un giro a vuoto non ha niente da dire', () {
       const giro = EsitoGiro(trovati: 1, abbinati: 1, esiti: [EsitoSync(con: 'PC')]);

@@ -77,7 +77,7 @@ class _SchermataTravasoState extends State<SchermataTravaso> {
       idDispositivo: imp.idDispositivo,
       nome: imp.nomeDispositivo,
       chiaveVault: List<int>.filled(32, 0),
-      leggiVaultCifrato: () => '',
+      leggiVaultCifrato: () async => '',
       riceviVault: (_, _) async => {},
     );
     final trovati =

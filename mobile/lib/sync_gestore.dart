@@ -114,6 +114,12 @@ class EsitoGiro {
 class GestoreSync extends ChangeNotifier {
   final Sessione sessione;
 
+  /// La porta dell'ascoltatore. A parametro **solo per i test**, come nel
+  /// gemello Python: con quella fissa non si potrebbero far parlare due
+  /// estremi sulla stessa macchina, e soprattutto il test fallirebbe a caso
+  /// quando l'app vera è aperta e la 8732 è già occupata.
+  final int porta;
+
   Ascoltatore? _ascoltatore;
   Annunciatore? _annunciatore;
 
@@ -134,7 +140,7 @@ class GestoreSync extends ChangeNotifier {
 
   EsitoSync? ultimo;
 
-  GestoreSync(this.sessione);
+  GestoreSync(this.sessione, {this.porta = portaSync});
 
   Impostazioni get _imp => impostazioni.value;
 
@@ -183,15 +189,17 @@ class GestoreSync extends ChangeNotifier {
         // fotografia il dispositivo appena abbinato resterebbe sconosciuto.
         fidati: _imp.fidati,
         saltVault: sessione.vault.salt,
-        leggiVaultCifrato: () => _cifratoOra,
+        // Si cifra QUANDO SERVE, e vale per tutte e due le direzioni. Prima
+        // era una copia preparata all'inizio di un sync in uscita: quando era
+        // il PC a chiamare, il telefono faceva da server e mandava una
+        // stringa vuota, e di là si leggeva «il vault ricevuto non è
+        // leggibile». Il difetto c'era da sempre ed è rimasto invisibile
+        // finché il PC non ha imparato a chiamare per primo.
+        leggiVaultCifrato: () => sessione.testoCifrato(),
         riceviVault: riceviVault,
         codiceAttivo: codiceAttivo,
         abbina: _abbina,
       );
-
-  /// Il vault cifrato pronto da mandare. Si ricalcola a ogni sync e non si
-  /// tiene in giro più del necessario.
-  String _cifratoOra = '';
 
   Future<bool> avvia() async {
     await ferma(pulisciCodice: false);
@@ -200,7 +208,7 @@ class GestoreSync extends ChangeNotifier {
       return false;
     }
     final ctx = _contesto();
-    final a = Ascoltatore(ctx);
+    final a = Ascoltatore(ctx, porta: porta);
     if (!await a.avvia()) return false;
     _ascoltatore = a;
     final ann = Annunciatore(ctx, portaDelSync: a.portaVera);
@@ -316,7 +324,6 @@ class GestoreSync extends ChangeNotifier {
 
   Future<EsitoSync> _verso(String indirizzo, int porta, String nome,
       {String codice = '', Duration attesa = attesaMax}) async {
-    _cifratoOra = await sessione.testoCifrato();
     try {
       final r = await sincronizza(_contesto(), indirizzo,
           porta: porta, codice: codice, attesaConnessione: attesa);
@@ -334,8 +341,6 @@ class GestoreSync extends ChangeNotifier {
       ultimo = esito;
       notifyListeners();
       return esito;
-    } finally {
-      _cifratoOra = '';
     }
   }
 

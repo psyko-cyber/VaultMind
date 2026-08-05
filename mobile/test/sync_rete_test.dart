@@ -35,7 +35,7 @@ class Finto {
       chiaveVault: chiaveVault ?? chiave,
       fidati: fidati,
       saltVault: List.filled(16, 1),
-      leggiVaultCifrato: () => blob,
+      leggiVaultCifrato: () async => blob,
       riceviVault: (b, i) async {
         ricevuti.add([b, i]);
         return {'ricevuto': true};
