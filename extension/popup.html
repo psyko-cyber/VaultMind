@@ -65,6 +65,13 @@
   .frow .cp{width:auto;margin:0;padding:4px 9px;font-size:11.5px;background:transparent;
             border:1px solid var(--line);color:var(--txt);border-radius:7px;font-weight:500}
   .frow .cp:hover{border-color:var(--accent);color:var(--accent)}
+  /* Icone al posto della parola "Copia" ripetuta su ogni riga: gli stessi
+     glifi dell'app (⧉ e 👁), cosi' il gesto e' lo stesso ovunque. */
+  .frow .ico{width:auto;flex:0 0 auto;margin:0;padding:3px 7px;font-size:13px;line-height:1.25;
+             background:transparent;border:1px solid var(--line);color:var(--dim);
+             border-radius:7px;font-weight:500}
+  .frow .ico:hover{border-color:var(--accent);color:var(--accent);filter:none}
+  .frow .val.visibile{color:var(--txt)}
   .reply{color:var(--dim);font-size:12.5px;font-style:italic;margin:8px 2px}
   footer{padding:9px 14px;border-top:1px solid var(--line);color:var(--dim);font-size:11px;text-align:center}
   #toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:var(--accent);
@@ -128,8 +135,15 @@
   <section id="viewImpostazioni" class="view hidden">
     <div class="sez">Tema</div>
     <div id="temi"></div>
-    <p class="dim" style="margin-top:12px">Gli stessi tre dell'app e del telefono. La scelta vale solo per questa
+    <p class="dim" style="margin-top:10px">Gli stessi tre dell'app e del telefono. La scelta vale solo per questa
        estensione: resta nel browser, non tocca il vault.</p>
+
+    <div class="sez" style="margin-top:18px">Privacy</div>
+    <div id="privacy"></div>
+    <p class="dim" style="margin-top:10px">Coperti, i valori si vedono uno alla volta col 👁 e si richiudono da soli
+       dopo 15 secondi. Questo popup si apre sopra la pagina che stai guardando: il momento in cui compare è proprio
+       quello in cui potresti non essere solo davanti allo schermo.</p>
+
     <button class="ghost" id="impChiudi">Indietro</button>
   </section>
 

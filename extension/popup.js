@@ -52,6 +52,49 @@ const TEMI = [
 
 function temaValido(id) { return TEMI.some(t => t.id === id); }
 
+/* ---------- privacy ----------
+ * Accesa di default, e la scelta e' voluta: questo popup si apre sopra la
+ * pagina che stai guardando, quindi il momento in cui compare e' proprio
+ * quello in cui potresti non essere solo davanti allo schermo. Chi vuole i
+ * valori in chiaro lo dice una volta, e resta cosi'. */
+let PRIVACY = true;
+
+async function caricaPrivacy() {
+  // Assente = accesa: chi installa l'estensione oggi parte coperto.
+  PRIVACY = (await chrome.storage.local.get("vm_privacy")).vm_privacy !== false;
+}
+
+async function cambiaPrivacy() {
+  PRIVACY = !PRIVACY;
+  await chrome.storage.local.set({ vm_privacy: PRIVACY });
+  renderPrivacy();
+  ridisegna();
+}
+
+function renderPrivacy() {
+  const box = $("#privacy");
+  box.innerHTML = "";
+  const b = document.createElement("button");
+  b.className = "tema" + (PRIVACY ? " sel" : "");
+  const t = document.createElement("span");
+  t.textContent = PRIVACY ? "Valori coperti" : "Valori in chiaro";
+  const s = document.createElement("span");
+  s.className = "segno";
+  s.textContent = PRIVACY ? "ON" : "OFF";
+  b.append(t, s);
+  b.addEventListener("click", cambiaPrivacy);
+  box.appendChild(b);
+}
+
+/* Ridisegna quello che e' gia' a schermo dopo un cambio di privacy: senza,
+ * bisognerebbe richiudere e riaprire il popup per vedere l'effetto. */
+function ridisegna() {
+  ["#results", "#site"].forEach(sel => {
+    const box = $(sel);
+    if (box && box._ultimo) render(box._ultimo.list, box, box._ultimo.titolo);
+  });
+}
+
 async function caricaTema() {
   const t = (await chrome.storage.local.get("vm_tema")).vm_tema;
   if (temaValido(t)) document.body.dataset.tema = t;
@@ -101,6 +144,7 @@ $("#impBtn").addEventListener("click", () => {
   VISTE.forEach(v => $("#" + v).classList.add("hidden"));
   $("#viewImpostazioni").classList.remove("hidden");
   renderTemi();
+  renderPrivacy();
 });
 
 $("#impChiudi").addEventListener("click", () => {
@@ -127,6 +171,7 @@ async function copia(v, label) {
 /* ---------- avvio ---------- */
 async function init() {
   await caricaTema();
+  await caricaPrivacy();
   TOKEN = (await chrome.storage.local.get("vm_token")).vm_token || null;
   $("#stato").textContent = "";
   if (!TOKEN) { show("viewPair"); return; }
@@ -192,6 +237,7 @@ const OTP = /otp|2fa|totp|autenticat/i;
 function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, m => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[m])); }
 
 function render(list, box, titolo) {
+  box._ultimo = { list, titolo };   // per ridisegnare al cambio di privacy
   box.innerHTML = "";
   if (!list.length) return;
   const h = document.createElement("div");
@@ -200,33 +246,88 @@ function render(list, box, titolo) {
   list.slice(0, 60).forEach(e => box.appendChild(cardVoce(e)));
 }
 
+/* Lunghezza vera fino a 14 pallini, come nell'app: una fila sempre uguale
+ * farebbe sembrare identiche due password diverse. */
+const pallini = (v) => "•".repeat(Math.min(v.length, 14));
+
+/* L'occhio si richiude da solo dopo 15 secondi, come nell'app. Un valore
+ * lasciato scoperto in un popup che resta aperto e' esattamente la cosa che
+ * la Privacy doveva evitare. */
+function bottoneOcchio(vEl, valore) {
+  const b = document.createElement("button");
+  b.className = "ico";
+  b.textContent = "👁";
+  b.title = "Mostra";
+  let visibile = false, timer = null;
+  b.addEventListener("click", () => {
+    visibile = !visibile;
+    vEl.textContent = visibile ? valore : pallini(valore);
+    vEl.classList.toggle("visibile", visibile);
+    clearTimeout(timer);
+    if (visibile) timer = setTimeout(() => {
+      visibile = false;
+      vEl.textContent = pallini(valore);
+      vEl.classList.remove("visibile");
+    }, 15000);
+  });
+  return b;
+}
+
+function bottoneCopia(valore, etichetta) {
+  const b = document.createElement("button");
+  b.className = "ico";
+  b.textContent = "⧉";
+  b.title = "Copia";
+  b.addEventListener("click", async () => {
+    await copia(valore, etichetta);
+    b.textContent = "✓";
+    b.style.color = "var(--ok)";
+    setTimeout(() => { b.textContent = "⧉"; b.style.color = ""; }, 4000);
+  });
+  return b;
+}
+
+function bottoneOtp(voce) {
+  const b = document.createElement("button");
+  b.className = "cp";
+  b.textContent = "Codice 2FA";
+  b.addEventListener("click", async () => {
+    const r = await apiFetch("/api/totp", { cred_id: voce.id });
+    const primo = ((r.j || {}).otp || []).find(o => o.code);
+    if (primo) await copia(primo.code, "Codice 2FA (" + primo.remaining + "s)");
+    else toast("Secret 2FA non valido");
+  });
+  return b;
+}
+
 function cardVoce(e) {
   const c = document.createElement("div");
   c.className = "card";
   c.innerHTML = `<div class="tit">${e.critical ? '<span class="star">★</span>' : ""}${esc(e.title)}</div>`;
   (e.fields || []).forEach(f => {
-    if (!(f.value || "").trim()) return;
+    const valore = (f.value || "").trim();
+    if (!valore) return;
     const otp = OTP.test(f.label || "");
-    const segreto = !otp && SEGRETO.test(f.label || "");
+    // Con la Privacy accesa si copre TUTTO, non solo le password: il popup si
+    // apre sopra una pagina qualsiasi, e capita di averlo aperto mentre si
+    // condivide lo schermo o con qualcuno alle spalle.
+    const coperto = otp || PRIVACY || SEGRETO.test(f.label || "");
+
     const row = document.createElement("div");
     row.className = "frow";
-    row.innerHTML = `<span class="lab" title="${esc(f.label)}">${esc(f.label)}</span>
-                     <span class="val">${segreto || otp ? "••••••••" : esc(f.value)}</span>`;
-    const b = document.createElement("button");
-    b.className = "cp";
-    if (otp) {
-      b.textContent = "Codice 2FA";
-      b.onclick = async () => {
-        const r = await apiFetch("/api/totp", { cred_id: e.id });
-        const primo = ((r.j || {}).otp || []).find(o => o.code);
-        if (primo) { await copia(primo.code, "Codice 2FA (" + primo.remaining + "s)"); }
-        else toast("Secret 2FA non valido");
-      };
-    } else {
-      b.textContent = "Copia";
-      b.onclick = () => copia(f.value, f.label);
-    }
-    row.appendChild(b);
+    const lab = document.createElement("span");
+    lab.className = "lab";
+    lab.title = f.label || "";
+    lab.textContent = f.label || "";
+    const v = document.createElement("span");
+    v.className = "val";
+    v.textContent = coperto ? pallini(valore) : valore;
+    row.append(lab, v);
+
+    // Niente occhio sull'OTP: li' il valore coperto e' il SEGRETO, e vederlo
+    // non serve a nessuno — il codice si prende col pulsante accanto.
+    if (coperto && !otp) row.appendChild(bottoneOcchio(v, valore));
+    row.appendChild(otp ? bottoneOtp(e) : bottoneCopia(valore, f.label));
     c.appendChild(row);
   });
   return c;
