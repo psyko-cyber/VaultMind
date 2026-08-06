@@ -478,13 +478,12 @@
       ]
     },
     "impronta": {
-      "_nota": "Quattro creste concentriche aperte in basso, ognuna con la coda che scende. Prima erano archi senza coda e a 20 px sembravano mezza impronta: e' quello che si e' visto sul telefono.",
+      "_nota": "TRE creste con code di lunghezza diversa sui due lati. Due lezioni pagate: (1) le icone si giudicano ALLA MISURA IN CUI SI USANO — a 22 px il tratto vale 1,4 px, e quattro anelli distanti 2 unita' di griglia lasciavano 0,5 px di vuoto, cioe' sullo schermo una macchia piena; (2) archi simmetrici che finiscono alla stessa altezza leggono come un arcobaleno, non come un polpastrello. Si controlla col banco «Alle misure vere» in anteprima.html.",
       "titolo": "Impronta digitale",
       "forme": [
-        {"d": "M4.0 16.4A8.8 9.0 0 1 1 20.0 16.4v1.6"},
-        {"d": "M6.0 14.9A6.4 6.8 0 1 1 18.0 14.9v2.2"},
-        {"d": "M8.1 13.8A4.0 4.6 0 1 1 15.9 13.8v2.4"},
-        {"d": "M10.2 13.0A1.8 2.4 0 1 1 13.8 13.0v1.8"}
+        {"d": "M4.7 19.6L4.7 18.2A8.6 9.4 0 1 1 19.6 17.6v2.4"},
+        {"d": "M7.3 18.0L7.3 15.8A5.2 5.9 0 1 1 16.9 15.2v3.0"},
+        {"d": "M10.2 16.7L10.2 13.9A1.9 2.4 0 1 1 13.9 13.7v3.4"}
       ]
     },
     "fissa": {

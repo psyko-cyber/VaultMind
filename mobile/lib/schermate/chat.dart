@@ -159,20 +159,26 @@ class _SezioneChatState extends State<SezioneChat> {
                   controller: _domanda,
                   textInputAction: TextInputAction.send,
                   onSubmitted: (_) => _chiedi(),
-                  decoration: InputDecoration(
+                  // Niente icona dentro il campo: la scheda «Chat» sta due
+                  // centimetri piu' sotto con la stessa identica bolla, e due
+                  // volte lo stesso simbolo nella stessa schermata non
+                  // aggiunge niente -- toglie soltanto spazio alla frase.
+                  decoration: const InputDecoration(
                     hintText: 'Cosa ti serve?',
-                    prefixIcon: IconaVM(Icone.chat, color: context.cTenue),
                   ),
                 ),
               ),
               const SizedBox(width: 8),
               IconButton.filled(
                 onPressed: _chiedi,
+                tooltip: 'Invia',
                 style: IconButton.styleFrom(
                   backgroundColor: context.cAccento,
                   foregroundColor: context.cSuAccento,
                 ),
-                icon: const IconaVM(Icone.su),
+                // L'aereo di carta, lo stesso del PC. Prima era una freccia in
+                // su, che sul telefono vuol dire «vai in cima», non «manda».
+                icon: IconaVM(Icone.invia, size: 20, color: context.cSuAccento),
               ),
             ],
           ),

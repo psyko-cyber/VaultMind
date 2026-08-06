@@ -888,18 +888,18 @@ Path _rete() {
 }
 Path _impronta() {
   final p = Path();
-  p.moveTo(4, 16.4);
-  p.arcToPoint(const Offset(20, 16.4), radius: const Radius.elliptical(8.8, 9), rotation: 0, largeArc: true, clockwise: true);
-  p.lineTo(20, 18);
-  p.moveTo(6, 14.9);
-  p.arcToPoint(const Offset(18, 14.9), radius: const Radius.elliptical(6.4, 6.8), rotation: 0, largeArc: true, clockwise: true);
-  p.lineTo(18, 17.1);
-  p.moveTo(8.1, 13.8);
-  p.arcToPoint(const Offset(15.9, 13.8), radius: const Radius.elliptical(4, 4.6), rotation: 0, largeArc: true, clockwise: true);
-  p.lineTo(15.9, 16.2);
-  p.moveTo(10.2, 13);
-  p.arcToPoint(const Offset(13.8, 13), radius: const Radius.elliptical(1.8, 2.4), rotation: 0, largeArc: true, clockwise: true);
-  p.lineTo(13.8, 14.8);
+  p.moveTo(4.7, 19.6);
+  p.lineTo(4.7, 18.2);
+  p.arcToPoint(const Offset(19.6, 17.6), radius: const Radius.elliptical(8.6, 9.4), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(19.6, 20);
+  p.moveTo(7.3, 18);
+  p.lineTo(7.3, 15.8);
+  p.arcToPoint(const Offset(16.9, 15.2), radius: const Radius.elliptical(5.2, 5.9), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(16.9, 18.2);
+  p.moveTo(10.2, 16.7);
+  p.lineTo(10.2, 13.9);
+  p.arcToPoint(const Offset(13.9, 13.7), radius: const Radius.elliptical(1.9, 2.4), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(13.9, 17.1);
   return p;
 }
 Path _fissa() {
