@@ -3,6 +3,10 @@
 /// I casi qui sotto vengono da uso reale: "Netflix 798" sul telefono non
 /// trovava niente perché il filtro cercava l'intera frase dentro un solo
 /// pezzo, e il titolo è "Netflix (798)" — con le parentesi in mezzo.
+// `flutter test` esegue i file in parallelo e Argon2 (time 3, 64 MB) non
+// lascia molta CPU agli altri: il limite di 30 secondi qui non c'entra niente
+// col codice in prova, scade e basta. Stessa difesa di vault_test.dart.
+@Timeout(Duration(minutes: 3))
 library;
 
 import 'dart:convert';

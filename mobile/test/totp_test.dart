@@ -3,6 +3,10 @@
 /// Un errore nel base32 o nell'impacchettare il contatore big-endian produce
 /// codici plausibili e sempre sbagliati: non si nota finché qualcuno non
 /// prova ad accedere a un servizio vero e non entra.
+// `flutter test` esegue i file in parallelo e Argon2 (time 3, 64 MB) non
+// lascia molta CPU agli altri: il limite di 30 secondi qui non c'entra niente
+// col codice in prova, scade e basta. Stessa difesa di vault_test.dart.
+@Timeout(Duration(minutes: 3))
 library;
 
 import 'dart:convert';
