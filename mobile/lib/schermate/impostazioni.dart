@@ -172,7 +172,10 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             onTap: _backup,
           ),
           ListTile(
-            leading: IconaVM(Icone.backup, color: context.cTenue),
+            // Non 'backup': quella e' l'icona del salvataggio, e le due righe
+            // stanno una sotto l'altra. Con la stessa icona si legge il titolo
+            // per capire quale delle due e' — cioe' l'icona non serve a niente.
+            leading: IconaVM(Icone.documentoSu, color: context.cTenue),
             title: const Text('Importa un altro backup'),
             subtitle: Text('Sostituisce il vault attuale, conservandone una copia.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),

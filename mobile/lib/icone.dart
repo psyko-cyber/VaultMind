@@ -33,6 +33,7 @@ class Icone {
   static const String luna = 'luna';
   static const String notte = 'notte';
   static const String backup = 'backup';
+  static const String documentoSu = 'documento-su';
   static const String importa = 'importa';
   static const String sync = 'sync';
   static const String aggiorna = 'aggiorna';
@@ -153,6 +154,7 @@ const Map<String, Path Function()> _tracciati = {
   'luna': _luna,
   'notte': _notte,
   'backup': _backup,
+  'documento-su': _documentoSu,
   'importa': _importa,
   'sync': _sync,
   'aggiorna': _aggiorna,
@@ -426,6 +428,27 @@ Path _backup() {
   p.lineTo(17.5, 20.5);
   p.arcToPoint(const Offset(19.5, 18.5), radius: const Radius.elliptical(2, 2), rotation: 0, largeArc: false, clockwise: false);
   p.lineTo(19.5, 15.6);
+  return p;
+}
+Path _documentoSu() {
+  final p = Path();
+  p.moveTo(13.4, 3.6);
+  p.lineTo(7.2, 3.6);
+  p.arcToPoint(const Offset(5.2, 5.6), radius: const Radius.elliptical(2, 2), rotation: 0, largeArc: false, clockwise: false);
+  p.lineTo(5.2, 18.4);
+  p.arcToPoint(const Offset(7.2, 20.4), radius: const Radius.elliptical(2, 2), rotation: 0, largeArc: false, clockwise: false);
+  p.lineTo(16.8, 20.4);
+  p.arcToPoint(const Offset(18.8, 18.4), radius: const Radius.elliptical(2, 2), rotation: 0, largeArc: false, clockwise: false);
+  p.lineTo(18.8, 8.8);
+  p.close();
+  p.moveTo(13.4, 3.6);
+  p.lineTo(13.4, 8.8);
+  p.lineTo(18.6, 8.8);
+  p.moveTo(12, 17.2);
+  p.lineTo(12, 10.8);
+  p.moveTo(9.6, 13.2);
+  p.lineTo(12, 10.8);
+  p.lineTo(14.4, 13.2);
   return p;
 }
 Path _importa() {
@@ -865,20 +888,18 @@ Path _rete() {
 }
 Path _impronta() {
   final p = Path();
-  p.moveTo(3.2, 8.7);
-  p.arcToPoint(const Offset(12, 3.6), radius: const Radius.elliptical(10.4, 10.4), rotation: 0, largeArc: false, clockwise: true);
-  p.arcToPoint(const Offset(20.8, 8.7), radius: const Radius.elliptical(10.4, 10.4), rotation: 0, largeArc: false, clockwise: true);
-  p.moveTo(5.8, 11.2);
-  p.arcToPoint(const Offset(18.2, 11.2), radius: const Radius.elliptical(6.4, 6.4), rotation: 0, largeArc: false, clockwise: true);
-  p.lineTo(18.2, 13.6);
-  p.arcToPoint(const Offset(17.3, 18.3), radius: const Radius.elliptical(13, 13), rotation: 0, largeArc: false, clockwise: true);
-  p.moveTo(9.2, 11.2);
-  p.arcToPoint(const Offset(15, 11.2), radius: const Radius.elliptical(2.9, 2.9), rotation: 0, largeArc: false, clockwise: true);
-  p.lineTo(15, 14.4);
-  p.arcToPoint(const Offset(13.9, 18.8), radius: const Radius.elliptical(9.6, 9.6), rotation: 0, largeArc: false, clockwise: true);
-  p.moveTo(12, 11.6);
-  p.lineTo(12, 15);
-  p.arcToPoint(const Offset(11.1, 18.2), radius: const Radius.elliptical(6, 6), rotation: 0, largeArc: false, clockwise: true);
+  p.moveTo(4, 16.4);
+  p.arcToPoint(const Offset(20, 16.4), radius: const Radius.elliptical(8.8, 9), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(20, 18);
+  p.moveTo(6, 14.9);
+  p.arcToPoint(const Offset(18, 14.9), radius: const Radius.elliptical(6.4, 6.8), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(18, 17.1);
+  p.moveTo(8.1, 13.8);
+  p.arcToPoint(const Offset(15.9, 13.8), radius: const Radius.elliptical(4, 4.6), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(15.9, 16.2);
+  p.moveTo(10.2, 13);
+  p.arcToPoint(const Offset(13.8, 13), radius: const Radius.elliptical(1.8, 2.4), rotation: 0, largeArc: true, clockwise: true);
+  p.lineTo(13.8, 14.8);
   return p;
 }
 Path _fissa() {

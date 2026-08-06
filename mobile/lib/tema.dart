@@ -27,11 +27,14 @@ const nomiTema = {
 /// tema scuro aveva un accento blu che sul PC non esiste — lì è ciano — e le
 /// due app sembravano due prodotti diversi.
 ///
-/// I `tenue` sono cambiati il 06/08/2026: valevano `#8FA0C0` e `#5B6B8A`, che
-/// sul rispettivo pannello davano 3,1–4,2 contro il 4,5:1 minimo di WCAG AA.
-/// È il colore di ogni etichetta e di ogni spiegazione dell'app, cioè di
-/// quasi tutto il testo che non sia un titolo. Il rapporto lo si legge
-/// calcolato a schermo in `design/anteprima.html`.
+/// I `tenue` sono il colore di ogni etichetta e di ogni spiegazione, cioè di
+/// quasi tutto il testo che non sia un titolo. Il chiaro è passato da
+/// `#5B6B8A` a `#4F5D75` (da 4,81 a 5,97:1). I due scuri **erano già a
+/// posto**: valevano `#8FA0C0`, cioè 7,45:1. Per qualche ora hanno avuto il
+/// valore calcolato per il web, che li portava a 5,67 — ancora sopra la
+/// soglia AA ma visibilmente più spento, e sul telefono si è visto subito.
+/// La lezione sta nel numero: 4,5 è un pavimento, non un obiettivo.
+/// I rapporti si leggono calcolati a schermo in `design/anteprima.html`.
 ThemeData temaDati(TemaId id) {
   switch (id) {
     case TemaId.chiaro:
@@ -43,7 +46,7 @@ ThemeData temaDati(TemaId id) {
         accento: const Color(0xFF0369A1),
         verde: const Color(0xFF047857),
         testo: const Color(0xFF0F1729),
-        tenue: const Color(0xFF5C6C87),
+        tenue: const Color(0xFF4F5D75),
         suAccento: Colors.white,
       );
     case TemaId.scuro:
@@ -55,7 +58,7 @@ ThemeData temaDati(TemaId id) {
         accento: const Color(0xFF38BDF8),
         verde: const Color(0xFF34D399),
         testo: const Color(0xFFE8ECF6),
-        tenue: const Color(0xFF7C8AA8),
+        tenue: const Color(0xFF8FA0C0),
         suAccento: const Color(0xFF04121C),
       );
     case TemaId.notteOro:
@@ -67,7 +70,7 @@ ThemeData temaDati(TemaId id) {
         accento: const Color(0xFFE3B341),
         verde: const Color(0xFF4ADE80),
         testo: const Color(0xFFE8ECF6),
-        tenue: const Color(0xFF7E8CAC),
+        tenue: const Color(0xFF8FA0C0),
         suAccento: const Color(0xFF1A1206),
       );
   }

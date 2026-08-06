@@ -162,6 +162,16 @@
         {"d": "M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"}
       ]
     },
+    "documento-su": {
+      "_nota": "«Importa un backup»: un documento che entra nell'app. Distinto da 'backup' (vassoio + freccia giu') per SAGOMA, non solo per il verso della freccia — due frecce specchiate si confondono.",
+      "titolo": "Importa da un file",
+      "forme": [
+        {"d": "M13.4 3.6H7.2a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h9.6a2 2 0 0 0 2-2V8.8z"},
+        {"d": "M13.4 3.6v5.2h5.2"},
+        {"d": "M12 17.2v-6.4"},
+        {"d": "M9.6 13.2 12 10.8l2.4 2.4"}
+      ]
+    },
     "importa": {
       "titolo": "Importa credenziali",
       "forme": [
@@ -468,12 +478,13 @@
       ]
     },
     "impronta": {
+      "_nota": "Quattro creste concentriche aperte in basso, ognuna con la coda che scende. Prima erano archi senza coda e a 20 px sembravano mezza impronta: e' quello che si e' visto sul telefono.",
       "titolo": "Impronta digitale",
       "forme": [
-        {"d": "M3.2 8.7A10.4 10.4 0 0 1 12 3.6a10.4 10.4 0 0 1 8.8 5.1"},
-        {"d": "M5.8 11.2a6.4 6.4 0 0 1 12.4 0v2.4a13 13 0 0 1-.9 4.7"},
-        {"d": "M9.2 11.2a2.9 2.9 0 0 1 5.8 0v3.2a9.6 9.6 0 0 1-1.1 4.4"},
-        {"d": "M12 11.6v3.4a6 6 0 0 1-.9 3.2"}
+        {"d": "M4.0 16.4A8.8 9.0 0 1 1 20.0 16.4v1.6"},
+        {"d": "M6.0 14.9A6.4 6.8 0 1 1 18.0 14.9v2.2"},
+        {"d": "M8.1 13.8A4.0 4.6 0 1 1 15.9 13.8v2.4"},
+        {"d": "M10.2 13.0A1.8 2.4 0 1 1 13.8 13.0v1.8"}
       ]
     },
     "fissa": {

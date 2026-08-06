@@ -216,9 +216,12 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset('assets/logo.png', width: 96, height: 96,
-                    errorBuilder: (_, _, _) =>
-                        IconaVM(Icone.scudo, size: 88, color: context.cAccento)),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(24),
+                  child: Image.asset('assets/logo.png', width: 96, height: 96,
+                      errorBuilder: (_, _, _) =>
+                          IconaVM(Icone.scudo, size: 88, color: context.cAccento)),
+                ),
                 const SizedBox(height: 18),
                 const Text('VAULTMIND',
                     style: TextStyle(
@@ -304,10 +307,16 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.5),
         ),
         const SizedBox(height: 18),
-        TextButton(
+        OutlinedButton.icon(
           onPressed: _occupato ? null : _importa,
-          child: Text('Importa un altro backup',
-              style: TextStyle(color: context.cTenue, fontSize: 12.5)),
+          icon: IconaVM(Icone.documentoSu, size: 18, color: context.cTenue),
+          label: Text('Importa un altro backup',
+              style: TextStyle(color: context.cTenue, fontSize: 13)),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: context.cBordo),
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            minimumSize: const Size.fromHeight(0),
+          ),
         ),
       ];
 
@@ -348,7 +357,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _importa,
-          icon: IconaVM(Icone.documento, color: context.cAccento),
+          icon: IconaVM(Icone.documentoSu, color: context.cAccento),
           label: Text('Ho un file di backup',
               style: TextStyle(color: context.cAccento)),
           style: OutlinedButton.styleFrom(

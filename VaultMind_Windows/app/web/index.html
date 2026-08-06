@@ -61,13 +61,17 @@
     --s0:#080B14; --s1:#0E1524; --s2:#121A2B; --s3:#18223A;
     --brd:#1F2A40; --brd-forte:#2C3A56;
 
-    /* Testo in tre livelli. --t3 valeva #5A6884: 3,1:1 sul pannello, sotto
-       il minimo AA di 4,5 -- ed e' il colore di TUTTE le spiegazioni, i
-       contatori e i suggerimenti dell'app. --t1 esiste per non riscrivere
-       `#fff`, che nel tema chiaro andava corretto elemento per elemento con
-       una lista di selettori a cui bisognava ricordarsi di aggiungere ogni
-       cosa nuova. */
-    --t1:#FFFFFF; --t2:#AEB9CF; --t3:#7C8AA8;
+    /* Testo secondario. Ha una storia: sul web valeva #5A6884 (3,51:1, sotto
+       il minimo AA di 4,5) e la prima correzione scelse il valore MINIMO che
+       superasse la soglia. Poi lo stesso valore e' finito su Android, dove
+       `tenue` era gia' #8FA0C0 a 7,45:1 — cioe' la correzione del PC ha
+       peggiorato il telefono, e sul telefono si e' visto: il pulsante
+       «Importa un altro backup» sembrava spento. 4,5 e' un pavimento, non un
+       obiettivo. */
+    /* --t1 esiste per non riscrivere `#fff`, che nel tema chiaro andava
+       corretto elemento per elemento con una lista di selettori a cui
+       bisognava ricordarsi di aggiungere ogni cosa nuova. */
+    --t1:#FFFFFF; --t2:#AEB9CF; --t3:#8FA0C0;
 
     --acc:#38BDF8; --acc-su:#04121C; --acc-velo:rgba(56,189,248,.12);
     --vio:#7B7DF3; --vio-pieno:#4F46E5;
@@ -103,10 +107,10 @@
     --ease:cubic-bezier(.2,.7,.3,1);
     --molla:cubic-bezier(.34,1.56,.64,1);
 
-    /* Font di sistema. Prima arrivavano da fonts.googleapis.com: in un
-       gestore di password che si vanta di essere offline, ogni avvio diceva
-       a Google che l'app era aperta -- e senza rete la tipografia spariva
-       comunque, perche' il ripiego era il font di sistema. */
+    /* I font stanno in app/web/fonts/ (vedi il blocco @font-face piu' sopra).
+       Dopo ognuno resta la catena di ripiego di sistema: se un giorno un file
+       sparisse, l'app resterebbe leggibile invece di cadere sul serif del
+       browser. */
     --disp:'Space Grotesk','Segoe UI Variable Display','Segoe UI',sans-serif;
     --body:'Inter','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
     --mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;
@@ -176,6 +180,10 @@
     box-shadow:var(--el2)}
   .lockbox{width:min(92vw,400px);padding:32px}
   .badge-row{display:flex;justify-content:center;margin-bottom:14px}
+  /* Il logo e' un PNG con un fondo quadrato suo, piu' chiaro di quello
+     dell'app: senza smussatura si vede il quadrato e l'angolo sembra
+     tagliato. Agli angoli c'e' solo fondo, il disegno non ci arriva. */
+  .logo{border-radius:24%;display:block}
   .icon-chip{padding:12px;border-radius:var(--r-lg);background:var(--acc-velo);border:1px solid var(--gl-acc-brd);display:inline-flex}
   .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:var(--t1);text-align:center;font-size:28px}
   .sub{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--t3);text-align:center;margin-top:6px;text-transform:uppercase}
@@ -374,7 +382,7 @@
   body[data-theme="light"]{
     --s0:#F4F7FC; --s1:#EEF3FA; --s2:#FFFFFF; --s3:#F8FBFF;
     --brd:#D9E2F0; --brd-forte:#C2D0E4;
-    --t1:#0F1729; --t2:#2F3D57; --t3:#5C6C87;
+    --t1:#0F1729; --t2:#2F3D57; --t3:#4F5D75;
     --acc:#0369A1; --acc-su:#FFFFFF; --acc-velo:rgba(3,105,161,.09);
     --vio:#4F46E5; --vio-pieno:#4338CA;
     --ok:#047857; --ok-velo:rgba(4,120,87,.09);
@@ -394,7 +402,7 @@
   body[data-theme="night"]{
     --s0:#050912; --s1:#0B1226; --s2:#0E1730; --s3:#152043;
     --brd:#1E2C4C; --brd-forte:#2B3C63;
-    --t1:#FFFFFF; --t2:#B9C4DB; --t3:#7E8CAC;
+    --t1:#FFFFFF; --t2:#B9C4DB; --t3:#8FA0C0;
     --acc:#E3B341; --acc-su:#1A1206; --acc-velo:rgba(227,179,65,.12);
     --vio:#D8A544; --vio-pieno:#1E3A8A;
     --ok:#4ADE80; --ok-velo:rgba(74,222,128,.10);
@@ -529,6 +537,7 @@
 <symbol id="i-luna" viewBox="0 0 24 24"><path d="M20.2 14.6A8.7 8.7 0 0 1 9.4 3.8a8.7 8.7 0 1 0 10.8 10.8z"/></symbol>
 <symbol id="i-notte" viewBox="0 0 24 24"><path d="M20.4 15.3A8.4 8.4 0 0 1 10.1 5a8.4 8.4 0 1 0 10.3 10.3z"/><path d="M16.6 3.2l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></symbol>
 <symbol id="i-backup" viewBox="0 0 24 24"><path d="M12 3.2v10.3"/><path d="M8.2 9.7 12 13.5 15.8 9.7"/><path d="M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/></symbol>
+<symbol id="i-documento-su" viewBox="0 0 24 24"><path d="M13.4 3.6H7.2a2 2 0 0 0-2 2v12.8a2 2 0 0 0 2 2h9.6a2 2 0 0 0 2-2V8.8z"/><path d="M13.4 3.6v5.2h5.2"/><path d="M12 17.2v-6.4"/><path d="M9.6 13.2 12 10.8l2.4 2.4"/></symbol>
 <symbol id="i-importa" viewBox="0 0 24 24"><path d="M12 13.5V3.2"/><path d="M8.2 7 12 3.2 15.8 7"/><path d="M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/></symbol>
 <symbol id="i-sync" viewBox="0 0 24 24"><path d="M20.4 12.6a8.5 8.5 0 0 1-14.3 5.7"/><path d="M3.6 11.4a8.5 8.5 0 0 1 14.3-5.7"/><path d="M17.4 2.6v3.3h-3.3"/><path d="M6.6 21.4v-3.3h3.3"/></symbol>
 <symbol id="i-aggiorna" viewBox="0 0 24 24"><path d="M20.3 9.6A8.6 8.6 0 1 0 20.5 14"/><path d="M20.6 3.9v5.7h-5.7"/></symbol>
@@ -568,7 +577,7 @@
 <symbol id="i-dispositivo" viewBox="0 0 24 24"><rect x="7" y="2.6" width="10" height="18.8" rx="2.5"/><path d="M10.6 5.6h2.8"/><path d="M12 18.2h.01"/></symbol>
 <symbol id="i-dispositivi" viewBox="0 0 24 24"><rect x="2.6" y="5" width="12.4" height="9.4" rx="2"/><path d="M6 18h5.6"/><path d="M8.8 14.4V18"/><rect x="16.6" y="9.6" width="4.8" height="10.4" rx="1.6"/></symbol>
 <symbol id="i-rete" viewBox="0 0 24 24"><path d="M4.6 8.6a10.5 10.5 0 0 1 14.8 0"/><path d="M7.6 11.9a6.2 6.2 0 0 1 8.8 0"/><path d="M10.4 15.2a2.3 2.3 0 0 1 3.2 0"/><path d="M12 18.6h.01"/></symbol>
-<symbol id="i-impronta" viewBox="0 0 24 24"><path d="M3.2 8.7A10.4 10.4 0 0 1 12 3.6a10.4 10.4 0 0 1 8.8 5.1"/><path d="M5.8 11.2a6.4 6.4 0 0 1 12.4 0v2.4a13 13 0 0 1-.9 4.7"/><path d="M9.2 11.2a2.9 2.9 0 0 1 5.8 0v3.2a9.6 9.6 0 0 1-1.1 4.4"/><path d="M12 11.6v3.4a6 6 0 0 1-.9 3.2"/></symbol>
+<symbol id="i-impronta" viewBox="0 0 24 24"><path d="M4.0 16.4A8.8 9.0 0 1 1 20.0 16.4v1.6"/><path d="M6.0 14.9A6.4 6.8 0 1 1 18.0 14.9v2.2"/><path d="M8.1 13.8A4.0 4.6 0 1 1 15.9 13.8v2.4"/><path d="M10.2 13.0A1.8 2.4 0 1 1 13.8 13.0v1.8"/></symbol>
 <symbol id="i-fissa" viewBox="0 0 24 24"><path d="M14.8 3.4 20.6 9.2l-3.1 3.1-.9 5.5-8.4-8.4 5.5-.9z"/><path d="M8.2 15.8 3.4 20.6"/></symbol>
 <symbol id="i-stella" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.7l6-.9z"/></symbol>
 <symbol id="i-utente" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.9"/><path d="M4.6 20.4a7.6 7.6 0 0 1 14.8 0"/></symbol>
@@ -579,7 +588,7 @@
 <!-- LOCK -->
 <div id="lock">
   <div class="card lockbox rise">
-    <div class="badge-row"><img src="/static/logo.png" alt="" style="width:64px;height:64px"></div>
+    <div class="badge-row"><img class="logo" src="/static/logo.png" alt="" width="64" height="64"></div>
     <div class="brand">VAULTMIND</div>
     <div class="sub">LOCALE · OFFLINE · AES-256</div>
     <div id="firstRunNote" class="firstrun hidden">
@@ -605,7 +614,7 @@
   <header>
     <div style="display:flex;align-items:center;gap:10px">
       <button class="iconbtn" id="menuBtn" title="Menu" aria-label="Menu"><svg class="ic ic-20" aria-hidden="true"><use href="#i-menu"/></svg></button>
-      <div class="hbrand" style="display:flex;align-items:center;gap:8px"><img src="/static/logo.png" alt="" style="width:22px;height:22px">VaultMind</div>
+      <div class="hbrand" style="display:flex;align-items:center;gap:8px"><img class="logo" src="/static/logo.png" alt="" width="22" height="22">VaultMind</div>
     </div>
     <div class="pills">
       <span class="pill db" id="pillDb"><svg class="ic ic-14" aria-hidden="true"><use href="#i-database"/></svg> 0 voci</span>
