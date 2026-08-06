@@ -24,6 +24,15 @@ Consegnabili/*.apk
 # Installer compilato (installer/build-installer.ps1): rigenerabile, ~100 MB
 installer/Output/
 
+# Firma dell'APK: la password del keystore e il keystore stesso.
+# Perderli significa non poter piu' aggiornare l'app di NESSUNO, quindi vanno
+# custoditi fuori da qui (il keystore sta in C:\Android\, la password nel
+# vault). Committarli significherebbe regalare a chi ha accesso al repo la
+# possibilita' di firmare finti aggiornamenti di VaultMind.
+mobile/android/key.properties
+*.jks
+*.keystore
+
 # Sistema
 .DS_Store
 Thumbs.db

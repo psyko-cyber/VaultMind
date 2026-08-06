@@ -1,0 +1,19 @@
+# Modello per key.properties, che NON sta in git perche' contiene la password.
+#
+# Come si usa: copia questo file come `key.properties` (stessa cartella),
+# metti la password vera al posto dei segnaposto, e non toccare altro.
+#
+# Il keystore lo si e' creato una volta sola con:
+#   keytool -genkeypair -v -keystore C:\Android\vaultmind-release.jks \
+#           -keyalg RSA -keysize 4096 -validity 10000 -alias vaultmind
+#
+# ATTENZIONE, e non e' una formula: il file .jks e questa password non hanno
+# recupero. Perderli vuol dire non poter piu' aggiornare l'app di nessuno -
+# nemmeno la propria - perche' Android rifiuta un aggiornamento firmato con un
+# timbro diverso. Vanno custoditi come la master password, e infatti la
+# password sta nel vault.
+
+storePassword=METTI-QUI-LA-PASSWORD-DEL-KEYSTORE
+keyPassword=METTI-QUI-LA-STESSA-PASSWORD
+keyAlias=vaultmind
+storeFile=C:/Android/vaultmind-release.jks
