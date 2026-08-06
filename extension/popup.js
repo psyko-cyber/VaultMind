@@ -16,6 +16,13 @@ let ENTRIES = [];      // solo in RAM del popup
 
 const $ = (s) => document.querySelector(s);
 
+/* Un'icona come stringa. I nomi sono quelli di design/icone.json; lo sprite
+ * che li definisce sta in popup.html e lo scrive il generatore. La CSP di
+ * MV3 vieta gli script in linea ma non tocca l'SVG. */
+function ico(nome, cls) {
+  return `<svg class="ic${cls ? " " + cls : ""}" aria-hidden="true"><use href="#i-${nome}"/></svg>`;
+}
+
 /* ---------- API ---------- */
 async function apiFetch(path, body) {
   const opts = { headers: { "X-VaultMind-Token": TOKEN || "" } };
@@ -127,7 +134,7 @@ function renderTemi() {
     if (t.id === attivo) {
       const s = document.createElement("span");
       s.className = "segno";
-      s.textContent = "✓";
+      s.innerHTML = ico("spunta");
       b.appendChild(s);
     }
     b.addEventListener("click", () => scegliTema(t.id));
@@ -256,7 +263,8 @@ const pallini = (v) => "•".repeat(Math.min(v.length, 14));
 function bottoneOcchio(vEl, valore) {
   const b = document.createElement("button");
   b.className = "ico";
-  b.textContent = "👁";
+  b.setAttribute("aria-label", "Mostra o nascondi");
+  b.innerHTML = ico("occhio");
   b.title = "Mostra";
   let visibile = false, timer = null;
   b.addEventListener("click", () => {
@@ -276,13 +284,14 @@ function bottoneOcchio(vEl, valore) {
 function bottoneCopia(valore, etichetta) {
   const b = document.createElement("button");
   b.className = "ico";
-  b.textContent = "⧉";
+  b.setAttribute("aria-label", "Copia");
+  b.innerHTML = ico("copia");
   b.title = "Copia";
   b.addEventListener("click", async () => {
     await copia(valore, etichetta);
-    b.textContent = "✓";
+    b.innerHTML = ico("spunta");
     b.style.color = "var(--ok)";
-    setTimeout(() => { b.textContent = "⧉"; b.style.color = ""; }, 4000);
+    setTimeout(() => { b.innerHTML = ico("copia"); b.style.color = ""; }, 4000);
   });
   return b;
 }
@@ -303,7 +312,7 @@ function bottoneOtp(voce) {
 function cardVoce(e) {
   const c = document.createElement("div");
   c.className = "card";
-  c.innerHTML = `<div class="tit">${e.critical ? '<span class="star">★</span>' : ""}${esc(e.title)}</div>`;
+  c.innerHTML = `<div class="tit">${e.critical ? '<span class="star" title="Voce critica">'+ico("scudo-ok")+"</span>" : ""}${esc(e.title)}</div>`;
   (e.fields || []).forEach(f => {
     const valore = (f.value || "").trim();
     if (!valore) return;

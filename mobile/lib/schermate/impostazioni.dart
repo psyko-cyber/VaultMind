@@ -14,6 +14,8 @@ import '../sync_gestore.dart';
 import '../tema.dart';
 import 'dialoghi.dart';
 import 'sincronizza.dart';
+import '../icone.dart';
+import '../interruttore.dart';
 
 class SchermataImpostazioni extends StatefulWidget {
   final Sessione sessione;
@@ -80,7 +82,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
 
           _Sezione('Sicurezza'),
           ListTile(
-            leading: Icon(Icons.lock_clock, color: context.cTenue),
+            leading: IconaVM(Icone.orologio, color: context.cTenue),
             title: const Text('Blocca dopo inattività'),
             subtitle: Text(
               imp.autoBlocco == 0
@@ -103,17 +105,13 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             ),
           ),
           if (_improntaDisponibile)
-            SwitchListTile(
-              value: _improntaAttiva,
-              activeThumbColor: context.cAccento,
-              secondary: Icon(Icons.fingerprint, color: context.cTenue),
-              title: const Text('Sblocco con impronta'),
-              subtitle: Text(
-                _improntaAttiva
-                    ? 'Attivo. La master password non è salvata: è la chiave del vault a essere protetta dal telefono.'
-                    : 'Si attiva al prossimo sblocco con la master password.',
-                style: TextStyle(fontSize: 12, color: context.cTenue),
-              ),
+            RigaInterruttore(
+              acceso: _improntaAttiva,
+              icona: const IconaVM(Icone.impronta, size: 22),
+              titolo: 'Sblocco con impronta',
+              descrizione: _improntaAttiva
+                  ? 'Attivo. La master password non è salvata: è la chiave del vault a essere protetta dal telefono.'
+                  : 'Si attiva al prossimo sblocco con la master password.',
               // Si può solo spegnere da qui: per accenderlo serve la chiave,
               // che esiste solo nel momento in cui si sblocca con la password.
               onChanged: _improntaAttiva
@@ -129,7 +127,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
           // sincronizzare si fa spesso — e infatti il tasto in alto ora
           // sincronizza invece di aprire questa schermata.
           ListTile(
-            leading: Icon(Icons.devices_outlined, color: context.cTenue),
+            leading: IconaVM(Icone.dispositivi, color: context.cTenue),
             title: const Text('Sincronizza con altri dispositivi'),
             subtitle: Text(
                 widget.gestoreSync.fidati.isEmpty
@@ -146,7 +144,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
 
           _Sezione('Vault'),
           ListTile(
-            leading: Icon(Icons.info_outline, color: context.cTenue),
+            leading: IconaVM(Icone.info, color: context.cTenue),
             title: Text('${widget.quanteVoci} voci su questo telefono'),
             subtitle: Text(
                 'Una copia completa e cifrata, che funziona anche senza rete.',
@@ -154,7 +152,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
           ),
           if (imp.pinnate.isNotEmpty)
             ListTile(
-              leading: Icon(Icons.push_pin_outlined, color: context.cTenue),
+              leading: IconaVM(Icone.fissa, color: context.cTenue),
               title: Text('${imp.pinnate.length} voci fissate in cima'),
               subtitle: Text(
                   'Valgono solo su questo telefono: non stanno nel vault e non viaggiano col backup.',
@@ -166,7 +164,7 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
               ),
             ),
           ListTile(
-            leading: Icon(Icons.save_alt, color: context.cTenue),
+            leading: IconaVM(Icone.backup, color: context.cTenue),
             title: const Text('Salva un backup'),
             subtitle: Text(
                 'Il vault cifrato di questo telefono, da mandare dove vuoi: chi lo intercetta vede rumore.',
@@ -174,14 +172,14 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             onTap: _backup,
           ),
           ListTile(
-            leading: Icon(Icons.download_outlined, color: context.cTenue),
+            leading: IconaVM(Icone.backup, color: context.cTenue),
             title: const Text('Importa un altro backup'),
             subtitle: Text('Sostituisce il vault attuale, conservandone una copia.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
             onTap: _reimporta,
           ),
           ListTile(
-            leading: Icon(Icons.delete_outline, color: context.cErrore),
+            leading: IconaVM(Icone.cestino, color: context.cErrore),
             title: Text('Elimina il vault da questo telefono',
                 style: TextStyle(color: context.cErrore)),
             subtitle: Text('Sul PC resta tutto: qui c\'è solo una copia.',
@@ -289,10 +287,11 @@ class _Sezione extends StatelessWidget {
         child: Text(
           titolo.toUpperCase(),
           style: TextStyle(
+            fontFamily: 'Space Grotesk',
             fontSize: 11,
             letterSpacing: 1.4,
             fontWeight: FontWeight.w600,
-            color: context.cTenue,
+            color: context.cAccento,
           ),
         ),
       );

@@ -23,9 +23,15 @@ const nomiTema = {
 ///   verde    -> tertiary           (i codici 2FA)
 ///
 /// I valori sono **gli stessi delle variabili CSS del PC**, non colori
-/// somiglianti: `--bg`, `--panel`, `--border`, `--accent`, `--green` in
-/// `index.html`. Il tema scuro aveva un accento blu che sul PC non esiste — lì
-/// è ciano — e le due app sembravano due prodotti diversi.
+/// somiglianti: `--s0`, `--s2`, `--brd`, `--acc`, `--ok` in `index.html`. Il
+/// tema scuro aveva un accento blu che sul PC non esiste — lì è ciano — e le
+/// due app sembravano due prodotti diversi.
+///
+/// I `tenue` sono cambiati il 06/08/2026: valevano `#8FA0C0` e `#5B6B8A`, che
+/// sul rispettivo pannello davano 3,1–4,2 contro il 4,5:1 minimo di WCAG AA.
+/// È il colore di ogni etichetta e di ogni spiegazione dell'app, cioè di
+/// quasi tutto il testo che non sia un titolo. Il rapporto lo si legge
+/// calcolato a schermo in `design/anteprima.html`.
 ThemeData temaDati(TemaId id) {
   switch (id) {
     case TemaId.chiaro:
@@ -36,33 +42,33 @@ ThemeData temaDati(TemaId id) {
         bordo: const Color(0xFFD9E2F0),
         accento: const Color(0xFF0369A1),
         verde: const Color(0xFF047857),
-        testo: const Color(0xFF17203A),
-        tenue: const Color(0xFF5B6B8A),
+        testo: const Color(0xFF0F1729),
+        tenue: const Color(0xFF5C6C87),
         suAccento: Colors.white,
       );
     case TemaId.scuro:
       return _costruisci(
         brillantezza: Brightness.dark,
-        fondo: const Color(0xFF0A0E1A),
+        fondo: const Color(0xFF080B14),
         pannello: const Color(0xFF121A2B),
         bordo: const Color(0xFF1F2A40),
         accento: const Color(0xFF38BDF8),
         verde: const Color(0xFF34D399),
         testo: const Color(0xFFE8ECF6),
-        tenue: const Color(0xFF8FA0C0),
-        suAccento: const Color(0xFF06121C),
+        tenue: const Color(0xFF7C8AA8),
+        suAccento: const Color(0xFF04121C),
       );
     case TemaId.notteOro:
       return _costruisci(
         brillantezza: Brightness.dark,
-        fondo: const Color(0xFF070C1A),
+        fondo: const Color(0xFF050912),
         pannello: const Color(0xFF0E1730),
         bordo: const Color(0xFF1E2C4C),
         accento: const Color(0xFFE3B341),
         verde: const Color(0xFF4ADE80),
         testo: const Color(0xFFE8ECF6),
-        tenue: const Color(0xFF8FA0C0),
-        suAccento: const Color(0xFF141414),
+        tenue: const Color(0xFF7E8CAC),
+        suAccento: const Color(0xFF1A1206),
       );
   }
 }
@@ -104,6 +110,14 @@ ThemeData _costruisci({
     brightness: brillantezza,
     colorScheme: schema,
     scaffoldBackgroundColor: fondo,
+    // Inter, lo stesso file del PC e dell'estensione. Prima era il font di
+    // sistema, cioe' Roboto qui e Segoe di la': le due app si somigliavano
+    // nei colori e si tradivano nella forma delle lettere.
+    fontFamily: 'Inter',
+    // Le icone dell'app sono `IconaVM` e prendono il colore da qui: cosi'
+    // nessuna schermata deve passarlo a mano, come sul PC dove arriva da
+    // `currentColor`.
+    iconTheme: IconThemeData(color: tenue),
     appBarTheme: AppBarTheme(
       backgroundColor: pannello,
       foregroundColor: testo,

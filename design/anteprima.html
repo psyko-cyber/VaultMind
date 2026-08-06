@@ -1,0 +1,715 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VaultMind — sistema visivo</title>
+<!--
+  IL LABORATORIO. Si apre con doppio clic, non serve nessun server.
+
+  Perche' esiste: l'app PC e' 2500 righe di HTML monolitico, e provare un
+  colore o un raggio dentro quel file vuol dire ricostruire l'exe per
+  guardarlo. Qui i tre temi si cambiano con un clic e i componenti stanno
+  tutti nella stessa schermata, uno sotto l'altro, dove le incoerenze si
+  vedono da sole.
+
+  Non e' documentazione: e' il posto dove si DECIDE. I valori qui dentro sono
+  la sorgente di quelli in index.html, tema.dart e popup.html.
+
+  I contrasti non sono scritti a mano: li calcola il file stesso, leggendo le
+  variabili CSS applicate, con la formula WCAG. Un valore che peggiora si
+  colora di rosso da solo -- e' l'unico modo perche' resti vero fra sei mesi.
+
+  Le icone fra i marcatori le scrive `py -3 design/genera_icone.py`.
+-->
+<style>
+/* ==========================================================================
+   1. I TOKEN
+
+   ATTENZIONE: i tre blocchi qui sotto sono una COPIA di quelli in
+   `VaultMind_Windows/app/web/index.html`, che e' l'originale. Qui si prova un
+   valore nuovo; quando convince, si porta li' -- e si riporta indietro il
+   blocco intero, altrimenti questa pagina dice bugie sui contrasti, che e'
+   peggio che non averla.
+   ========================================================================== */
+:root, [data-tema="scuro"]{
+    /* Superfici, in ordine di vicinanza a chi guarda: s0 e' il fondo della
+       pagina, s3 e' cio' che sta piu' in alto. I nomi di prima (bg, panel,
+       panel2) non dicevano quale stesse sopra quale, e infatti `panel2` era
+       piu' scuro di `panel` ma si usava per gli incassi. */
+    --s0:#080B14; --s1:#0E1524; --s2:#121A2B; --s3:#18223A;
+    --brd:#1F2A40; --brd-forte:#2C3A56;
+
+    /* Testo in tre livelli. --t3 valeva #5A6884: 3,1:1 sul pannello, sotto
+       il minimo AA di 4,5 -- ed e' il colore di TUTTE le spiegazioni, i
+       contatori e i suggerimenti dell'app. --t1 esiste per non riscrivere
+       `#fff`, che nel tema chiaro andava corretto elemento per elemento con
+       una lista di selettori a cui bisognava ricordarsi di aggiungere ogni
+       cosa nuova. */
+    --t1:#FFFFFF; --t2:#AEB9CF; --t3:#7C8AA8;
+
+    --acc:#38BDF8; --acc-su:#04121C; --acc-velo:rgba(56,189,248,.12);
+    --vio:#7B7DF3; --vio-pieno:#4F46E5;
+    --ok:#34D399; --ok-velo:rgba(52,211,153,.10);
+    /* Rosso e giallo erano scritti a mano (#FCA5A5, #FBBF24) in venti punti e
+       nessuno dei due era corretto dal tema chiaro: finivano su bianco a
+       2:1, cioe' gli errori si leggevano solo sapendo gia' che c'erano. */
+    --err:#FCA5A5; --err-velo:rgba(252,165,165,.09);
+    --warn:#FBBF24; --warn-velo:rgba(251,191,36,.10);
+
+    /* Vetro. La cornice dell'app (intestazione, tab, barra di scrittura,
+       menu) e' una superficie sola: sfoca cio' che ci scorre sotto e si
+       tinge verso il fondo, invece di essere un colore opaco che nel tema
+       chiaro diventava una fascia grigia. */
+    --gl-bg:rgba(9,13,24,.66); --gl-bg-2:rgba(9,13,24,.52);
+    --gl-brd:rgba(255,255,255,.10); --gl-luce:rgba(255,255,255,.34);
+    --gl-blur:18px;
+    /* L'interruttore ha una traccia sua: `--gl-bg` e' un velo che va verso il
+       fondo, e la pallina (bianca) nel tema chiaro ci sparirebbe dentro. */
+    --sw-off:rgba(255,255,255,.10);
+    --gl-acc:rgba(56,189,248,.55); --gl-acc-brd:rgba(56,189,248,.7);
+
+    /* Ombre, non bagliori: il box-shadow ciano da 28px sulla schermata di
+       sblocco faceva molto videogioco e poco strumento di sicurezza. */
+    --el1:0 1px 2px rgba(0,0,0,.45);
+    --el2:0 8px 28px rgba(0,0,0,.45);
+    --el3:0 24px 64px rgba(0,0,0,.55);
+    --anello:0 0 0 2px var(--s0),0 0 0 4px var(--acc);
+
+    --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:24px; --sp6:32px;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:999px;
+    --dur1:120ms; --dur2:220ms; --dur3:380ms;
+    --ease:cubic-bezier(.2,.7,.3,1);
+    --molla:cubic-bezier(.34,1.56,.64,1);
+
+    /* Font di sistema. Prima arrivavano da fonts.googleapis.com: in un
+       gestore di password che si vanta di essere offline, ogni avvio diceva
+       a Google che l'app era aperta -- e senza rete la tipografia spariva
+       comunque, perche' il ripiego era il font di sistema. */
+    --disp:'Segoe UI Variable Display','Segoe UI',system-ui,sans-serif;
+    --body:'Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
+    --mono:'Cascadia Mono',Consolas,ui-monospace,monospace;
+  
+}
+
+[data-tema="chiaro"]{
+    --s0:#F4F7FC; --s1:#EEF3FA; --s2:#FFFFFF; --s3:#F8FBFF;
+    --brd:#D9E2F0; --brd-forte:#C2D0E4;
+    --t1:#0F1729; --t2:#2F3D57; --t3:#5C6C87;
+    --acc:#0369A1; --acc-su:#FFFFFF; --acc-velo:rgba(3,105,161,.09);
+    --vio:#4F46E5; --vio-pieno:#4338CA;
+    --ok:#047857; --ok-velo:rgba(4,120,87,.09);
+    --err:#B91C1C; --err-velo:rgba(185,28,28,.08);
+    --warn:#B45309; --warn-velo:rgba(180,83,9,.09);
+    --gl-bg:rgba(255,255,255,.72); --gl-bg-2:rgba(248,251,255,.62);
+    --gl-brd:rgba(15,23,41,.10); --gl-luce:rgba(255,255,255,.9);
+    --sw-off:rgba(15,23,41,.10);
+    --gl-acc:rgba(3,105,161,.55); --gl-acc-brd:rgba(3,105,161,.6);
+    --el1:0 1px 2px rgba(15,23,41,.08);
+    --el2:0 8px 28px rgba(15,23,41,.10);
+    --el3:0 24px 64px rgba(15,23,41,.14);
+  
+}
+
+[data-tema="notte"]{
+    --s0:#050912; --s1:#0B1226; --s2:#0E1730; --s3:#152043;
+    --brd:#1E2C4C; --brd-forte:#2B3C63;
+    --t1:#FFFFFF; --t2:#B9C4DB; --t3:#7E8CAC;
+    --acc:#E3B341; --acc-su:#1A1206; --acc-velo:rgba(227,179,65,.12);
+    --vio:#D8A544; --vio-pieno:#1E3A8A;
+    --ok:#4ADE80; --ok-velo:rgba(74,222,128,.10);
+    --gl-bg:rgba(5,9,20,.7); --gl-bg-2:rgba(5,9,20,.55);
+    --sw-off:rgba(255,255,255,.09);
+    --gl-acc:rgba(227,179,65,.5); --gl-acc-brd:rgba(227,179,65,.65);
+  
+}
+
+/* ==========================================================================
+   2. La pagina del laboratorio
+   ========================================================================== */
+*{box-sizing:border-box}
+html,body{margin:0}
+body{
+  background:var(--s0); color:var(--t2);
+  font:15px/1.55 var(--body);
+  padding-bottom:var(--sp6);
+  transition:background var(--dur2) var(--ease), color var(--dur2) var(--ease);
+}
+/* I due aloni. Non sono decorazione: senza qualcosa dietro, il vetro non ha
+   niente da rifrangere e resta una pillola opaca. */
+body::before{
+  content:""; position:fixed; inset:0; pointer-events:none; z-index:0;
+  background:
+    radial-gradient(60vw 50vh at 12% 0%, var(--acc-velo), transparent 70%),
+    radial-gradient(50vw 45vh at 92% 18%, rgba(99,102,241,.10), transparent 70%);
+}
+.pag{position:relative; z-index:1; max-width:1080px; margin:0 auto; padding:0 var(--sp5)}
+
+header.top{
+  position:sticky; top:0; z-index:20;
+  display:flex; align-items:center; gap:var(--sp3);
+  padding:var(--sp3) var(--sp5); margin-bottom:var(--sp5);
+  background:var(--gl-bg);
+  backdrop-filter:blur(18px) saturate(180%);
+  -webkit-backdrop-filter:blur(18px) saturate(180%);
+  border-bottom:1px solid var(--gl-brd);
+}
+.marchio{font:600 17px/1 var(--disp); color:var(--t1); letter-spacing:-.2px}
+.marchio small{display:block; font:400 10px/1.4 var(--mono); color:var(--t3);
+  letter-spacing:.16em; text-transform:uppercase; margin-top:3px}
+.temi{margin-left:auto; display:flex; gap:var(--sp1); padding:var(--sp1);
+  background:var(--gl-bg); border:1px solid var(--gl-brd); border-radius:var(--r-full)}
+.temi button{
+  display:flex; align-items:center; gap:6px; padding:7px 13px;
+  border:0; border-radius:var(--r-full); background:none; color:var(--t3);
+  font:500 12.5px/1 var(--body); cursor:pointer;
+  transition:color var(--dur1) var(--ease), background var(--dur1) var(--ease);
+}
+.temi button:hover{color:var(--t1)}
+.temi button[aria-pressed="true"]{background:var(--acc); color:var(--acc-su)}
+
+h2{font:600 13px/1 var(--disp); letter-spacing:.13em; text-transform:uppercase;
+  color:var(--acc); margin:var(--sp6) 0 var(--sp2)}
+h2:first-of-type{margin-top:0}
+.nota{font-size:13px; color:var(--t3); margin:0 0 var(--sp4); max-width:64ch}
+.blocco{background:var(--s2); border:1px solid var(--brd); border-radius:var(--r-lg);
+  padding:var(--sp5); box-shadow:var(--el1)}
+.griglia{display:grid; gap:var(--sp3)}
+
+/* --- icone --- */
+.ic{width:20px; height:20px; flex:0 0 auto;
+  fill:none; stroke:currentColor; stroke-width:1.5;
+  stroke-linecap:round; stroke-linejoin:round}
+.ic-16{width:16px;height:16px} .ic-24{width:24px;height:24px}
+.ic-32{width:28px;height:28px; stroke-width:1.4}
+#ico-griglia{grid-template-columns:repeat(auto-fill,minmax(112px,1fr))}
+.ico-cella{margin:0; display:flex; flex-direction:column; align-items:center;
+  gap:var(--sp2); padding:var(--sp3) var(--sp1); border-radius:var(--r-md);
+  color:var(--t1); border:1px solid transparent;
+  transition:background var(--dur1) var(--ease), border-color var(--dur1) var(--ease)}
+.ico-cella:hover{background:var(--s3); border-color:var(--brd)}
+.ico-cella figcaption{font:400 10.5px/1.3 var(--mono); color:var(--t3);
+  text-align:center; word-break:break-word}
+
+/* --- colore --- */
+#colori{grid-template-columns:repeat(auto-fill,minmax(216px,1fr))}
+.campione{border:1px solid var(--brd); border-radius:var(--r-md); overflow:hidden}
+.campione .tinta{height:56px; display:flex; align-items:flex-end; padding:var(--sp2)}
+.campione .dati{padding:var(--sp2) var(--sp3); background:var(--s1)}
+.campione .nome{font:500 12.5px/1.4 var(--body); color:var(--t1)}
+.campione .val{font:400 11px/1.4 var(--mono); color:var(--t3); text-transform:uppercase}
+
+table.cr{width:100%; border-collapse:collapse; font-size:13px}
+table.cr th{font:500 10.5px/1 var(--disp); letter-spacing:.1em; text-transform:uppercase;
+  color:var(--t3); text-align:left; padding:0 var(--sp3) var(--sp2) 0}
+table.cr td{padding:7px var(--sp3) 7px 0; border-top:1px solid var(--brd); color:var(--t2)}
+table.cr td.n{font-family:var(--mono); font-size:12.5px}
+.esito{display:inline-block; min-width:66px; text-align:center;
+  font:500 10.5px/1 var(--mono); padding:4px 8px; border-radius:var(--r-full)}
+.esito.si{color:var(--ok); border:1px solid var(--ok); background:var(--ok-velo)}
+.esito.no{color:var(--err); border:1px solid var(--err); background:rgba(252,165,165,.10)}
+
+/* ==========================================================================
+   3. L'INTERRUTTORE IN VETRO
+   ==========================================================================
+   L'ordine dei livelli conta: il fondo sfocato, poi il riflesso in alto
+   (::before), poi la pallina (::after). Il riflesso e' cio' che distingue
+   il vetro da una pillola semitrasparente -- e' l'arco di luce che sul vetro
+   vero si forma dove la superficie curva verso l'alto.
+   ========================================================================== */
+.sw{
+  position:relative; width:52px; height:31px; flex:0 0 auto;
+  border-radius:var(--r-full); cursor:pointer;
+  background:var(--sw-off);
+  border:1px solid var(--gl-brd);
+  backdrop-filter:blur(var(--gl-blur)) saturate(180%);
+  -webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%);
+  box-shadow:inset 0 1px 1px var(--gl-luce), inset 0 -2px 4px rgba(0,0,0,.18), var(--el1);
+  transition:background var(--dur2) var(--ease), border-color var(--dur2) var(--ease),
+             box-shadow var(--dur2) var(--ease);
+  -webkit-tap-highlight-color:transparent;
+}
+.sw::before{
+  content:""; position:absolute; left:2px; right:2px; top:1px; height:44%;
+  border-radius:var(--r-full);
+  background:linear-gradient(180deg, var(--gl-luce), transparent);
+  pointer-events:none;
+}
+.sw::after{
+  content:""; position:absolute; top:3px; left:3px; width:25px; height:25px;
+  border-radius:var(--r-full);
+  background:linear-gradient(180deg,#FFFFFF,#E9EEF6);
+  box-shadow:0 2px 6px rgba(0,0,0,.32), 0 0 0 .5px rgba(0,0,0,.05),
+             inset 0 1px 0 rgba(255,255,255,.95);
+  /* La molla e' cio' che si sente col dito: la pallina supera di poco la fine
+     corsa e torna. Una transizione lineare sembra un interruttore di plastica. */
+  transition:transform var(--dur3) var(--molla), width var(--dur2) var(--ease);
+}
+.sw.on{
+  background:var(--gl-acc); border-color:var(--gl-acc-brd);
+  box-shadow:inset 0 1px 1px var(--gl-luce), inset 0 -2px 4px rgba(0,0,0,.12),
+             0 0 14px var(--acc-velo), var(--el1);
+}
+.sw.on::after{transform:translateX(21px)}
+/* Schiacciata la goccia si allunga, come il liquido che resiste. */
+.sw:active::after{width:30px}
+.sw.on:active::after{transform:translateX(16px); width:30px}
+.sw:focus-visible{outline:none; box-shadow:var(--anello)}
+.sw[aria-disabled="true"]{opacity:.4; cursor:not-allowed}
+
+/* --- righe di impostazione --- */
+.riga{display:flex; align-items:center; gap:var(--sp5); padding:var(--sp4) 0;
+  border-top:1px solid var(--brd)}
+.riga:first-child{border-top:none; padding-top:0}
+.riga:last-child{padding-bottom:0}
+.riga .testi{flex:1; min-width:0}
+.riga .lab{display:flex; align-items:center; gap:var(--sp2);
+  font-size:14px; color:var(--t1)}
+.riga .desc{font-size:12.5px; color:var(--t3); margin-top:3px; line-height:1.45}
+
+/* --- componenti --- */
+.fila{display:flex; flex-wrap:wrap; gap:var(--sp3); align-items:center}
+.btn{display:inline-flex; align-items:center; gap:var(--sp2);
+  padding:10px 18px; border:1px solid transparent; border-radius:var(--r-md);
+  font:600 14px/1 var(--body); cursor:pointer;
+  background:var(--acc); color:var(--acc-su);
+  transition:filter var(--dur1) var(--ease), transform var(--dur1) var(--ease)}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(1px)}
+.btn.fantasma{background:transparent; border-color:var(--brd-forte); color:var(--t1)}
+.btn.fantasma:hover{background:var(--s3); filter:none}
+.btn.vetro{background:var(--gl-bg); border-color:var(--gl-brd); color:var(--t1);
+  backdrop-filter:blur(var(--gl-blur)) saturate(180%);
+  -webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%);
+  box-shadow:inset 0 1px 0 var(--gl-luce), var(--el1)}
+.btn.pericolo{background:transparent; border-color:var(--err); color:var(--err)}
+.btn:focus-visible{outline:none; box-shadow:var(--anello)}
+
+.icb{display:inline-flex; align-items:center; justify-content:center;
+  width:36px; height:36px; border:1px solid var(--brd); border-radius:var(--r-sm);
+  background:none; color:var(--t2); cursor:pointer;
+  transition:color var(--dur1) var(--ease), border-color var(--dur1) var(--ease),
+             background var(--dur1) var(--ease)}
+.icb:hover{color:var(--t1); background:var(--s3); border-color:var(--brd-forte)}
+.icb:focus-visible{outline:none; box-shadow:var(--anello)}
+
+.campo{width:100%; padding:11px 14px; border-radius:var(--r-md);
+  background:var(--s1); border:1px solid var(--brd); color:var(--t1);
+  font:400 14px/1.2 var(--mono); outline:none;
+  transition:border-color var(--dur1) var(--ease), box-shadow var(--dur1) var(--ease)}
+.campo::placeholder{color:var(--t3)}
+.campo:focus{border-color:var(--acc); box-shadow:0 0 0 3px var(--acc-velo)}
+
+.pill{display:inline-flex; align-items:center; gap:6px; padding:5px 11px;
+  border-radius:var(--r-full); font:400 11.5px/1 var(--mono); border:1px solid}
+.pill.acc{color:var(--acc); border-color:var(--acc); background:var(--acc-velo)}
+.pill.ok{color:var(--ok); border-color:var(--ok); background:var(--ok-velo)}
+.pill.vio{color:var(--vio); border-color:var(--vio); background:rgba(99,102,241,.10)}
+
+.voce{position:relative; overflow:hidden; padding:var(--sp4);
+  background:var(--s1); border:1px solid var(--brd); border-radius:var(--r-md)}
+.voce .barra{position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--acc)}
+.voce .tit{display:flex; align-items:center; gap:var(--sp2);
+  font:600 14.5px/1.3 var(--body); color:var(--t1)}
+.voce .kv{display:flex; align-items:center; justify-content:space-between;
+  gap:var(--sp4); margin-top:var(--sp3)}
+.voce .k{font:500 9.5px/1 var(--disp); letter-spacing:.12em; text-transform:uppercase; color:var(--t3)}
+.voce .v{font:400 13.5px/1.4 var(--mono); color:var(--t2); letter-spacing:2px}
+
+.confronto{display:grid; grid-template-columns:1fr 1fr; gap:var(--sp3)}
+.confronto > div{padding:var(--sp4); border-radius:var(--r-md); border:1px solid var(--brd)}
+.confronto .et{font:500 10.5px/1 var(--disp); letter-spacing:.12em; text-transform:uppercase;
+  color:var(--t3); margin-bottom:var(--sp3)}
+.confronto .prima{background:var(--s1)}
+.confronto .dopo{background:var(--s1); border-color:var(--acc)}
+.tabmenu{display:flex; gap:var(--sp1); font-size:20px}
+.tabmenu.nuova{font-size:inherit; color:var(--t1)}
+
+@media (prefers-reduced-motion:reduce){
+  *,*::before,*::after{transition-duration:1ms!important; animation-duration:1ms!important}
+}
+@media (max-width:720px){
+  .confronto{grid-template-columns:1fr}
+  .pag{padding:0 var(--sp4)}
+}
+</style>
+</head>
+<body data-tema="scuro">
+
+<!-- ICONE:INIZIO -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+<symbol id="i-lucchetto" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M7.75 10.5V7a4.25 4.25 0 0 1 8.5 0v3.5"/><path d="M12 14.75v2.5"/></symbol>
+<symbol id="i-lucchetto-aperto" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M7.75 10.5V7a4.25 4.25 0 0 1 8.16-1.7"/><path d="M12 14.75v2.5"/></symbol>
+<symbol id="i-chiave" viewBox="0 0 24 24"><circle cx="7.2" cy="12" r="4"/><circle cx="7.2" cy="12" r="1.3"/><path d="M11.2 12H20.8"/><path d="M17.2 12v3.4"/><path d="M20.4 12v2.6"/></symbol>
+<symbol id="i-scudo" viewBox="0 0 24 24"><path d="M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"/></symbol>
+<symbol id="i-scudo-ok" viewBox="0 0 24 24"><path d="M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"/><path d="M9 11.9 11.3 14.2 15.4 10.1"/></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3-3.58 3-8 3-8-1.34-8-3z"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></symbol>
+<symbol id="i-cartella" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-cartella-piu" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 10.8v5.6"/><path d="M9.2 13.6h5.6"/></symbol>
+<symbol id="i-cartella-off" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.2 3.2 20.8 20.8"/></symbol>
+<symbol id="i-tastierino" viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="17.2" height="17.2" rx="3"/><circle cx="8.4" cy="8.4" r="1.15"/><circle cx="15.6" cy="8.4" r="1.15"/><circle cx="8.4" cy="15.6" r="1.15"/><circle cx="15.6" cy="15.6" r="1.15"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="3"/><path d="M8 17v4l4.4-4"/></symbol>
+<symbol id="i-impostazioni" viewBox="0 0 24 24"><path d="M3.5 7.5h8"/><path d="M16.5 7.5h4"/><path d="M3.5 16.5h4"/><path d="M12.5 16.5h8"/><circle cx="14" cy="7.5" r="2.5"/><circle cx="10" cy="16.5" r="2.5"/></symbol>
+<symbol id="i-tema" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z"/></symbol>
+<symbol id="i-sole" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.2"/><path d="M12 19v2.2"/><path d="M2.8 12h2.2"/><path d="M19 12h2.2"/><path d="M5.5 5.5 7 7"/><path d="M17 17l1.5 1.5"/><path d="M18.5 5.5 17 7"/><path d="M7 17l-1.5 1.5"/></symbol>
+<symbol id="i-luna" viewBox="0 0 24 24"><path d="M20.2 14.6A8.7 8.7 0 0 1 9.4 3.8a8.7 8.7 0 1 0 10.8 10.8z"/></symbol>
+<symbol id="i-notte" viewBox="0 0 24 24"><path d="M20.4 15.3A8.4 8.4 0 0 1 10.1 5a8.4 8.4 0 1 0 10.3 10.3z"/><path d="M16.6 3.2l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></symbol>
+<symbol id="i-backup" viewBox="0 0 24 24"><path d="M12 3.2v10.3"/><path d="M8.2 9.7 12 13.5 15.8 9.7"/><path d="M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/></symbol>
+<symbol id="i-importa" viewBox="0 0 24 24"><path d="M12 13.5V3.2"/><path d="M8.2 7 12 3.2 15.8 7"/><path d="M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24"><path d="M20.4 12.6a8.5 8.5 0 0 1-14.3 5.7"/><path d="M3.6 11.4a8.5 8.5 0 0 1 14.3-5.7"/><path d="M17.4 2.6v3.3h-3.3"/><path d="M6.6 21.4v-3.3h3.3"/></symbol>
+<symbol id="i-aggiorna" viewBox="0 0 24 24"><path d="M20.3 9.6A8.6 8.6 0 1 0 20.5 14"/><path d="M20.6 3.9v5.7h-5.7"/></symbol>
+<symbol id="i-cerca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.8"/><path d="M15.9 15.9 21 21"/></symbol>
+<symbol id="i-occhio" viewBox="0 0 24 24"><path d="M2.6 12S6.1 5.6 12 5.6 21.4 12 21.4 12 17.9 18.4 12 18.4 2.6 12 2.6 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-occhio-barrato" viewBox="0 0 24 24"><path d="M10.1 5.8A9.5 9.5 0 0 1 12 5.6c5.9 0 9.4 6.4 9.4 6.4a17.4 17.4 0 0 1-2.9 3.8"/><path d="M6.4 7.9A17.4 17.4 0 0 0 2.6 12S6.1 18.4 12 18.4a9.5 9.5 0 0 0 4-.9"/><path d="M10 10a2.8 2.8 0 0 0 4 4"/><path d="M3.2 3.2 20.8 20.8"/></symbol>
+<symbol id="i-copia" viewBox="0 0 24 24"><rect x="9" y="9" width="11.5" height="11.5" rx="2.5"/><path d="M6 15h-.5A2.5 2.5 0 0 1 3 12.5v-7A2.5 2.5 0 0 1 5.5 3h7A2.5 2.5 0 0 1 15 5.5V6"/></symbol>
+<symbol id="i-spunta" viewBox="0 0 24 24"><path d="M4.5 12.6 9.6 17.7 19.5 6.6"/></symbol>
+<symbol id="i-chiudi" viewBox="0 0 24 24"><path d="M6.2 6.2 17.8 17.8"/><path d="M17.8 6.2 6.2 17.8"/></symbol>
+<symbol id="i-piu" viewBox="0 0 24 24"><path d="M12 4.8v14.4"/><path d="M4.8 12h14.4"/></symbol>
+<symbol id="i-meno-cerchio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></symbol>
+<symbol id="i-matita" viewBox="0 0 24 24"><path d="M16.4 3.6a2.15 2.15 0 0 1 3 3L7.4 18.6 3 20l1.4-4.4z"/><path d="M14.4 5.6 17.4 8.6"/></symbol>
+<symbol id="i-cestino" viewBox="0 0 24 24"><path d="M4 6.6h16"/><path d="M9.6 6.6V4.8a1.2 1.2 0 0 1 1.2-1.2h2.4a1.2 1.2 0 0 1 1.2 1.2v1.8"/><path d="M6.2 6.6l.9 12.7a2 2 0 0 0 2 1.9h5.8a2 2 0 0 0 2-1.9l.9-12.7"/><path d="M10.2 10.8v6.2"/><path d="M13.8 10.8v6.2"/></symbol>
+<symbol id="i-microfono" viewBox="0 0 24 24"><rect x="9" y="2.6" width="6" height="11.4" rx="3"/><path d="M5.6 11.6a6.4 6.4 0 0 0 12.8 0"/><path d="M12 18v3.4"/><path d="M8.6 21.4h6.8"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.6" y="6.6" width="10.8" height="10.8" rx="2.5"/></symbol>
+<symbol id="i-orologio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.4 2"/></symbol>
+<symbol id="i-invia" viewBox="0 0 24 24"><path d="M21 3 3 9.8l7.4 3.4L13.8 21z"/><path d="M21 3 10.4 13.2"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></symbol>
+<symbol id="i-altro" viewBox="0 0 24 24"><circle cx="12" cy="5.4" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="18.6" r="1.4"/></symbol>
+<symbol id="i-documento" viewBox="0 0 24 24"><path d="M13.8 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8.2z"/><path d="M13.8 3.5v4.7h4.7"/></symbol>
+<symbol id="i-elenco" viewBox="0 0 24 24"><path d="M8.5 7h11.5"/><path d="M8.5 12h11.5"/><path d="M8.5 17h11.5"/><path d="M4 7h.01"/><path d="M4 12h.01"/><path d="M4 17h.01"/></symbol>
+<symbol id="i-dado" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8.6" cy="8.6" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.4" cy="15.4" r="1.3"/></symbol>
+<symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7" height="7" rx="1.8"/><rect x="13.6" y="3.4" width="7" height="7" rx="1.8"/><rect x="3.4" y="13.6" width="7" height="7" rx="1.8"/><path d="M13.6 13.6h3.2v3.2h-3.2z"/><path d="M20.6 17.4v3.2h-3.2"/></symbol>
+<symbol id="i-esterno" viewBox="0 0 24 24"><path d="M14.2 3.6h6.2v6.2"/><path d="M20.4 3.6 11.6 12.4"/><path d="M18.2 14v4.4a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2V7.8a2 2 0 0 1 2-2H10"/></symbol>
+<symbol id="i-chevron-giu" viewBox="0 0 24 24"><path d="M6.4 9.4 12 15 17.6 9.4"/></symbol>
+<symbol id="i-chevron-destra" viewBox="0 0 24 24"><path d="M9.4 6.4 15 12 9.4 17.6"/></symbol>
+<symbol id="i-su" viewBox="0 0 24 24"><path d="M6.4 14.6 12 9 17.6 14.6"/></symbol>
+<symbol id="i-giu" viewBox="0 0 24 24"><path d="M6.4 9.4 12 15 17.6 9.4"/></symbol>
+<symbol id="i-indietro" viewBox="0 0 24 24"><path d="M20 12H4.6"/><path d="M10.6 5.8 4.4 12l6.2 6.2"/></symbol>
+<symbol id="i-avanti" viewBox="0 0 24 24"><path d="M4 12h15.4"/><path d="M13.4 5.8 19.6 12l-6.2 6.2"/></symbol>
+<symbol id="i-avviso" viewBox="0 0 24 24"><path d="M10.7 4.3 2.7 18.1a1.5 1.5 0 0 0 1.3 2.3h16a1.5 1.5 0 0 0 1.3-2.3L13.3 4.3a1.5 1.5 0 0 0-2.6 0z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/></symbol>
+<symbol id="i-scintilla" viewBox="0 0 24 24"><path d="M11 3.4 12.9 8.3 17.8 10.2 12.9 12.1 11 17 9.1 12.1 4.2 10.2 9.1 8.3z"/><path d="M17.9 15.1l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+<symbol id="i-banca" viewBox="0 0 24 24"><path d="M3.4 9.4 12 4.2l8.6 5.2"/><path d="M5.8 9.8v8.4"/><path d="M9.9 9.8v8.4"/><path d="M14.1 9.8v8.4"/><path d="M18.2 9.8v8.4"/><path d="M3.2 20.6h17.6"/></symbol>
+<symbol id="i-identita" viewBox="0 0 24 24"><rect x="2.6" y="4.8" width="18.8" height="14.4" rx="2.5"/><circle cx="8.6" cy="11" r="2.1"/><path d="M5.4 16.6a3.6 3.6 0 0 1 6.4 0"/><path d="M14.6 10h4.2"/><path d="M14.6 13.6h4.2"/></symbol>
+<symbol id="i-estensione" viewBox="0 0 24 24"><rect x="3" y="4.6" width="18" height="14.8" rx="2.5"/><path d="M3 9.4h18"/><circle cx="6.2" cy="7" r="0.75"/><circle cx="8.9" cy="7" r="0.75"/></symbol>
+<symbol id="i-dispositivo" viewBox="0 0 24 24"><rect x="7" y="2.6" width="10" height="18.8" rx="2.5"/><path d="M10.6 5.6h2.8"/><path d="M12 18.2h.01"/></symbol>
+<symbol id="i-dispositivi" viewBox="0 0 24 24"><rect x="2.6" y="5" width="12.4" height="9.4" rx="2"/><path d="M6 18h5.6"/><path d="M8.8 14.4V18"/><rect x="16.6" y="9.6" width="4.8" height="10.4" rx="1.6"/></symbol>
+<symbol id="i-rete" viewBox="0 0 24 24"><path d="M4.6 8.6a10.5 10.5 0 0 1 14.8 0"/><path d="M7.6 11.9a6.2 6.2 0 0 1 8.8 0"/><path d="M10.4 15.2a2.3 2.3 0 0 1 3.2 0"/><path d="M12 18.6h.01"/></symbol>
+<symbol id="i-impronta" viewBox="0 0 24 24"><path d="M3.2 8.7A10.4 10.4 0 0 1 12 3.6a10.4 10.4 0 0 1 8.8 5.1"/><path d="M5.8 11.2a6.4 6.4 0 0 1 12.4 0v2.4a13 13 0 0 1-.9 4.7"/><path d="M9.2 11.2a2.9 2.9 0 0 1 5.8 0v3.2a9.6 9.6 0 0 1-1.1 4.4"/><path d="M12 11.6v3.4a6 6 0 0 1-.9 3.2"/></symbol>
+<symbol id="i-fissa" viewBox="0 0 24 24"><path d="M14.8 3.4 20.6 9.2l-3.1 3.1-.9 5.5-8.4-8.4 5.5-.9z"/><path d="M8.2 15.8 3.4 20.6"/></symbol>
+<symbol id="i-stella" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.7l6-.9z"/></symbol>
+<symbol id="i-utente" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.9"/><path d="M4.6 20.4a7.6 7.6 0 0 1 14.8 0"/></symbol>
+<symbol id="i-globo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5a13 13 0 0 1 0 17 13 13 0 0 1 0-17z"/></symbol>
+</svg>
+<!-- ICONE:FINE -->
+
+<header class="top">
+  <div class="marchio">VaultMind<small>sistema visivo</small></div>
+  <div class="temi" role="group" aria-label="Tema">
+    <button data-t="scuro" aria-pressed="true"><svg class="ic ic-16" aria-hidden="true"><use href="#i-luna"/></svg>Scuro</button>
+    <button data-t="chiaro" aria-pressed="false"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sole"/></svg>Chiaro</button>
+    <button data-t="notte" aria-pressed="false"><svg class="ic ic-16" aria-hidden="true"><use href="#i-notte"/></svg>Notte e oro</button>
+  </div>
+</header>
+
+<div class="pag">
+
+  <h2>Contrasto</h2>
+  <p class="nota">Calcolato adesso dalla pagina, con la formula WCAG 2.1, leggendo
+    le variabili applicate al tema attivo. La soglia AA per il testo normale e'
+    4,5:1. Fra parentesi il valore che aveva prima.</p>
+  <div class="blocco"><table class="cr"><thead><tr>
+    <th>Colore</th><th>su s0</th><th>su s1</th><th>su s2</th><th>su s3</th><th>Esito</th>
+  </tr></thead><tbody id="tab-cr"></tbody></table></div>
+
+  <h2>Superfici e tinte</h2>
+  <p class="nota">Le superfici hanno un ordine: <code>s0</code> e' il fondo,
+    <code>s3</code> e' cio' che sta piu' vicino a chi guarda. Prima erano tre
+    nomi senza gerarchia e capitava che un pannello fosse piu' scuro dello
+    sfondo su cui poggiava.</p>
+  <div class="blocco griglia" id="colori"></div>
+
+  <h2>Interruttori</h2>
+  <p class="nota">Vetro vero: sfocano cio' che hanno dietro. Provali &mdash; la
+    pallina supera di poco la fine corsa e torna, e premendo si allunga come
+    una goccia che resiste. Sono gli stessi che finiranno su Android, dove il
+    <code>BackdropFilter</code> fa lo stesso lavoro.</p>
+  <div class="blocco">
+    <div class="riga">
+      <div class="testi">
+        <div class="lab"><svg class="ic ic-16" aria-hidden="true"><use href="#i-scintilla"/></svg>
+          mind (Ollama) <span class="pill ok">attivo</span></div>
+        <div class="desc">Risposte in chat formulate da un modello locale. Se spento, usa frasi standard.</div>
+      </div>
+      <div class="sw on" role="switch" tabindex="0" aria-checked="true" aria-label="Assistente locale"></div>
+    </div>
+    <div class="riga">
+      <div class="testi">
+        <div class="lab"><svg class="ic ic-16" aria-hidden="true"><use href="#i-microfono"/></svg>
+          Microfono / dettatura</div>
+        <div class="desc">Input vocale nella barra di ricerca, trascritto sul dispositivo.</div>
+      </div>
+      <div class="sw" role="switch" tabindex="0" aria-checked="false" aria-label="Dettatura"></div>
+    </div>
+    <div class="riga">
+      <div class="testi">
+        <div class="lab"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sync"/></svg>
+          Sincronizzazione fra dispositivi</div>
+        <div class="desc">Si allinea da solo al rientro sulla rete di casa.</div>
+      </div>
+      <div class="sw on" role="switch" tabindex="0" aria-checked="true" aria-label="Sincronizzazione"></div>
+    </div>
+    <div class="riga">
+      <div class="testi">
+        <div class="lab">Non disponibile</div>
+        <div class="desc">Come si vede un interruttore che non si puo' toccare.</div>
+      </div>
+      <div class="sw" role="switch" aria-disabled="true" aria-checked="false" aria-label="Disattivato"></div>
+    </div>
+  </div>
+
+  <h2>Icone</h2>
+  <p class="nota">Griglia 24, tratto 1,5, terminazioni tonde. Prendono il colore
+    dal testo che le contiene, quindi seguono il tema senza una riga di codice
+    in piu'. Sorgente unica: <code>design/icone.json</code>.</p>
+  <div class="blocco griglia" id="ico-griglia">
+<!-- GRIGLIA-ICONE:INIZIO -->
+  <figure class="ico-cella" title="Vault bloccato"><svg class="ic ic-32" aria-hidden="true"><use href="#i-lucchetto"/></svg><figcaption>lucchetto</figcaption></figure>
+  <figure class="ico-cella" title="Vault sbloccato"><svg class="ic ic-32" aria-hidden="true"><use href="#i-lucchetto-aperto"/></svg><figcaption>lucchetto-aperto</figcaption></figure>
+  <figure class="ico-cella" title="Credenziale"><svg class="ic ic-32" aria-hidden="true"><use href="#i-chiave"/></svg><figcaption>chiave</figcaption></figure>
+  <figure class="ico-cella" title="Sicurezza"><svg class="ic ic-32" aria-hidden="true"><use href="#i-scudo"/></svg><figcaption>scudo</figcaption></figure>
+  <figure class="ico-cella" title="Protetto e verificato"><svg class="ic ic-32" aria-hidden="true"><use href="#i-scudo-ok"/></svg><figcaption>scudo-ok</figcaption></figure>
+  <figure class="ico-cella" title="Database delle voci"><svg class="ic ic-32" aria-hidden="true"><use href="#i-database"/></svg><figcaption>database</figcaption></figure>
+  <figure class="ico-cella" title="Categoria"><svg class="ic ic-32" aria-hidden="true"><use href="#i-cartella"/></svg><figcaption>cartella</figcaption></figure>
+  <figure class="ico-cella" title="Nuova categoria"><svg class="ic ic-32" aria-hidden="true"><use href="#i-cartella-piu"/></svg><figcaption>cartella-piu</figcaption></figure>
+  <figure class="ico-cella" title="Senza categoria"><svg class="ic ic-32" aria-hidden="true"><use href="#i-cartella-off"/></svg><figcaption>cartella-off</figcaption></figure>
+  <figure class="ico-cella" title="Codice numerico"><svg class="ic ic-32" aria-hidden="true"><use href="#i-tastierino"/></svg><figcaption>tastierino</figcaption></figure>
+  <figure class="ico-cella" title="Chat"><svg class="ic ic-32" aria-hidden="true"><use href="#i-chat"/></svg><figcaption>chat</figcaption></figure>
+  <figure class="ico-cella" title="Impostazioni"><svg class="ic ic-32" aria-hidden="true"><use href="#i-impostazioni"/></svg><figcaption>impostazioni</figcaption></figure>
+  <figure class="ico-cella" title="Tema"><svg class="ic ic-32" aria-hidden="true"><use href="#i-tema"/></svg><figcaption>tema</figcaption></figure>
+  <figure class="ico-cella" title="Tema chiaro"><svg class="ic ic-32" aria-hidden="true"><use href="#i-sole"/></svg><figcaption>sole</figcaption></figure>
+  <figure class="ico-cella" title="Tema scuro"><svg class="ic ic-32" aria-hidden="true"><use href="#i-luna"/></svg><figcaption>luna</figcaption></figure>
+  <figure class="ico-cella" title="Tema notte e oro"><svg class="ic ic-32" aria-hidden="true"><use href="#i-notte"/></svg><figcaption>notte</figcaption></figure>
+  <figure class="ico-cella" title="Backup del vault"><svg class="ic ic-32" aria-hidden="true"><use href="#i-backup"/></svg><figcaption>backup</figcaption></figure>
+  <figure class="ico-cella" title="Importa credenziali"><svg class="ic ic-32" aria-hidden="true"><use href="#i-importa"/></svg><figcaption>importa</figcaption></figure>
+  <figure class="ico-cella" title="Sincronizza"><svg class="ic ic-32" aria-hidden="true"><use href="#i-sync"/></svg><figcaption>sync</figcaption></figure>
+  <figure class="ico-cella" title="Aggiorna"><svg class="ic ic-32" aria-hidden="true"><use href="#i-aggiorna"/></svg><figcaption>aggiorna</figcaption></figure>
+  <figure class="ico-cella" title="Cerca"><svg class="ic ic-32" aria-hidden="true"><use href="#i-cerca"/></svg><figcaption>cerca</figcaption></figure>
+  <figure class="ico-cella" title="Mostra"><svg class="ic ic-32" aria-hidden="true"><use href="#i-occhio"/></svg><figcaption>occhio</figcaption></figure>
+  <figure class="ico-cella" title="Nascondi"><svg class="ic ic-32" aria-hidden="true"><use href="#i-occhio-barrato"/></svg><figcaption>occhio-barrato</figcaption></figure>
+  <figure class="ico-cella" title="Copia"><svg class="ic ic-32" aria-hidden="true"><use href="#i-copia"/></svg><figcaption>copia</figcaption></figure>
+  <figure class="ico-cella" title="Fatto"><svg class="ic ic-32" aria-hidden="true"><use href="#i-spunta"/></svg><figcaption>spunta</figcaption></figure>
+  <figure class="ico-cella" title="Chiudi"><svg class="ic ic-32" aria-hidden="true"><use href="#i-chiudi"/></svg><figcaption>chiudi</figcaption></figure>
+  <figure class="ico-cella" title="Aggiungi"><svg class="ic ic-32" aria-hidden="true"><use href="#i-piu"/></svg><figcaption>piu</figcaption></figure>
+  <figure class="ico-cella" title="Togli"><svg class="ic ic-32" aria-hidden="true"><use href="#i-meno-cerchio"/></svg><figcaption>meno-cerchio</figcaption></figure>
+  <figure class="ico-cella" title="Modifica"><svg class="ic ic-32" aria-hidden="true"><use href="#i-matita"/></svg><figcaption>matita</figcaption></figure>
+  <figure class="ico-cella" title="Elimina"><svg class="ic ic-32" aria-hidden="true"><use href="#i-cestino"/></svg><figcaption>cestino</figcaption></figure>
+  <figure class="ico-cella" title="Detta"><svg class="ic ic-32" aria-hidden="true"><use href="#i-microfono"/></svg><figcaption>microfono</figcaption></figure>
+  <figure class="ico-cella" title="Ferma"><svg class="ic ic-32" aria-hidden="true"><use href="#i-stop"/></svg><figcaption>stop</figcaption></figure>
+  <figure class="ico-cella" title="In corso"><svg class="ic ic-32" aria-hidden="true"><use href="#i-orologio"/></svg><figcaption>orologio</figcaption></figure>
+  <figure class="ico-cella" title="Invia"><svg class="ic ic-32" aria-hidden="true"><use href="#i-invia"/></svg><figcaption>invia</figcaption></figure>
+  <figure class="ico-cella" title="Menu"><svg class="ic ic-32" aria-hidden="true"><use href="#i-menu"/></svg><figcaption>menu</figcaption></figure>
+  <figure class="ico-cella" title="Altre azioni"><svg class="ic ic-32" aria-hidden="true"><use href="#i-altro"/></svg><figcaption>altro</figcaption></figure>
+  <figure class="ico-cella" title="File"><svg class="ic ic-32" aria-hidden="true"><use href="#i-documento"/></svg><figcaption>documento</figcaption></figure>
+  <figure class="ico-cella" title="Elenco"><svg class="ic ic-32" aria-hidden="true"><use href="#i-elenco"/></svg><figcaption>elenco</figcaption></figure>
+  <figure class="ico-cella" title="Genera password"><svg class="ic ic-32" aria-hidden="true"><use href="#i-dado"/></svg><figcaption>dado</figcaption></figure>
+  <figure class="ico-cella" title="Inquadra il QR"><svg class="ic ic-32" aria-hidden="true"><use href="#i-qr"/></svg><figcaption>qr</figcaption></figure>
+  <figure class="ico-cella" title="Apri nel browser"><svg class="ic ic-32" aria-hidden="true"><use href="#i-esterno"/></svg><figcaption>esterno</figcaption></figure>
+  <figure class="ico-cella" title="Espandi"><svg class="ic ic-32" aria-hidden="true"><use href="#i-chevron-giu"/></svg><figcaption>chevron-giu</figcaption></figure>
+  <figure class="ico-cella" title="Apri"><svg class="ic ic-32" aria-hidden="true"><use href="#i-chevron-destra"/></svg><figcaption>chevron-destra</figcaption></figure>
+  <figure class="ico-cella" title="Sposta su"><svg class="ic ic-32" aria-hidden="true"><use href="#i-su"/></svg><figcaption>su</figcaption></figure>
+  <figure class="ico-cella" title="Sposta giu"><svg class="ic ic-32" aria-hidden="true"><use href="#i-giu"/></svg><figcaption>giu</figcaption></figure>
+  <figure class="ico-cella" title="Indietro"><svg class="ic ic-32" aria-hidden="true"><use href="#i-indietro"/></svg><figcaption>indietro</figcaption></figure>
+  <figure class="ico-cella" title="Avanti"><svg class="ic ic-32" aria-hidden="true"><use href="#i-avanti"/></svg><figcaption>avanti</figcaption></figure>
+  <figure class="ico-cella" title="Attenzione"><svg class="ic ic-32" aria-hidden="true"><use href="#i-avviso"/></svg><figcaption>avviso</figcaption></figure>
+  <figure class="ico-cella" title="Informazione"><svg class="ic ic-32" aria-hidden="true"><use href="#i-info"/></svg><figcaption>info</figcaption></figure>
+  <figure class="ico-cella" title="Assistente locale"><svg class="ic ic-32" aria-hidden="true"><use href="#i-scintilla"/></svg><figcaption>scintilla</figcaption></figure>
+  <figure class="ico-cella" title="Conto bancario"><svg class="ic ic-32" aria-hidden="true"><use href="#i-banca"/></svg><figcaption>banca</figcaption></figure>
+  <figure class="ico-cella" title="Documento d'identita"><svg class="ic ic-32" aria-hidden="true"><use href="#i-identita"/></svg><figcaption>identita</figcaption></figure>
+  <figure class="ico-cella" title="Estensione del browser"><svg class="ic ic-32" aria-hidden="true"><use href="#i-estensione"/></svg><figcaption>estensione</figcaption></figure>
+  <figure class="ico-cella" title="Dispositivo abbinato"><svg class="ic ic-32" aria-hidden="true"><use href="#i-dispositivo"/></svg><figcaption>dispositivo</figcaption></figure>
+  <figure class="ico-cella" title="Dispositivi"><svg class="ic ic-32" aria-hidden="true"><use href="#i-dispositivi"/></svg><figcaption>dispositivi</figcaption></figure>
+  <figure class="ico-cella" title="Rete locale"><svg class="ic ic-32" aria-hidden="true"><use href="#i-rete"/></svg><figcaption>rete</figcaption></figure>
+  <figure class="ico-cella" title="Impronta digitale"><svg class="ic ic-32" aria-hidden="true"><use href="#i-impronta"/></svg><figcaption>impronta</figcaption></figure>
+  <figure class="ico-cella" title="Voce fissata"><svg class="ic ic-32" aria-hidden="true"><use href="#i-fissa"/></svg><figcaption>fissa</figcaption></figure>
+  <figure class="ico-cella" title="Preferita"><svg class="ic ic-32" aria-hidden="true"><use href="#i-stella"/></svg><figcaption>stella</figcaption></figure>
+  <figure class="ico-cella" title="Account"><svg class="ic ic-32" aria-hidden="true"><use href="#i-utente"/></svg><figcaption>utente</figcaption></figure>
+  <figure class="ico-cella" title="Indirizzo web"><svg class="ic ic-32" aria-hidden="true"><use href="#i-globo"/></svg><figcaption>globo</figcaption></figure>
+<!-- GRIGLIA-ICONE:FINE -->
+  </div>
+
+  <h2>Prima e dopo</h2>
+  <div class="confronto">
+    <div class="prima">
+      <div class="et">Oggi</div>
+      <div class="tabmenu">&#x1F4AC; &#x1F5C4;&#xFE0F; &#x1F4C1; &#x2699;&#xFE0F; &#x1F504;</div>
+      <p class="nota" style="margin:12px 0 0">Le emoji le disegna il sistema
+        operativo: cambiano colore, peso e stile fuori dal nostro controllo, e
+        su Windows sono a colori pieni in mezzo a un'interfaccia sobria.</p>
+    </div>
+    <div class="dopo">
+      <div class="et">Dopo</div>
+      <div class="tabmenu nuova">
+        <svg class="ic ic-24" aria-hidden="true"><use href="#i-chat"/></svg>
+        <svg class="ic ic-24" aria-hidden="true"><use href="#i-database"/></svg>
+        <svg class="ic ic-24" aria-hidden="true"><use href="#i-cartella"/></svg>
+        <svg class="ic ic-24" aria-hidden="true"><use href="#i-impostazioni"/></svg>
+        <svg class="ic ic-24" aria-hidden="true"><use href="#i-sync"/></svg>
+      </div>
+      <p class="nota" style="margin:12px 0 0">Stesso tratto, stessa griglia,
+        stesso colore del testo accanto. E sono le identiche icone che disegna
+        l'app Android.</p>
+    </div>
+  </div>
+
+  <h2>Componenti</h2>
+  <div class="blocco">
+    <div class="fila">
+      <button class="btn"><svg class="ic ic-16" aria-hidden="true"><use href="#i-lucchetto-aperto"/></svg>Sblocca vault</button>
+      <button class="btn fantasma"><svg class="ic ic-16" aria-hidden="true"><use href="#i-backup"/></svg>Ripristina da backup</button>
+      <button class="btn vetro"><svg class="ic ic-16" aria-hidden="true"><use href="#i-importa"/></svg>Importa</button>
+      <button class="btn pericolo"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cestino"/></svg>Svuota</button>
+    </div>
+    <div class="fila" style="margin-top:16px">
+      <button class="icb" aria-label="Cerca"><svg class="ic" aria-hidden="true"><use href="#i-cerca"/></svg></button>
+      <button class="icb" aria-label="Copia"><svg class="ic" aria-hidden="true"><use href="#i-copia"/></svg></button>
+      <button class="icb" aria-label="Mostra"><svg class="ic" aria-hidden="true"><use href="#i-occhio"/></svg></button>
+      <button class="icb" aria-label="Modifica"><svg class="ic" aria-hidden="true"><use href="#i-matita"/></svg></button>
+      <button class="icb" aria-label="Elimina"><svg class="ic" aria-hidden="true"><use href="#i-cestino"/></svg></button>
+      <button class="icb" aria-label="Apri nel browser"><svg class="ic" aria-hidden="true"><use href="#i-esterno"/></svg></button>
+      <span class="pill acc"><svg class="ic ic-16" aria-hidden="true"><use href="#i-database"/></svg>812 voci</span>
+      <span class="pill vio"><svg class="ic ic-16" aria-hidden="true"><use href="#i-scintilla"/></svg>LLM locale</span>
+      <span class="pill ok"><svg class="ic ic-16" aria-hidden="true"><use href="#i-rete"/></svg>2 dispositivi</span>
+    </div>
+    <div class="fila" style="margin-top:16px">
+      <input class="campo" style="max-width:320px" placeholder="Master password" type="password" value="passwordlunga">
+      <input class="campo" style="max-width:320px" placeholder="Cerca fra le voci">
+    </div>
+    <div style="margin-top:20px; max-width:420px">
+      <div class="voce">
+        <div class="barra"></div>
+        <div class="tit"><svg class="ic ic-16" aria-hidden="true"><use href="#i-chiave"/></svg>Poste Italiane</div>
+        <div class="kv">
+          <div><div class="k">Utente</div><div class="v" style="letter-spacing:0">mario.rossi@posta.it</div></div>
+          <button class="icb" aria-label="Copia utente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-copia"/></svg></button>
+        </div>
+        <div class="kv">
+          <div><div class="k">Password</div><div class="v">&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;&bull;</div></div>
+          <div style="display:flex; gap:6px">
+            <button class="icb" aria-label="Mostra"><svg class="ic ic-16" aria-hidden="true"><use href="#i-occhio"/></svg></button>
+            <button class="icb" aria-label="Copia"><svg class="ic ic-16" aria-hidden="true"><use href="#i-copia"/></svg></button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h2>Tipografia</h2>
+  <div class="blocco">
+    <div style="font:600 30px/1.2 var(--disp); color:var(--t1); letter-spacing:-.6px">VaultMind</div>
+    <div style="font:500 10.5px/1 var(--disp); letter-spacing:.16em; text-transform:uppercase; color:var(--t3); margin-top:10px">Locale &middot; offline &middot; AES-256</div>
+    <p style="margin:18px 0 0; max-width:62ch; color:var(--t2)">Testo normale, il corpo dell'app.
+      Passa a livello <span style="color:var(--t3)">t3 per le spiegazioni secondarie</span>,
+      che adesso restano leggibili invece di essere un suggerimento.</p>
+    <div style="font-family:var(--mono); color:var(--ok); font-size:26px; letter-spacing:4px; margin-top:16px">418 902</div>
+    <div style="font-family:var(--mono); font-size:12px; color:var(--t3); margin-top:4px">codice 2FA &mdash; monospazio, cifre di larghezza fissa</div>
+  </div>
+
+</div>
+
+<script>
+/* Il tema si cambia sull'elemento <body>, come nell'app (`data-theme`). */
+document.querySelectorAll('.temi button').forEach(b=>{
+  b.onclick=()=>{
+    document.body.dataset.tema=b.dataset.t;
+    document.querySelectorAll('.temi button').forEach(x=>
+      x.setAttribute('aria-pressed', String(x===b)));
+    disegna();
+  };
+});
+
+/* Gli interruttori: stessa forma che ha gia' l'app (una classe `on` su un
+   div), cosi' il JS del PC non deve cambiare di una riga. */
+function commuta(sw){
+  if(sw.getAttribute('aria-disabled')==='true') return;
+  const acceso=sw.classList.toggle('on');
+  sw.setAttribute('aria-checked', String(acceso));
+}
+document.querySelectorAll('.sw').forEach(sw=>{
+  sw.onclick=()=>commuta(sw);
+  sw.onkeydown=e=>{ if(e.key===' '||e.key==='Enter'){ e.preventDefault(); commuta(sw); } };
+});
+
+/* ---- Contrasto, misurato non dichiarato ---------------------------------
+   Legge i valori davvero applicati (getComputedStyle), quindi non puo'
+   mentire: se qualcuno cambia una variabile e peggiora, la riga diventa
+   rossa da sola. */
+function lin(c){ c/=255; return c<=.03928 ? c/12.92 : Math.pow((c+.055)/1.055, 2.4); }
+function lum(css){
+  const m=css.trim().match(/^#?([0-9a-f]{6})$/i) ||
+          css.match(/rgba?\((\d+)[,\s]+(\d+)[,\s]+(\d+)/i);
+  let r,g,b;
+  if(m && m[1] && m[1].length===6){ const h=m[1];
+    r=parseInt(h.slice(0,2),16); g=parseInt(h.slice(2,4),16); b=parseInt(h.slice(4,6),16);
+  } else if(m){ r=+m[1]; g=+m[2]; b=+m[3]; } else return null;
+  return .2126*lin(r)+.7152*lin(g)+.0722*lin(b);
+}
+function cr(a,b){
+  const la=lum(a), lb=lum(b);
+  if(la===null||lb===null) return null;
+  return (Math.max(la,lb)+.05)/(Math.min(la,lb)+.05);
+}
+
+/* I valori di partenza, per la colonna "prima". Non sono calcolati: sono
+   quelli che stanno oggi in index.html. */
+const PRIMA={
+  scuro:{t3:'#5A6884', vio:'#6366F1'},
+  chiaro:{t3:'#6B7C99', vio:'#4F46E5'},
+  notte:{t3:'#6A789A', vio:'#C9922E'}
+};
+const RIGHE=[
+  ['--t1','Testo principale'], ['--t2','Testo corrente'],
+  ['--t3','Testo secondario'], ['--acc','Accento'],
+  ['--vio','Viola'], ['--ok','Verde 2FA'], ['--err','Errore']
+];
+
+function disegna(){
+  const st=getComputedStyle(document.body);
+  const v=n=>st.getPropertyValue(n).trim();
+  const fondi=['--s0','--s1','--s2','--s3'].map(v);
+  const tema=document.body.dataset.tema;
+
+  const corpo=document.getElementById('tab-cr');
+  corpo.innerHTML=RIGHE.map(([nome,etichetta])=>{
+    const col=v(nome);
+    const valori=fondi.map(f=>cr(col,f));
+    const peggio=Math.min(...valori.filter(x=>x!==null));
+    const chiave=nome==='--t3'?'t3':nome==='--vio'?'vio':null;
+    let prima='';
+    if(chiave && PRIMA[tema][chiave]){
+      const p=Math.min(...fondi.map(f=>cr(PRIMA[tema][chiave],f)));
+      prima=` <span style="color:var(--t3)">(era ${p.toFixed(2)})</span>`;
+    }
+    const ok=peggio>=4.5;
+    return `<tr>
+      <td><span style="display:inline-block;width:10px;height:10px;border-radius:3px;
+        background:${col};vertical-align:-1px;margin-right:8px"></span>${etichetta}
+        <code style="font-size:11px;color:var(--t3)">${nome}</code>${prima}</td>
+      ${valori.map(x=>`<td class="n">${x.toFixed(2)}</td>`).join('')}
+      <td><span class="esito ${ok?'si':'no'}">${ok?'AA':'sotto AA'}</span></td>
+    </tr>`;
+  }).join('');
+
+  const NOMI=[['--s0','Fondo'],['--s1','Incassata'],['--s2','Pannello'],
+    ['--s3','Sollevata'],['--brd','Bordo'],['--acc','Accento'],
+    ['--vio','Viola'],['--ok','Verde'],['--warn','Avviso'],['--err','Errore']];
+  document.getElementById('colori').innerHTML=NOMI.map(([n,et])=>`
+    <div class="campione">
+      <div class="tinta" style="background:${v(n)}"></div>
+      <div class="dati"><div class="nome">${et}</div>
+        <div class="val">${n} &nbsp; ${v(n)}</div></div>
+    </div>`).join('');
+}
+disegna();
+</script>
+</body>
+</html>

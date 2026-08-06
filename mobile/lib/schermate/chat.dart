@@ -23,6 +23,7 @@ import '../sessione.dart';
 import '../tema.dart';
 import '../vault.dart';
 import 'scheda_voce.dart';
+import '../icone.dart';
 
 class SezioneChat extends StatefulWidget {
   final Sessione sessione;
@@ -160,7 +161,7 @@ class _SezioneChatState extends State<SezioneChat> {
                   onSubmitted: (_) => _chiedi(),
                   decoration: InputDecoration(
                     hintText: 'Cosa ti serve?',
-                    prefixIcon: Icon(Icons.forum_outlined, color: context.cTenue),
+                    prefixIcon: IconaVM(Icone.chat, color: context.cTenue),
                   ),
                 ),
               ),
@@ -171,7 +172,7 @@ class _SezioneChatState extends State<SezioneChat> {
                   backgroundColor: context.cAccento,
                   foregroundColor: context.cSuAccento,
                 ),
-                icon: const Icon(Icons.arrow_upward),
+                icon: const IconaVM(Icone.su),
               ),
             ],
           ),
@@ -291,7 +292,7 @@ class _Scelta extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(fontSize: 11, color: context.cTenue)),
-        trailing: Icon(Icons.chevron_right, color: context.cTenue),
+        trailing: IconaVM(Icone.chevronDestra, color: context.cTenue),
       ),
     );
   }

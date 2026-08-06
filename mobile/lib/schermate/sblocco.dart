@@ -14,6 +14,7 @@ import '../vault.dart';
 import 'casa.dart';
 import 'dialoghi.dart';
 import 'travaso.dart';
+import '../icone.dart';
 
 class SchermataSblocco extends StatefulWidget {
   final bool vaultPresente;
@@ -217,14 +218,21 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
               children: [
                 Image.asset('assets/logo.png', width: 96, height: 96,
                     errorBuilder: (_, _, _) =>
-                        Icon(Icons.shield, size: 88, color: context.cAccento)),
+                        IconaVM(Icone.scudo, size: 88, color: context.cAccento)),
                 const SizedBox(height: 18),
                 const Text('VAULTMIND',
                     style: TextStyle(
-                        fontSize: 26, letterSpacing: 6, fontWeight: FontWeight.w600)),
+                        fontFamily: 'Space Grotesk',
+                        fontSize: 26,
+                        letterSpacing: 6,
+                        fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 Text('LOCALE · OFFLINE · AES-256',
-                    style: TextStyle(fontSize: 11, letterSpacing: 2, color: context.cTenue)),
+                    style: TextStyle(
+                        fontFamily: 'JetBrains Mono',
+                        fontSize: 11,
+                        letterSpacing: 2,
+                        color: context.cTenue)),
                 const SizedBox(height: 34),
                 if (_presente) ..._formSblocco() else ..._invitoImport(),
                 if (_errore != null) ...[
@@ -250,7 +258,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           onSubmitted: (_) => _sblocca(),
           decoration: InputDecoration(
             labelText: 'Master password',
-            prefixIcon: Icon(Icons.lock_outline, color: context.cTenue),
+            prefixIcon: IconaVM(Icone.lucchetto, color: context.cTenue),
           ),
         ),
         const SizedBox(height: 16),
@@ -279,7 +287,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           const SizedBox(height: 14),
           OutlinedButton.icon(
             onPressed: _occupato ? null : _sbloccaConImpronta,
-            icon: Icon(Icons.fingerprint, color: context.cAccento),
+            icon: IconaVM(Icone.impronta, color: context.cAccento),
             label: Text('Sblocca con l\'impronta',
                 style: TextStyle(color: context.cAccento)),
             style: OutlinedButton.styleFrom(
@@ -327,7 +335,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           child: FilledButton.icon(
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(
                 builder: (_) => const SchermataTravaso())),
-            icon: const Icon(Icons.wifi_tethering),
+            icon: const IconaVM(Icone.rete),
             label: const Text('Ricevi il vault dal PC',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: FilledButton.styleFrom(
@@ -340,7 +348,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         const SizedBox(height: 12),
         OutlinedButton.icon(
           onPressed: _importa,
-          icon: Icon(Icons.file_open_outlined, color: context.cAccento),
+          icon: IconaVM(Icone.documento, color: context.cAccento),
           label: Text('Ho un file di backup',
               style: TextStyle(color: context.cAccento)),
           style: OutlinedButton.styleFrom(

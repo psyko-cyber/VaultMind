@@ -15,6 +15,7 @@ import '../ponte_file.dart';
 import '../tema.dart';
 import '../totp.dart';
 import '../vault.dart';
+import '../icone.dart';
 
 /// Etichette il cui valore è un segreto: si mostrano a pallini finché non si
 /// tocca l'occhio. Un vault aperto in metropolitana non deve stampare le
@@ -133,12 +134,12 @@ class SchedaVoce extends StatelessWidget {
                   if (fissata)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.push_pin, size: 14, color: colore),
+                      child: IconaVM(Icone.fissa, size: 14, color: colore),
                     ),
                   if (credenziale.critical)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: Icon(Icons.star, size: 15, color: context.cAccento),
+                      child: IconaVM(Icone.stella, size: 15, color: context.cAccento),
                     ),
                   Expanded(
                     child: Text(credenziale.title,
@@ -196,7 +197,7 @@ class _Azioni extends StatelessWidget {
         children: [
           TextButton.icon(
             onPressed: onFissa,
-            icon: Icon(fissata ? Icons.push_pin : Icons.push_pin_outlined,
+            icon: IconaVM(fissata ? Icone.fissa : Icone.fissa,
                 size: 16, color: context.cTenue),
             label: Text(fissata ? 'Liberala' : 'Fissa in cima',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
@@ -207,7 +208,7 @@ class _Azioni extends StatelessWidget {
               iconSize: 18,
               visualDensity: VisualDensity.compact,
               tooltip: 'Modifica',
-              icon: Icon(Icons.edit_outlined, color: context.cTenue),
+              icon: IconaVM(Icone.matita, color: context.cTenue),
               onPressed: onModifica,
             ),
           if (onElimina != null)
@@ -215,7 +216,7 @@ class _Azioni extends StatelessWidget {
               iconSize: 18,
               visualDensity: VisualDensity.compact,
               tooltip: 'Elimina',
-              icon: Icon(Icons.delete_outline, color: context.cErrore),
+              icon: IconaVM(Icone.cestino, color: context.cErrore),
               onPressed: onElimina,
             ),
         ],
@@ -346,7 +347,7 @@ class _RigaCampoState extends State<_RigaCampo> {
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
                   fontSize: 12.5,
-                  fontFamily: 'monospace',
+                  fontFamily: 'JetBrains Mono',
                   color: _isUrl ? context.cLink : context.cTesto),
             ),
           ),
@@ -357,21 +358,21 @@ class _RigaCampoState extends State<_RigaCampo> {
               iconSize: 18,
               visualDensity: VisualDensity.compact,
               tooltip: 'Apri nel browser',
-              icon: Icon(Icons.open_in_new, color: context.cLink),
+              icon: IconaVM(Icone.esterno, color: context.cLink),
               onPressed: _apri,
             ),
           if (_isSegreto)
             IconButton(
               iconSize: 18,
               visualDensity: VisualDensity.compact,
-              icon: Icon(_visibile ? Icons.visibility_off : Icons.visibility,
+              icon: IconaVM(_visibile ? Icone.occhioBarrato : Icone.occhio,
                   color: context.cTenue),
               onPressed: () => setState(() => _visibile = !_visibile),
             ),
           IconButton(
             iconSize: 18,
             visualDensity: VisualDensity.compact,
-            icon: Icon(Icons.copy, color: context.cTenue),
+            icon: IconaVM(Icone.copia, color: context.cTenue),
             onPressed: () => _copia(widget.campo.value, widget.campo.label),
           ),
         ],
@@ -407,14 +408,14 @@ class _RigaCampoState extends State<_RigaCampo> {
                         style: TextStyle(
                             fontSize: 26,
                             letterSpacing: 4,
-                            fontFamily: 'monospace',
+                            fontFamily: 'JetBrains Mono',
                             color: context.cVerde),
                       ),
                     ),
                     Text('${o.remaining}s',
                         style: TextStyle(fontSize: 12, color: context.cTenue)),
                     IconButton(
-                      icon: Icon(Icons.copy, color: context.cTenue),
+                      icon: IconaVM(Icone.copia, color: context.cTenue),
                       onPressed: () => _copia(o.code, 'Codice 2FA'),
                     ),
                   ],

@@ -5,268 +5,436 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>VaultMind — locale</title>
 <link rel="icon" type="image/png" href="/static/logo.png">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<!-- Qui c'erano due <link> a fonts.googleapis.com. Tolti il 06/08/2026: erano
+     l'unica connessione verso l'esterno che l'app aprisse, in un prodotto che
+     si presenta come offline-first, e bastavano a dire a un terzo che
+     VaultMind era stato aperto, da che IP e quando. In cambio non davano
+     nemmeno la tipografia promessa: senza rete il ripiego era gia' il font di
+     sistema, cioe' quello che adesso si usa e basta. -->
 <style>
+  /* ---- I FONT, dentro l'app ------------------------------------------
+     Fino al 06/08/2026 arrivavano da fonts.googleapis.com: l'unica
+     connessione verso l'esterno che VaultMind aprisse, in un prodotto che si
+     presenta come offline-first. Bastava a dire a un terzo che l'app era
+     stata aperta, da che IP e quando -- e senza rete non li dava comunque,
+     quindi la tipografia che si vedeva era gia' quella di sistema.
+
+     Sono i file variabili di Google, ridotti da Google stessa al solo
+     alfabeto latino: 212 KB per tre famiglie e tutti i pesi da 400 a 700.
+     `font-display:block` e non `swap` perche' i file sono su disco e non
+     c'e' nessuna attesa da coprire: `swap` mostrerebbe un lampo di font di
+     sistema a ogni avvio, che e' proprio l'effetto che si voleva togliere.
+     La licenza (SIL OFL) sta accanto ai file, in app/web/fonts/. ---- */
+  @font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(/static/fonts/Inter-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+  @font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(/static/fonts/Inter-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(/static/fonts/SpaceGrotesk-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(/static/fonts/SpaceGrotesk-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(/static/fonts/JetBrainsMono-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(/static/fonts/JetBrainsMono-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+
+  /* ======================================================================
+     I TOKEN.
+     Si provano in `design/anteprima.html`, che si apre con doppio clic e
+     mostra i tre temi uno accanto all'altro: cambiare un colore qui dentro
+     vorrebbe dire ricostruire l'exe per guardarlo.
+
+     Gli stessi valori stanno in `mobile/lib/tema.dart` e in
+     `extension/popup.html`. Se cambiano qui, cambiano anche li'.
+     ====================================================================== */
   :root{
-    --bg:#0A0E1A; --panel:#121A2B; --panel2:#0E1524; --border:#1F2A40;
-    --cyan:#38BDF8; --violet:#6366F1; --indigo:#4F46E5; --green:#34D399;
-    --soft:#AEB9CF; --faint:#5A6884;
-    --accent:#38BDF8; --accent2:#6366F1;
-    /* sfondo di intestazione, tab e barra di scrittura: era un blu quasi nero
-       fisso, che nel tema chiaro diventava una fascia grigia */
-    --bar:rgba(7,11,20,.7); --bar-soft:rgba(7,11,20,.55);
-    --disp:'Space Grotesk',sans-serif; --body:'Inter',system-ui,sans-serif; --mono:'JetBrains Mono',monospace;
+    /* Superfici, in ordine di vicinanza a chi guarda: s0 e' il fondo della
+       pagina, s3 e' cio' che sta piu' in alto. I nomi di prima (bg, panel,
+       panel2) non dicevano quale stesse sopra quale, e infatti `panel2` era
+       piu' scuro di `panel` ma si usava per gli incassi. */
+    --s0:#080B14; --s1:#0E1524; --s2:#121A2B; --s3:#18223A;
+    --brd:#1F2A40; --brd-forte:#2C3A56;
+
+    /* Testo in tre livelli. --t3 valeva #5A6884: 3,1:1 sul pannello, sotto
+       il minimo AA di 4,5 -- ed e' il colore di TUTTE le spiegazioni, i
+       contatori e i suggerimenti dell'app. --t1 esiste per non riscrivere
+       `#fff`, che nel tema chiaro andava corretto elemento per elemento con
+       una lista di selettori a cui bisognava ricordarsi di aggiungere ogni
+       cosa nuova. */
+    --t1:#FFFFFF; --t2:#AEB9CF; --t3:#7C8AA8;
+
+    --acc:#38BDF8; --acc-su:#04121C; --acc-velo:rgba(56,189,248,.12);
+    --vio:#7B7DF3; --vio-pieno:#4F46E5;
+    --ok:#34D399; --ok-velo:rgba(52,211,153,.10);
+    /* Rosso e giallo erano scritti a mano (#FCA5A5, #FBBF24) in venti punti e
+       nessuno dei due era corretto dal tema chiaro: finivano su bianco a
+       2:1, cioe' gli errori si leggevano solo sapendo gia' che c'erano. */
+    --err:#FCA5A5; --err-velo:rgba(252,165,165,.09);
+    --warn:#FBBF24; --warn-velo:rgba(251,191,36,.10);
+
+    /* Vetro. La cornice dell'app (intestazione, tab, barra di scrittura,
+       menu) e' una superficie sola: sfoca cio' che ci scorre sotto e si
+       tinge verso il fondo, invece di essere un colore opaco che nel tema
+       chiaro diventava una fascia grigia. */
+    --gl-bg:rgba(9,13,24,.66); --gl-bg-2:rgba(9,13,24,.52);
+    --gl-brd:rgba(255,255,255,.10); --gl-luce:rgba(255,255,255,.34);
+    --gl-blur:18px;
+    /* L'interruttore ha una traccia sua: `--gl-bg` e' un velo che va verso il
+       fondo, e la pallina (bianca) nel tema chiaro ci sparirebbe dentro. */
+    --sw-off:rgba(255,255,255,.10);
+    --gl-acc:rgba(56,189,248,.55); --gl-acc-brd:rgba(56,189,248,.7);
+
+    /* Ombre, non bagliori: il box-shadow ciano da 28px sulla schermata di
+       sblocco faceva molto videogioco e poco strumento di sicurezza. */
+    --el1:0 1px 2px rgba(0,0,0,.45);
+    --el2:0 8px 28px rgba(0,0,0,.45);
+    --el3:0 24px 64px rgba(0,0,0,.55);
+    --anello:0 0 0 2px var(--s0),0 0 0 4px var(--acc);
+
+    --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:24px; --sp6:32px;
+    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:999px;
+    --dur1:120ms; --dur2:220ms; --dur3:380ms;
+    --ease:cubic-bezier(.2,.7,.3,1);
+    --molla:cubic-bezier(.34,1.56,.64,1);
+
+    /* Font di sistema. Prima arrivavano da fonts.googleapis.com: in un
+       gestore di password che si vanta di essere offline, ogni avvio diceva
+       a Google che l'app era aperta -- e senza rete la tipografia spariva
+       comunque, perche' il ripiego era il font di sistema. */
+    --disp:'Space Grotesk','Segoe UI Variable Display','Segoe UI',sans-serif;
+    --body:'Inter','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
+    --mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;
   }
   *{box-sizing:border-box} html,body{margin:0;height:100%}
   /* scrollbar discreta e moderna */
-  *{scrollbar-width:thin;scrollbar-color:var(--border) transparent}
+  *{scrollbar-width:thin;scrollbar-color:var(--brd) transparent}
   *::-webkit-scrollbar{width:8px;height:8px}
   *::-webkit-scrollbar-track{background:transparent}
-  *::-webkit-scrollbar-thumb{background:var(--border);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
-  *::-webkit-scrollbar-thumb:hover{background:var(--faint);background-clip:padding-box;border:2px solid transparent}
-  body{background:var(--bg);color:var(--soft);font-family:var(--body);
+  *::-webkit-scrollbar-thumb{background:var(--brd);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
+  *::-webkit-scrollbar-thumb:hover{background:var(--t3);background-clip:padding-box;border:2px solid transparent}
+  body{background:var(--s0);color:var(--t2);font-family:var(--body);
     background-image:radial-gradient(rgba(56,189,248,.025) 1px,transparent 1px);background-size:24px 24px;}
+  /* I due aloni dietro tutto. Non sono decorazione: il vetro sfoca cio' che
+     ha dietro, e dietro una fascia di colore piatto non c'e' niente da
+     sfocare -- l'intestazione resterebbe una pillola opaca. Sono fissi, non
+     scorrono, quindi il contenuto ci passa sotto e il vetro lo mostra. */
+  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
+    background:
+      radial-gradient(60vw 50vh at 10% -10%, var(--acc-velo), transparent 70%),
+      radial-gradient(50vw 45vh at 95% 12%, rgba(99,102,241,.10), transparent 70%)}
+  body[data-theme="night"]::before{
+    background:
+      radial-gradient(60vw 50vh at 10% -10%, var(--acc-velo), transparent 70%),
+      radial-gradient(50vw 45vh at 95% 12%, rgba(30,58,138,.16), transparent 70%)}
+  #lock,#app{position:relative;z-index:1}
   button{font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
   input{font-family:var(--body)}
   .hidden{display:none!important}
   @keyframes rise{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
-  .rise{animation:rise .35s cubic-bezier(.2,.7,.3,1) both}
-  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:#22304a;border-radius:8px}
+  .rise{animation:rise var(--dur3) var(--ease) both}
+  ::-webkit-scrollbar{width:8px}::-webkit-scrollbar-thumb{background:var(--brd);border-radius:8px}
+
+  /* Le icone. Uno sprite `<symbol>` in fondo alla pagina, richiamato con
+     `<use>`: nessuna richiesta di rete, nessun font da caricare, e il colore
+     arriva da `currentColor` -- cioe' seguono il tema da sole. Prima erano
+     emoji, disegnate dal sistema operativo a colori pieni. */
+  /* `display:inline-block` esplicito perche' piu' sotto c'e' `svg{display:block}`
+     (serve al logo e al lettore di QR): senza questa riga ogni icona in mezzo
+     a una frase andrebbe a capo da sola. */
+  .ic{display:inline-block;width:18px;height:18px;flex:0 0 auto;vertical-align:-3px;
+    fill:none;stroke:currentColor;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round}
+  .ic-14{width:14px;height:14px;vertical-align:-2px}
+  .ic-16{width:16px;height:16px;vertical-align:-3px}
+  .ic-20{width:20px;height:20px;vertical-align:-4px}
+  .ic-24{width:24px;height:24px;vertical-align:-5px}
+
+  /* Il fuoco da tastiera. Prima non esisteva: tre `outline:none` e nessun
+     rimpiazzo, quindi con Tab non si vedeva dove si era. In un'app che
+     custodisce password non e' un dettaglio estetico -- e' l'unico modo di
+     usarla senza mouse. `:focus-visible` e non `:focus`: cosi' non compare
+     cliccando col mouse, che e' il motivo per cui l'outline era stato tolto. */
+  :where(button,a,input,select,textarea,[tabindex],.sw):focus-visible{
+    outline:none;box-shadow:var(--anello)}
+
+  /* Chi ha chiesto meno animazioni al sistema operativo le ottiene. */
+  @media (prefers-reduced-motion:reduce){
+    *,*::before,*::after{
+      animation-duration:1ms!important;animation-iteration-count:1!important;
+      transition-duration:1ms!important;scroll-behavior:auto!important}
+  }
 
   /* lock */
   #lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:18px;
-    box-shadow:0 0 28px rgba(34,211,238,.14)}
+  .card{background:var(--s2);border:1px solid var(--brd);border-radius:var(--r-xl);
+    box-shadow:var(--el2)}
   .lockbox{width:min(92vw,400px);padding:32px}
   .badge-row{display:flex;justify-content:center;margin-bottom:14px}
-  .icon-chip{padding:12px;border-radius:14px;background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.3);display:inline-flex}
-  .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:#fff;text-align:center;font-size:28px}
-  .sub{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--faint);text-align:center;margin-top:6px;text-transform:uppercase}
-  label.lbl{font-family:var(--disp);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
-  .field{width:100%;margin-top:6px;border-radius:12px;padding:12px 14px;background:var(--panel2);
-    border:1px solid var(--border);color:#fff;outline:none;font-family:var(--mono)}
-  .btn{width:100%;margin-top:12px;border-radius:12px;padding:12px;font-weight:700;background:var(--cyan);color:var(--bg)}
+  .icon-chip{padding:12px;border-radius:var(--r-lg);background:var(--acc-velo);border:1px solid var(--gl-acc-brd);display:inline-flex}
+  .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:var(--t1);text-align:center;font-size:28px}
+  .sub{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--t3);text-align:center;margin-top:6px;text-transform:uppercase}
+  label.lbl{font-family:var(--disp);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
+  .field{width:100%;margin-top:6px;border-radius:12px;padding:12px 14px;background:var(--s1);
+    border:1px solid var(--brd);color:var(--t1);outline:none;font-family:var(--mono)}
+  .btn{width:100%;margin-top:12px;border-radius:12px;padding:12px;font-weight:700;background:var(--acc);color:var(--acc-su)}
   .btn:disabled{opacity:.4;cursor:default}
-  .hint{font-size:11px;color:var(--faint);margin-top:12px;line-height:1.4}
-  .err{color:#FCA5A5;font-size:12px;margin-top:8px;font-family:var(--mono)}
+  /* Le varianti del pulsante. Erano `style="..."` ripetuti nel markup: lo
+     stesso pulsante aveva tre aspetti in tre modali diversi, e cambiare la
+     palette non li raggiungeva. */
+  .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px}
+  .btn.fantasma{background:transparent;border:1px solid var(--brd);color:var(--t2);margin-top:8px}
+  .btn.fantasma:hover{background:var(--s3);border-color:var(--brd-forte);color:var(--t1)}
+  .btn.tratteggiato{background:transparent;border:1px dashed var(--acc);color:var(--acc);margin-top:0}
+  .btn.tratteggiato.vio{border-color:var(--vio);color:var(--vio)}
+  .btn.compatto{padding:8px;width:auto}
+  .btn.pieno-vio{background:var(--vio-pieno);color:#fff}
+  .hint{font-size:11px;color:var(--t3);margin-top:12px;line-height:1.4}
+  .err{color:var(--err);font-size:12px;margin-top:8px;font-family:var(--mono)}
   /* avviso di primo avvio: il vault non esiste ancora, la password va CREATA */
   .firstrun{margin-top:20px;padding:12px 14px;border-radius:12px;font-size:12px;line-height:1.5;
-    background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);color:var(--soft)}
-  .firstrun b{color:var(--cyan);display:block;margin-bottom:3px}
+    background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);color:var(--t2)}
+  .firstrun b{color:var(--acc);display:block;margin-bottom:3px}
 
   /* barra di avanzamento (import, operazioni lunghe).
      Sticky: con l'anteprima lunga si e' scrollati in fondo, sul pulsante Salva,
      e una barra in cima al modale non la vedrebbe nessuno. */
-  #impProgress{position:sticky;top:0;z-index:5;background:var(--panel);
-    padding:10px 0 12px;border-bottom:1px solid var(--border)}
-  .prg{height:6px;border-radius:6px;background:var(--border);overflow:hidden}
-  .prg i{display:block;height:100%;width:0;background:var(--accent);border-radius:6px;transition:width .15s linear}
+  #impProgress{position:sticky;top:0;z-index:5;background:var(--s2);
+    padding:10px 0 12px;border-bottom:1px solid var(--brd)}
+  .prg{height:6px;border-radius:6px;background:var(--brd);overflow:hidden}
+  .prg i{display:block;height:100%;width:0;background:var(--acc);border-radius:6px;transition:width .15s linear}
   /* indeterminata: usata quando il lavoro e' lato server e non sappiamo la percentuale */
   .prg.indet i{width:35%!important;transition:none;animation:prgslide 1.1s ease-in-out infinite}
   @keyframes prgslide{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
-  .prg-txt{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:7px;text-align:center}
+  .prg-txt{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:7px;text-align:center}
 
   /* app */
   #app{display:flex;flex-direction:column;height:100vh}
   header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;
-    border-bottom:1px solid var(--border);background:var(--bar);backdrop-filter:blur(8px)}
-  .hbrand{display:flex;align-items:center;gap:10px;color:#fff;font-family:var(--disp);font-weight:600;letter-spacing:-.3px;font-size:18px}
+    border-bottom:1px solid var(--gl-brd);background:var(--gl-bg);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)}
+  .hbrand{display:flex;align-items:center;gap:10px;color:var(--t1);font-family:var(--disp);font-weight:600;letter-spacing:-.3px;font-size:18px}
   .pills{display:flex;align-items:center;gap:8px}
   .pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
-  .pill.net{color:var(--green);border:1px solid rgba(52,211,153,.35)}
-  .pill.db{color:var(--cyan);border:1px solid rgba(34,211,238,.35)}
-  .pill.llm{color:var(--violet);border:1px solid rgba(167,139,250,.35)}
-  .iconbtn{padding:8px;border-radius:10px;border:1px solid var(--border)}
-  .iconbtn:hover{background:rgba(255,255,255,.05)}
+  .pill.net{color:var(--ok);border:1px solid rgba(52,211,153,.35)}
+  .pill.db{color:var(--acc);border:1px solid rgba(34,211,238,.35)}
+  .pill.llm{color:var(--vio);border:1px solid rgba(167,139,250,.35)}
+  /* Il pulsante-icona. `inline-flex` non e' un vezzo: un <svg> e' un elemento
+     in linea e poggia sulla linea di base del testo, quindi senza centratura
+     esplicita il pulsante cresce di qualche pixel sotto e la fila di pulsanti
+     si disallinea. */
+  .iconbtn{display:inline-flex;align-items:center;justify-content:center;gap:7px;
+    padding:8px 10px;min-width:36px;min-height:36px;border-radius:var(--r-sm);
+    border:1px solid var(--brd);color:var(--t2);
+    transition:color var(--dur1) var(--ease),border-color var(--dur1) var(--ease),
+               background var(--dur1) var(--ease)}
+  .iconbtn:hover{background:var(--s3);color:var(--t1);border-color:var(--brd-forte)}
+  /* Le tre tinte che prima erano `style="border-color:...;color:..."` ripetuti
+     nel markup, cioe' invisibili a chi cambia la palette. */
+  .iconbtn.pericolo{border-color:var(--err);color:var(--err)}
+  .iconbtn.pericolo:hover{background:var(--err-velo);color:var(--err);border-color:var(--err)}
+  .iconbtn.tinta-vio{border-color:var(--vio);color:var(--vio)}
+  .iconbtn.tinta-vio:hover{color:var(--vio);border-color:var(--vio)}
+  .iconbtn.tinta-ok{border-color:var(--ok);color:var(--ok)}
+  .iconbtn.tinta-ok:hover{color:var(--ok);border-color:var(--ok)}
+  .lente{display:inline-flex;color:var(--t3);flex:0 0 auto}
 
   main{flex:1;overflow-y:auto;padding:20px;max-width:680px;width:100%;margin:0 auto}
   .row{display:flex;margin-bottom:12px}
   .row.user{justify-content:flex-end}
   .bubble{max-width:88%;border-radius:18px;padding:10px 16px;font-size:15px;line-height:1.5}
-  .b-user{background:var(--indigo);color:#fff;box-shadow:0 0 20px rgba(79,70,229,.3)}
-  .b-ai{background:var(--panel);border:1px solid var(--border);color:var(--soft)}
-  .ai-tag{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--accent);margin-bottom:5px;display:flex;align-items:center;gap:6px}
-  .ai-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 6px var(--accent)}
+  .b-user{background:var(--vio-pieno);color:#fff;box-shadow:var(--el1)}
+  .b-ai{background:var(--s2);border:1px solid var(--brd);color:var(--t2)}
+  .ai-tag{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--acc);margin-bottom:5px;display:flex;align-items:center;gap:6px}
+  .ai-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 6px var(--acc)}
 
-  .cred{position:relative;overflow:hidden;border-radius:12px;padding:14px;margin-top:8px;background:var(--panel2);border:1px solid var(--border)}
-  .cred .accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--cyan)}
-  .cred .title{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}
+  .cred{position:relative;overflow:hidden;border-radius:12px;padding:14px;margin-top:8px;background:var(--s1);border:1px solid var(--brd)}
+  .cred .accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+  .cred .title{display:flex;align-items:center;gap:8px;color:var(--t1);font-weight:600}
   .credline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
   .credline .meta{min-width:0}
-  .credline .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--faint)}
-  .credline .v{font-family:var(--mono);color:var(--soft);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .credline .v.shown{color:#fff;letter-spacing:0}
-  .credline .v.urlv{color:var(--cyan);font-size:13px}
+  .credline .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
+  .credline .v{font-family:var(--mono);color:var(--t2);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .credline .v.shown{color:var(--t1);letter-spacing:0}
+  .credline .v.urlv{color:var(--acc);font-size:13px}
   .acts{display:flex;gap:6px;flex-shrink:0}
   .pickbtn{margin-top:8px;width:100%;text-align:left;border-radius:10px;padding:8px 12px;
-    background:rgba(34,211,238,.08);border:1px solid var(--cyan);color:var(--cyan)}
+    background:rgba(34,211,238,.08);border:1px solid var(--acc);color:var(--acc)}
 
 
-  .composer{border-top:1px solid var(--border);background:var(--bar);backdrop-filter:blur(8px)}
+  .composer{border-top:1px solid var(--gl-brd);background:var(--gl-bg);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)}
   .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:13px 20px 16px;display:flex;align-items:center;gap:8px}
-  .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 14px;background:var(--panel);border:1px solid var(--border)}
-  .searchbox input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:15px}
-  .send{padding:10px;border-radius:12px;background:var(--cyan)}
+  .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 14px;background:var(--s2);border:1px solid var(--brd)}
+  .searchbox input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:15px}
+  .send{display:inline-flex;align-items:center;justify-content:center;
+    width:40px;height:40px;border-radius:var(--r-md);
+    background:var(--acc);color:var(--acc-su)}
   .send:hover{filter:brightness(1.1)}
 
   .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6);z-index:50}
   .modalcard{width:min(92vw,420px);padding:24px}
-  .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;color:#fff;font-family:var(--disp);font-weight:700}
+  .modalcard.media{width:min(94vw,560px);max-height:88vh;overflow-y:auto}
+  .modalcard.larga{width:min(94vw,620px);max-height:88vh;overflow-y:auto}
+  .modalcard.colonna{overflow-y:visible;display:flex;flex-direction:column}
+  .mhead{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;color:var(--t1);font-family:var(--disp);font-weight:700}
   svg{display:block}
   .fieldrow{display:flex;gap:6px;margin-top:8px;align-items:flex-start}
   .fieldrow .lbl-in{flex:0 0 38%}
   .fieldrow .val-in{flex:1}
   .fieldrow input{padding:8px 10px;font-size:13px}
-  .fieldrow .rmrow{flex:0 0 auto;padding:8px;border:1px solid var(--border);border-radius:10px;color:var(--faint)}
-  .fieldrow .rmrow:hover{color:#FCA5A5;border-color:#FCA5A5}
+  .fieldrow .rmrow{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+    padding:8px;border:1px solid var(--brd);border-radius:var(--r-sm);color:var(--t3)}
+  .fieldrow .rmrow:hover{color:var(--err);border-color:var(--err)}
   /* frecce per decidere l'ordine dei campi: colonnina stretta, non rubano
      spazio ai due campi di testo */
   .fieldrow .movecol{flex:0 0 auto;display:flex;flex-direction:column;gap:2px}
-  .fieldrow .movecol button{padding:0 6px;line-height:15px;font-size:11px;
-    border:1px solid var(--border);border-radius:6px;color:var(--faint)}
-  .fieldrow .movecol button:hover{color:var(--accent);border-color:var(--accent)}
+  .fieldrow .movecol button{display:flex;align-items:center;justify-content:center;
+    padding:1px 5px;border:1px solid var(--brd);border-radius:6px;color:var(--t3)}
+  .fieldrow .movecol button:hover{color:var(--acc);border-color:var(--acc)}
 
   /* voce critica: account da cui si rimette mano a tutto il resto */
   .crit-row{display:flex;align-items:center;gap:10px;margin-top:14px;padding:11px 12px;
-    border-radius:12px;background:var(--panel2);border:1px solid var(--border)}
+    border-radius:12px;background:var(--s1);border:1px solid var(--brd)}
   .crit-row .txt{flex:1;min-width:0}
-  .crit-row .t1{font-size:13px;color:var(--soft)}
-  .crit-row .t2{font-size:11px;color:var(--faint);margin-top:2px;line-height:1.4}
+  .crit-row .t1{display:flex;align-items:center;gap:7px;font-size:13px;color:var(--t2)}
+  .crit-row .t2{font-size:11px;color:var(--t3);margin-top:2px;line-height:1.4}
   .crit-warn{margin-top:10px;padding:10px 12px;border-radius:10px;font-size:12px;line-height:1.5;
-    background:rgba(251,191,36,.08);border:1px solid rgba(251,191,36,.4);color:var(--soft)}
-  .crit-warn b{color:#FBBF24}
+    background:var(--warn-velo);border:1px solid var(--warn);color:var(--t2)}
+  .crit-warn b{color:var(--warn)}
   .badge-crit{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;
-    background:rgba(251,191,36,.1);border:1px solid rgba(251,191,36,.45);color:#FBBF24;white-space:nowrap}
+    background:var(--warn-velo);border:1px solid var(--warn);color:var(--warn);white-space:nowrap}
 
   /* TOTP / 2FA */
   .totp{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.3)}
   .totp .trow{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .totp .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--green)}
-  .totp .tcode{font-family:var(--mono);font-size:24px;font-weight:700;color:#fff;letter-spacing:3px;margin-top:2px}
-  .totp .terr{font-family:var(--mono);font-size:12px;color:#FCA5A5;margin-top:4px}
-  .totp .tbar{margin-top:8px;height:4px;border-radius:4px;background:var(--border);overflow:hidden}
-  .totp .tbar i{display:block;height:100%;background:var(--green);width:100%;transition:width 1s linear}
+  .totp .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ok)}
+  .totp .tcode{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--t1);letter-spacing:3px;margin-top:2px}
+  .totp .terr{font-family:var(--mono);font-size:12px;color:var(--err);margin-top:4px}
+  .totp .tbar{margin-top:8px;height:4px;border-radius:4px;background:var(--brd);overflow:hidden}
+  .totp .tbar i{display:block;height:100%;background:var(--ok);width:100%;transition:width 1s linear}
   .iconbtn.rec{background:rgba(52,211,153,.18)!important}
-  .onb-sec{border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:12px;background:var(--panel2)}
-  .onb-head{display:flex;align-items:center;gap:8px;color:#fff;font-weight:600}
+  .onb-sec{border:1px solid var(--brd);border-radius:12px;padding:12px;margin-top:12px;background:var(--s1)}
+  .onb-head{display:flex;align-items:center;gap:8px;color:var(--t1);font-weight:600}
 
   /* categorie: una riga per categoria, che si apre sulle sue voci */
-  .catrow{border:1px solid var(--border);border-radius:12px;background:var(--panel);margin:10px 14px}
+  .catrow{border:1px solid var(--brd);border-radius:12px;background:var(--s2);margin:10px 14px}
   .cathead{display:flex;align-items:center;gap:10px;padding:12px 14px;cursor:pointer}
-  .cathead .nm{font-weight:600;color:#fff;font-size:14px}
-  .cathead .cnt{font-size:11px;color:var(--faint);font-family:var(--mono)}
+  .cathead .nm{font-weight:600;color:var(--t1);font-size:14px}
+  .cathead .cnt{font-size:11px;color:var(--t3);font-family:var(--mono)}
   .cathead .sp{flex:1}
   .catrow.orfane{border-style:dashed}
-  .catbody{padding:0 14px 12px;border-top:1px solid var(--border)}
-  .catvoce{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px;color:var(--soft);
-    border-bottom:1px solid var(--border)}
+  .catbody{padding:0 14px 12px;border-top:1px solid var(--brd)}
+  .catvoce{display:flex;align-items:center;gap:8px;padding:7px 0;font-size:13px;color:var(--t2);
+    border-bottom:1px solid var(--brd)}
   .catvoce:last-child{border-bottom:none}
   .catvoce .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .catvuota{font-size:12px;color:var(--faint);padding:10px 0}
+  .catvuota{font-size:12px;color:var(--t3);padding:10px 0}
   /* scelta multipla delle voci da mettere in una categoria */
-  .pickrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--border);font-size:13px}
+  .pickrow{display:flex;align-items:center;gap:10px;padding:8px 4px;border-bottom:1px solid var(--brd);font-size:13px}
   .pickrow:last-child{border-bottom:none}
-  .pickrow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--soft)}
-  .pickrow .w{font-size:11px;color:var(--faint);white-space:nowrap}
+  .pickrow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)}
+  .pickrow .w{font-size:11px;color:var(--t3);white-space:nowrap}
 
   /* tab nav */
-  .tab-btn{flex:1;padding:11px;font-family:var(--disp);font-size:11px;letter-spacing:1px;text-transform:uppercase;
-    color:var(--faint);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;transition:color .2s,border-color .2s}
-  .tab-btn:hover{color:var(--soft)}
-  .tab-btn.active{color:var(--cyan);border-bottom-color:var(--cyan)}
+  .tab-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;
+    padding:11px;font-family:var(--disp);font-size:11px;letter-spacing:1px;text-transform:uppercase;
+    color:var(--t3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
+    transition:color var(--dur2) var(--ease),border-color var(--dur2) var(--ease)}
+  .tab-btn:hover{color:var(--t2)}
+  .tab-btn.active{color:var(--acc);border-bottom-color:var(--acc)}
 
   /* database panel */
   #dbPanel{flex:1;overflow-y:auto;padding:20px;max-width:980px;width:100%;margin:0 auto}
   /* La testata (ricerca + svuota) resta in vista durante lo scorrimento:
      con 800 voci risalire in cima per filtrare era una punizione.
-     Sfondo da --bg e non fisso: nel tema chiaro un colore scuro fisso
+     Sfondo da --s0 e non fisso: nel tema chiaro un colore scuro fisso
      farebbe la solita fascia grigia. */
   .db-head{display:flex;align-items:center;justify-content:space-between;
-    position:sticky;top:0;z-index:5;background:var(--bg);
+    position:sticky;top:0;z-index:5;background:var(--s0);
     padding:10px 0 12px;margin-bottom:10px}
-  .db-title{font-family:var(--disp);font-size:13px;letter-spacing:1px;color:var(--cyan)}
+  .db-title{font-family:var(--disp);font-size:13px;letter-spacing:1px;color:var(--acc)}
   #dbGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-  #dbEmpty{text-align:center;padding:48px 20px;color:var(--faint);font-family:var(--mono);font-size:13px}
+  #dbEmpty{text-align:center;padding:48px 20px;color:var(--t3);font-family:var(--mono);font-size:13px}
   .dbcard{display:flex;flex-direction:column;gap:6px}
-  .dbcard .dbtitle{color:#fff;font-weight:600;font-size:14px;flex:1;word-break:break-word}
+  .dbcard .dbtitle{color:var(--t1);font-weight:600;font-size:14px;flex:1;word-break:break-word}
   .dbtags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
-  .dbtag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--cyan)}
-  .del-confirm{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(252,165,165,.07);
-    border:1px solid rgba(252,165,165,.3);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-  .del-confirm .msg{font-family:var(--mono);font-size:12px;color:#FCA5A5}
+  .dbtag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--acc)}
+  .del-confirm{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--err-velo);
+    border:1px solid var(--err);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+  .del-confirm .msg{font-family:var(--mono);font-size:12px;color:var(--err)}
 
   /* ---- TEMI ---- */
   /* default = scuro (gia' definito in :root). Qui le varianti. */
   /* CHIARO — barre bianche leggermente azzurrate invece della fascia grigia
      che veniva fuori tenendo lo sfondo scuro del tema notte. */
   body[data-theme="light"]{
-    --bg:#F4F7FC; --panel:#FFFFFF; --panel2:#EEF3FA; --border:#D9E2F0;
-    --cyan:#0369A1; --violet:#4F46E5; --indigo:#4338CA; --green:#047857;
-    --soft:#2F3D57; --faint:#6B7C99;
-    --accent:#0369A1; --accent2:#4F46E5;
-    --bar:rgba(255,255,255,.85); --bar-soft:rgba(248,251,255,.8);
+    --s0:#F4F7FC; --s1:#EEF3FA; --s2:#FFFFFF; --s3:#F8FBFF;
+    --brd:#D9E2F0; --brd-forte:#C2D0E4;
+    --t1:#0F1729; --t2:#2F3D57; --t3:#5C6C87;
+    --acc:#0369A1; --acc-su:#FFFFFF; --acc-velo:rgba(3,105,161,.09);
+    --vio:#4F46E5; --vio-pieno:#4338CA;
+    --ok:#047857; --ok-velo:rgba(4,120,87,.09);
+    --err:#B91C1C; --err-velo:rgba(185,28,28,.08);
+    --warn:#B45309; --warn-velo:rgba(180,83,9,.09);
+    --gl-bg:rgba(255,255,255,.72); --gl-bg-2:rgba(248,251,255,.62);
+    --gl-brd:rgba(15,23,41,.10); --gl-luce:rgba(255,255,255,.9);
+    --sw-off:rgba(15,23,41,.10);
+    --gl-acc:rgba(3,105,161,.55); --gl-acc-brd:rgba(3,105,161,.6);
+    --el1:0 1px 2px rgba(15,23,41,.08);
+    --el2:0 8px 28px rgba(15,23,41,.10);
+    --el3:0 24px 64px rgba(15,23,41,.14);
   }
   body[data-theme="light"]{background-image:radial-gradient(rgba(3,105,161,.05) 1px,transparent 1px)}
-  body[data-theme="light"] header,
-  body[data-theme="light"] .composer{box-shadow:0 1px 18px rgba(15,23,41,.06)}
-  body[data-theme="light"] .card{box-shadow:0 4px 24px rgba(15,23,41,.08)}
-  body[data-theme="light"] .b-user{color:#fff}
-  body[data-theme="light"] .brand,
-  body[data-theme="light"] .dbcard .dbtitle,
-  body[data-theme="light"] .cred .title,
-  body[data-theme="light"] .hbrand{color:#0F1729}
-  body[data-theme="light"] .credline .v.shown{color:#0F1729}
-  body[data-theme="light"] .searchbox input,
-  body[data-theme="light"] .field{color:#0F1729}
 
   /* NOTTE E ORO — blu notte profondo, ottone come contrasto. */
   body[data-theme="night"]{
-    --bg:#070C1A; --panel:#0E1730; --panel2:#0A1124; --border:#1E2C4C;
-    --cyan:#E3B341; --violet:#C9922E; --indigo:#1E3A8A; --green:#4ADE80;
-    --soft:#B9C4DB; --faint:#6A789A;
-    --accent:#E3B341; --accent2:#C9922E;
-    --bar:rgba(6,10,24,.75); --bar-soft:rgba(6,10,24,.6);
+    --s0:#050912; --s1:#0B1226; --s2:#0E1730; --s3:#152043;
+    --brd:#1E2C4C; --brd-forte:#2B3C63;
+    --t1:#FFFFFF; --t2:#B9C4DB; --t3:#7E8CAC;
+    --acc:#E3B341; --acc-su:#1A1206; --acc-velo:rgba(227,179,65,.12);
+    --vio:#D8A544; --vio-pieno:#1E3A8A;
+    --ok:#4ADE80; --ok-velo:rgba(74,222,128,.10);
+    --gl-bg:rgba(5,9,20,.7); --gl-bg-2:rgba(5,9,20,.55);
+    --sw-off:rgba(255,255,255,.09);
+    --gl-acc:rgba(227,179,65,.5); --gl-acc-brd:rgba(227,179,65,.65);
   }
   body[data-theme="night"]{background-image:radial-gradient(rgba(227,179,65,.05) 1px,transparent 1px)}
-  body[data-theme="night"] .card{box-shadow:0 0 32px rgba(227,179,65,.10)}
-  body[data-theme="night"] .icon-chip{background:rgba(227,179,65,.08);border-color:rgba(227,179,65,.35)}
-  body[data-theme="night"] .b-user{background:var(--indigo);box-shadow:0 0 20px rgba(30,58,138,.45)}
-  /* il testo scuro sui bottoni dorati resta leggibile */
-  body[data-theme="night"] .btn,
-  body[data-theme="night"] .send{color:#1A1206}
 
   /* mini menu tema */
-  #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--panel);border:1px solid var(--border);
+  #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--s2);border:1px solid var(--brd);
     border-radius:12px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,.4);min-width:160px}
   #themeMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;border-radius:8px;
-    color:var(--soft);font-size:13px}
+    color:var(--t2);font-size:13px}
   #themeMenu button:hover{background:rgba(127,127,127,.12)}
-  #themeMenu button.sel{color:var(--cyan)}
+  #themeMenu button.sel{color:var(--acc)}
 
   /* generatore password */
-  .gen-pop{margin-top:10px;padding:12px;border-radius:12px;background:var(--panel2);border:1px solid var(--accent2)}
+  .gen-pop{margin-top:10px;padding:12px;border-radius:12px;background:var(--s1);border:1px solid var(--vio)}
   .gen-out{display:flex;align-items:center;gap:8px;margin-bottom:10px}
   .gen-out input{flex:1;font-family:var(--mono);font-size:14px;letter-spacing:1px;padding:9px 12px}
-  .gen-row{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--soft)}
-  .gen-row input[type=range]{flex:1;accent-color:var(--accent)}
-  .gen-row .len{font-family:var(--mono);min-width:26px;text-align:right;color:#fff}
+  .gen-row{display:flex;align-items:center;gap:10px;margin-top:8px;font-size:12px;color:var(--t2)}
+  .gen-row input[type=range]{flex:1;accent-color:var(--acc)}
+  .gen-row .len{font-family:var(--mono);min-width:26px;text-align:right;color:var(--t1)}
   .gen-toggles{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
   .gen-tg{display:flex;align-items:center;gap:5px;font-size:12px;cursor:pointer}
-  .gen-tg input{accent-color:var(--accent)}
+  .gen-tg input{accent-color:var(--acc)}
 
   /* filtro database */
   .db-filter{flex:1;max-width:280px;display:flex;align-items:center;gap:6px;border-radius:10px;
-    padding:7px 12px;background:var(--panel);border:1px solid var(--border)}
-  .db-filter input{flex:1;background:none;border:none;outline:none;color:#fff;font-size:13px;font-family:var(--mono)}
+    padding:7px 12px;background:var(--s2);border:1px solid var(--brd)}
+  .db-filter input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:13px;font-family:var(--mono)}
 
   /* menu hamburger */
-  #mainMenu{position:absolute;top:54px;left:16px;z-index:60;background:var(--panel);border:1px solid var(--border);
+  #mainMenu{position:absolute;top:54px;left:16px;z-index:60;background:var(--s2);border:1px solid var(--brd);
     border-radius:12px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,.45);min-width:200px}
   #mainMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:8px;
-    color:var(--soft);font-size:13px}
+    color:var(--t2);font-size:13px}
   #mainMenu button:hover{background:rgba(127,127,127,.1)}
-  #mainMenu .sep{height:1px;background:var(--border);margin:6px 4px}
+  #mainMenu .sep{height:1px;background:var(--brd);margin:6px 4px}
 
   /* pannello impostazioni.
      Il modale usa .card (non .modalcard): il padding sta tutto lì, quindi senza
@@ -274,24 +442,52 @@
   #setModal .card{max-width:600px !important;width:100% !important;padding:24px 26px}
   .set-section{margin-top:18px}
   .set-section h4{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-    color:var(--accent);margin:0 0 10px}
-  .set-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 0;border-top:1px solid var(--border)}
+    color:var(--acc);margin:0 0 10px}
+  .set-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 0;border-top:1px solid var(--brd)}
   .set-row:first-of-type{border-top:none}
   .set-row > div:first-child{flex:1;min-width:0}
-  .set-row .lab{font-size:13px;color:var(--soft);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
-  .set-row .desc{font-size:11px;color:var(--faint);margin-top:3px;line-height:1.4}
+  .set-row .lab{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .set-row .desc{font-size:11px;color:var(--t3);margin-top:3px;line-height:1.4}
   .set-row .ctl{flex:0 0 auto;white-space:nowrap}
-  /* switch */
-  .sw{position:relative;width:42px;height:24px;border-radius:999px;background:var(--border);cursor:pointer;transition:.2s;flex:0 0 auto}
-  .sw.on{background:var(--accent)}
-  .sw::after{content:"";position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.2s}
-  .sw.on::after{transform:translateX(18px)}
-  .set-sel{background:var(--panel2);border:1px solid var(--border);color:#fff;border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--mono)}
+  /* ---- L'interruttore in vetro -------------------------------------------
+     Tre livelli, e l'ordine conta: la traccia sfocata, il riflesso in alto
+     (::before), la pallina (::after). Il riflesso e' cio' che distingue il
+     vetro da una pillola semitrasparente: e' l'arco di luce che sul vetro
+     vero si forma dove la superficie curva verso l'alto.
+
+     Il JS non cambia: e' sempre un div con la classe `on` (vedi `setSw`). */
+  .sw{position:relative;width:52px;height:31px;flex:0 0 auto;
+    border-radius:var(--r-full);cursor:pointer;
+    background:var(--sw-off);border:1px solid var(--gl-brd);
+    backdrop-filter:blur(var(--gl-blur)) saturate(180%);
+    -webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%);
+    box-shadow:inset 0 1px 1px var(--gl-luce),inset 0 -2px 4px rgba(0,0,0,.18),var(--el1);
+    transition:background var(--dur2) var(--ease),border-color var(--dur2) var(--ease),
+               box-shadow var(--dur2) var(--ease)}
+  .sw::before{content:"";position:absolute;left:2px;right:2px;top:1px;height:44%;
+    border-radius:var(--r-full);pointer-events:none;
+    background:linear-gradient(180deg,var(--gl-luce),transparent)}
+  .sw::after{content:"";position:absolute;top:3px;left:3px;width:25px;height:25px;
+    border-radius:var(--r-full);
+    background:linear-gradient(180deg,#FFFFFF,#E9EEF6);
+    box-shadow:0 2px 6px rgba(0,0,0,.32),0 0 0 .5px rgba(0,0,0,.05),
+               inset 0 1px 0 rgba(255,255,255,.95);
+    /* La molla e' cio' che si sente col dito: la pallina supera di poco la
+       fine corsa e torna. Lineare sembra plastica. */
+    transition:transform var(--dur3) var(--molla),width var(--dur2) var(--ease)}
+  .sw.on{background:var(--gl-acc);border-color:var(--gl-acc-brd);
+    box-shadow:inset 0 1px 1px var(--gl-luce),inset 0 -2px 4px rgba(0,0,0,.12),
+               0 0 14px var(--acc-velo),var(--el1)}
+  .sw.on::after{transform:translateX(21px)}
+  /* Schiacciata, la goccia si allunga: e' il liquido che resiste. */
+  .sw:active::after{width:30px}
+  .sw.on:active::after{transform:translateX(16px);width:30px}
+  .set-sel{background:var(--s1);border:1px solid var(--brd);color:var(--t1);border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--mono)}
   .set-status{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:999px}
-  .set-status.ok{color:var(--green);border:1px solid rgba(52,211,153,.35)}
-  .set-status.off{color:var(--faint);border:1px solid var(--border)}
+  .set-status.ok{color:var(--ok);border:1px solid rgba(52,211,153,.35)}
+  .set-status.off{color:var(--t3);border:1px solid var(--brd)}
   .set-msg{font-size:12px;font-family:var(--mono);margin-top:8px;min-height:16px}
-  .set-msg.ok{color:var(--green)} .set-msg.err{color:#FCA5A5}
+  .set-msg.ok{color:var(--ok)} .set-msg.err{color:var(--err)}
   /* Percorso di un file salvato: da leggere E da copiare. `user-select:text`
      esplicito e `word-break` perché i percorsi Windows sono lunghi e non
      hanno spazi dove andare a capo. */
@@ -299,17 +495,86 @@
      proprie: `.desc` e' definita solo come discendente di .set-row, quindi
      fuori da una riga il testo ereditava il font del body ed esplodeva. */
   .ext-help{padding:2px 0 6px}
-  .ext-steps{margin:0;padding-left:16px;font-size:11px;color:var(--faint);line-height:1.65}
-  .ext-steps b{color:var(--soft);font-weight:600}
-  .ext-steps code{font-family:var(--mono);font-size:10px;color:var(--soft);
-    background:var(--panel2);border:1px solid var(--border);border-radius:4px;padding:1px 5px}
+  .ext-steps{margin:0;padding-left:16px;font-size:11px;color:var(--t3);line-height:1.65}
+  .ext-steps b{color:var(--t2);font-weight:600}
+  .ext-steps code{font-family:var(--mono);font-size:10px;color:var(--t2);
+    background:var(--s1);border:1px solid var(--brd);border-radius:4px;padding:1px 5px}
   .pathbox{display:flex;align-items:center;gap:8px;margin-top:8px;padding:8px 10px;
-    background:var(--panel2);border:1px solid var(--border);border-radius:10px}
-  .pathval{flex:1;font-family:var(--mono);font-size:12px;color:var(--soft);
+    background:var(--s1);border:1px solid var(--brd);border-radius:10px}
+  .pathval{flex:1;font-family:var(--mono);font-size:12px;color:var(--t2);
     user-select:text;-webkit-user-select:text;cursor:text;word-break:break-all}
 </style>
 </head>
 <body>
+
+<!-- Sprite delle icone. Lo scrive `py -3 design/genera_icone.py` dalla
+     sorgente `design/icone.json`: a mano qui dentro non si tocca, verrebbe
+     riscritto al primo giro del generatore. -->
+<!-- ICONE:INIZIO -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+<symbol id="i-lucchetto" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M7.75 10.5V7a4.25 4.25 0 0 1 8.5 0v3.5"/><path d="M12 14.75v2.5"/></symbol>
+<symbol id="i-lucchetto-aperto" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M7.75 10.5V7a4.25 4.25 0 0 1 8.16-1.7"/><path d="M12 14.75v2.5"/></symbol>
+<symbol id="i-chiave" viewBox="0 0 24 24"><circle cx="7.2" cy="12" r="4"/><circle cx="7.2" cy="12" r="1.3"/><path d="M11.2 12H20.8"/><path d="M17.2 12v3.4"/><path d="M20.4 12v2.6"/></symbol>
+<symbol id="i-scudo" viewBox="0 0 24 24"><path d="M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"/></symbol>
+<symbol id="i-scudo-ok" viewBox="0 0 24 24"><path d="M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"/><path d="M9 11.9 11.3 14.2 15.4 10.1"/></symbol>
+<symbol id="i-database" viewBox="0 0 24 24"><path d="M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3-3.58 3-8 3-8-1.34-8-3z"/><path d="M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"/><path d="M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"/></symbol>
+<symbol id="i-cartella" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></symbol>
+<symbol id="i-cartella-piu" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M12 10.8v5.6"/><path d="M9.2 13.6h5.6"/></symbol>
+<symbol id="i-cartella-off" viewBox="0 0 24 24"><path d="M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M3.2 3.2 20.8 20.8"/></symbol>
+<symbol id="i-tastierino" viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="17.2" height="17.2" rx="3"/><circle cx="8.4" cy="8.4" r="1.15"/><circle cx="15.6" cy="8.4" r="1.15"/><circle cx="8.4" cy="15.6" r="1.15"/><circle cx="15.6" cy="15.6" r="1.15"/></symbol>
+<symbol id="i-chat" viewBox="0 0 24 24"><rect x="3" y="4.5" width="18" height="12.5" rx="3"/><path d="M8 17v4l4.4-4"/></symbol>
+<symbol id="i-impostazioni" viewBox="0 0 24 24"><path d="M3.5 7.5h8"/><path d="M16.5 7.5h4"/><path d="M3.5 16.5h4"/><path d="M12.5 16.5h8"/><circle cx="14" cy="7.5" r="2.5"/><circle cx="10" cy="16.5" r="2.5"/></symbol>
+<symbol id="i-tema" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z"/></symbol>
+<symbol id="i-sole" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2.8v2.2"/><path d="M12 19v2.2"/><path d="M2.8 12h2.2"/><path d="M19 12h2.2"/><path d="M5.5 5.5 7 7"/><path d="M17 17l1.5 1.5"/><path d="M18.5 5.5 17 7"/><path d="M7 17l-1.5 1.5"/></symbol>
+<symbol id="i-luna" viewBox="0 0 24 24"><path d="M20.2 14.6A8.7 8.7 0 0 1 9.4 3.8a8.7 8.7 0 1 0 10.8 10.8z"/></symbol>
+<symbol id="i-notte" viewBox="0 0 24 24"><path d="M20.4 15.3A8.4 8.4 0 0 1 10.1 5a8.4 8.4 0 1 0 10.3 10.3z"/><path d="M16.6 3.2l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"/></symbol>
+<symbol id="i-backup" viewBox="0 0 24 24"><path d="M12 3.2v10.3"/><path d="M8.2 9.7 12 13.5 15.8 9.7"/><path d="M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/></symbol>
+<symbol id="i-importa" viewBox="0 0 24 24"><path d="M12 13.5V3.2"/><path d="M8.2 7 12 3.2 15.8 7"/><path d="M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"/></symbol>
+<symbol id="i-sync" viewBox="0 0 24 24"><path d="M20.4 12.6a8.5 8.5 0 0 1-14.3 5.7"/><path d="M3.6 11.4a8.5 8.5 0 0 1 14.3-5.7"/><path d="M17.4 2.6v3.3h-3.3"/><path d="M6.6 21.4v-3.3h3.3"/></symbol>
+<symbol id="i-aggiorna" viewBox="0 0 24 24"><path d="M20.3 9.6A8.6 8.6 0 1 0 20.5 14"/><path d="M20.6 3.9v5.7h-5.7"/></symbol>
+<symbol id="i-cerca" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.8"/><path d="M15.9 15.9 21 21"/></symbol>
+<symbol id="i-occhio" viewBox="0 0 24 24"><path d="M2.6 12S6.1 5.6 12 5.6 21.4 12 21.4 12 17.9 18.4 12 18.4 2.6 12 2.6 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-occhio-barrato" viewBox="0 0 24 24"><path d="M10.1 5.8A9.5 9.5 0 0 1 12 5.6c5.9 0 9.4 6.4 9.4 6.4a17.4 17.4 0 0 1-2.9 3.8"/><path d="M6.4 7.9A17.4 17.4 0 0 0 2.6 12S6.1 18.4 12 18.4a9.5 9.5 0 0 0 4-.9"/><path d="M10 10a2.8 2.8 0 0 0 4 4"/><path d="M3.2 3.2 20.8 20.8"/></symbol>
+<symbol id="i-copia" viewBox="0 0 24 24"><rect x="9" y="9" width="11.5" height="11.5" rx="2.5"/><path d="M6 15h-.5A2.5 2.5 0 0 1 3 12.5v-7A2.5 2.5 0 0 1 5.5 3h7A2.5 2.5 0 0 1 15 5.5V6"/></symbol>
+<symbol id="i-spunta" viewBox="0 0 24 24"><path d="M4.5 12.6 9.6 17.7 19.5 6.6"/></symbol>
+<symbol id="i-chiudi" viewBox="0 0 24 24"><path d="M6.2 6.2 17.8 17.8"/><path d="M17.8 6.2 6.2 17.8"/></symbol>
+<symbol id="i-piu" viewBox="0 0 24 24"><path d="M12 4.8v14.4"/><path d="M4.8 12h14.4"/></symbol>
+<symbol id="i-meno-cerchio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M8 12h8"/></symbol>
+<symbol id="i-matita" viewBox="0 0 24 24"><path d="M16.4 3.6a2.15 2.15 0 0 1 3 3L7.4 18.6 3 20l1.4-4.4z"/><path d="M14.4 5.6 17.4 8.6"/></symbol>
+<symbol id="i-cestino" viewBox="0 0 24 24"><path d="M4 6.6h16"/><path d="M9.6 6.6V4.8a1.2 1.2 0 0 1 1.2-1.2h2.4a1.2 1.2 0 0 1 1.2 1.2v1.8"/><path d="M6.2 6.6l.9 12.7a2 2 0 0 0 2 1.9h5.8a2 2 0 0 0 2-1.9l.9-12.7"/><path d="M10.2 10.8v6.2"/><path d="M13.8 10.8v6.2"/></symbol>
+<symbol id="i-microfono" viewBox="0 0 24 24"><rect x="9" y="2.6" width="6" height="11.4" rx="3"/><path d="M5.6 11.6a6.4 6.4 0 0 0 12.8 0"/><path d="M12 18v3.4"/><path d="M8.6 21.4h6.8"/></symbol>
+<symbol id="i-stop" viewBox="0 0 24 24"><rect x="6.6" y="6.6" width="10.8" height="10.8" rx="2.5"/></symbol>
+<symbol id="i-orologio" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.2V12l3.4 2"/></symbol>
+<symbol id="i-invia" viewBox="0 0 24 24"><path d="M21 3 3 9.8l7.4 3.4L13.8 21z"/><path d="M21 3 10.4 13.2"/></symbol>
+<symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16"/><path d="M4 12h16"/><path d="M4 17h16"/></symbol>
+<symbol id="i-altro" viewBox="0 0 24 24"><circle cx="12" cy="5.4" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="12" cy="18.6" r="1.4"/></symbol>
+<symbol id="i-documento" viewBox="0 0 24 24"><path d="M13.8 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8.2z"/><path d="M13.8 3.5v4.7h4.7"/></symbol>
+<symbol id="i-elenco" viewBox="0 0 24 24"><path d="M8.5 7h11.5"/><path d="M8.5 12h11.5"/><path d="M8.5 17h11.5"/><path d="M4 7h.01"/><path d="M4 12h.01"/><path d="M4 17h.01"/></symbol>
+<symbol id="i-dado" viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="17" height="17" rx="3.5"/><circle cx="8.6" cy="8.6" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="15.4" cy="15.4" r="1.3"/></symbol>
+<symbol id="i-qr" viewBox="0 0 24 24"><rect x="3.4" y="3.4" width="7" height="7" rx="1.8"/><rect x="13.6" y="3.4" width="7" height="7" rx="1.8"/><rect x="3.4" y="13.6" width="7" height="7" rx="1.8"/><path d="M13.6 13.6h3.2v3.2h-3.2z"/><path d="M20.6 17.4v3.2h-3.2"/></symbol>
+<symbol id="i-esterno" viewBox="0 0 24 24"><path d="M14.2 3.6h6.2v6.2"/><path d="M20.4 3.6 11.6 12.4"/><path d="M18.2 14v4.4a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2V7.8a2 2 0 0 1 2-2H10"/></symbol>
+<symbol id="i-chevron-giu" viewBox="0 0 24 24"><path d="M6.4 9.4 12 15 17.6 9.4"/></symbol>
+<symbol id="i-chevron-destra" viewBox="0 0 24 24"><path d="M9.4 6.4 15 12 9.4 17.6"/></symbol>
+<symbol id="i-su" viewBox="0 0 24 24"><path d="M6.4 14.6 12 9 17.6 14.6"/></symbol>
+<symbol id="i-giu" viewBox="0 0 24 24"><path d="M6.4 9.4 12 15 17.6 9.4"/></symbol>
+<symbol id="i-indietro" viewBox="0 0 24 24"><path d="M20 12H4.6"/><path d="M10.6 5.8 4.4 12l6.2 6.2"/></symbol>
+<symbol id="i-avanti" viewBox="0 0 24 24"><path d="M4 12h15.4"/><path d="M13.4 5.8 19.6 12l-6.2 6.2"/></symbol>
+<symbol id="i-avviso" viewBox="0 0 24 24"><path d="M10.7 4.3 2.7 18.1a1.5 1.5 0 0 0 1.3 2.3h16a1.5 1.5 0 0 0 1.3-2.3L13.3 4.3a1.5 1.5 0 0 0-2.6 0z"/><path d="M12 9.5v4"/><path d="M12 17h.01"/></symbol>
+<symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M12 11.2v5"/><path d="M12 7.9h.01"/></symbol>
+<symbol id="i-scintilla" viewBox="0 0 24 24"><path d="M11 3.4 12.9 8.3 17.8 10.2 12.9 12.1 11 17 9.1 12.1 4.2 10.2 9.1 8.3z"/><path d="M17.9 15.1l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"/></symbol>
+<symbol id="i-banca" viewBox="0 0 24 24"><path d="M3.4 9.4 12 4.2l8.6 5.2"/><path d="M5.8 9.8v8.4"/><path d="M9.9 9.8v8.4"/><path d="M14.1 9.8v8.4"/><path d="M18.2 9.8v8.4"/><path d="M3.2 20.6h17.6"/></symbol>
+<symbol id="i-identita" viewBox="0 0 24 24"><rect x="2.6" y="4.8" width="18.8" height="14.4" rx="2.5"/><circle cx="8.6" cy="11" r="2.1"/><path d="M5.4 16.6a3.6 3.6 0 0 1 6.4 0"/><path d="M14.6 10h4.2"/><path d="M14.6 13.6h4.2"/></symbol>
+<symbol id="i-estensione" viewBox="0 0 24 24"><rect x="3" y="4.6" width="18" height="14.8" rx="2.5"/><path d="M3 9.4h18"/><circle cx="6.2" cy="7" r="0.75"/><circle cx="8.9" cy="7" r="0.75"/></symbol>
+<symbol id="i-dispositivo" viewBox="0 0 24 24"><rect x="7" y="2.6" width="10" height="18.8" rx="2.5"/><path d="M10.6 5.6h2.8"/><path d="M12 18.2h.01"/></symbol>
+<symbol id="i-dispositivi" viewBox="0 0 24 24"><rect x="2.6" y="5" width="12.4" height="9.4" rx="2"/><path d="M6 18h5.6"/><path d="M8.8 14.4V18"/><rect x="16.6" y="9.6" width="4.8" height="10.4" rx="1.6"/></symbol>
+<symbol id="i-rete" viewBox="0 0 24 24"><path d="M4.6 8.6a10.5 10.5 0 0 1 14.8 0"/><path d="M7.6 11.9a6.2 6.2 0 0 1 8.8 0"/><path d="M10.4 15.2a2.3 2.3 0 0 1 3.2 0"/><path d="M12 18.6h.01"/></symbol>
+<symbol id="i-impronta" viewBox="0 0 24 24"><path d="M3.2 8.7A10.4 10.4 0 0 1 12 3.6a10.4 10.4 0 0 1 8.8 5.1"/><path d="M5.8 11.2a6.4 6.4 0 0 1 12.4 0v2.4a13 13 0 0 1-.9 4.7"/><path d="M9.2 11.2a2.9 2.9 0 0 1 5.8 0v3.2a9.6 9.6 0 0 1-1.1 4.4"/><path d="M12 11.6v3.4a6 6 0 0 1-.9 3.2"/></symbol>
+<symbol id="i-fissa" viewBox="0 0 24 24"><path d="M14.8 3.4 20.6 9.2l-3.1 3.1-.9 5.5-8.4-8.4 5.5-.9z"/><path d="M8.2 15.8 3.4 20.6"/></symbol>
+<symbol id="i-stella" viewBox="0 0 24 24"><path d="M12 3.4l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.7l6-.9z"/></symbol>
+<symbol id="i-utente" viewBox="0 0 24 24"><circle cx="12" cy="8.2" r="3.9"/><path d="M4.6 20.4a7.6 7.6 0 0 1 14.8 0"/></symbol>
+<symbol id="i-globo" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5a13 13 0 0 1 0 17 13 13 0 0 1 0-17z"/></symbol>
+</svg>
+<!-- ICONE:FINE -->
 
 <!-- LOCK -->
 <div id="lock">
@@ -327,7 +592,7 @@
       <input id="master" class="field" type="password" placeholder="••••••••••••" autofocus />
       <input id="master2" class="field hidden" type="password" placeholder="Ripeti la master password" />
       <button id="unlockBtn" class="btn" disabled>Sblocca vault</button>
-      <button id="restoreBtn" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">Ripristina da backup…</button>
+      <button id="restoreBtn" class="btn fantasma">Ripristina da backup…</button>
       <input id="restoreFile" type="file" accept="application/json,.json" class="hidden" />
       <div id="lockErr" class="err"></div>
       <p class="hint" id="lockHint">La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.</p>
@@ -339,52 +604,52 @@
 <div id="app" class="hidden">
   <header>
     <div style="display:flex;align-items:center;gap:10px">
-      <button class="iconbtn" id="menuBtn" title="Menu" style="font-size:18px;padding:6px 10px">☰</button>
+      <button class="iconbtn" id="menuBtn" title="Menu" aria-label="Menu"><svg class="ic ic-20" aria-hidden="true"><use href="#i-menu"/></svg></button>
       <div class="hbrand" style="display:flex;align-items:center;gap:8px"><img src="/static/logo.png" alt="" style="width:22px;height:22px">VaultMind</div>
     </div>
     <div class="pills">
-      <span class="pill db" id="pillDb">🗄️ 0 voci</span>
-      <span class="pill llm hidden" id="pillLlm">✨ LLM locale</span>
+      <span class="pill db" id="pillDb"><svg class="ic ic-14" aria-hidden="true"><use href="#i-database"/></svg> 0 voci</span>
+      <span class="pill llm hidden" id="pillLlm"><svg class="ic ic-14" aria-hidden="true"><use href="#i-scintilla"/></svg> LLM locale</span>
       <!-- Compare solo quando c'è almeno un dispositivo abbinato: un pulsante
            che non ha con chi parlare è solo una domanda in più. -->
-      <button class="iconbtn hidden" id="syncNow" title="Sincronizza ora">🔄</button>
-      <button class="iconbtn" id="themeBtn" title="Tema">🎨</button>
-      <button class="iconbtn" id="backupBtn" title="Backup del vault (file cifrato)">💾</button>
-      <button class="iconbtn" id="lockAgain" title="Blocca">🔒</button>
+      <button class="iconbtn hidden" id="syncNow" title="Sincronizza ora" aria-label="Sincronizza ora"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg></button>
+      <button class="iconbtn" id="themeBtn" title="Tema" aria-label="Cambia tema"><svg class="ic" aria-hidden="true"><use href="#i-tema"/></svg></button>
+      <button class="iconbtn" id="backupBtn" title="Backup del vault (file cifrato)" aria-label="Backup del vault"><svg class="ic" aria-hidden="true"><use href="#i-backup"/></svg></button>
+      <button class="iconbtn" id="lockAgain" title="Blocca" aria-label="Blocca il vault"><svg class="ic" aria-hidden="true"><use href="#i-lucchetto"/></svg></button>
     </div>
   </header>
 
   <!-- TAB NAV -->
-  <div id="tabNav" style="display:flex;border-bottom:1px solid var(--border);background:var(--bar-soft);backdrop-filter:blur(8px)">
-    <button class="tab-btn" data-tab="chat">💬 Chat</button>
-    <button class="tab-btn" data-tab="db">🗄️ Database</button>
-    <button class="tab-btn" data-tab="cat">📁 Categorie</button>
+  <div id="tabNav" style="display:flex;border-bottom:1px solid var(--brd);background:var(--gl-bg-2);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)">
+    <button class="tab-btn" data-tab="chat"><svg class="ic ic-16" aria-hidden="true"><use href="#i-chat"/></svg>Chat</button>
+    <button class="tab-btn" data-tab="db"><svg class="ic ic-16" aria-hidden="true"><use href="#i-database"/></svg>Database</button>
+    <button class="tab-btn" data-tab="cat"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cartella"/></svg>Categorie</button>
   </div>
 
   <!-- MENU TEMA -->
   <div id="themeMenu" class="hidden">
-    <button data-theme="dark" class="sel">🌙 Scuro</button>
-    <button data-theme="light">☀️ Chiaro</button>
-    <button data-theme="night">🌌 Notte e oro</button>
+    <button data-theme="dark" class="sel"><svg class="ic ic-16" aria-hidden="true"><use href="#i-luna"/></svg>Scuro</button>
+    <button data-theme="light"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sole"/></svg>Chiaro</button>
+    <button data-theme="night"><svg class="ic ic-16" aria-hidden="true"><use href="#i-notte"/></svg>Notte e oro</button>
   </div>
 
   <!-- MENU HAMBURGER -->
   <div id="mainMenu" class="hidden">
-    <button data-act="chat">💬 Chat</button>
-    <button data-act="db">🗄️ Database</button>
+    <button data-act="chat"><svg class="ic ic-16" aria-hidden="true"><use href="#i-chat"/></svg>Chat</button>
+    <button data-act="db"><svg class="ic ic-16" aria-hidden="true"><use href="#i-database"/></svg>Database</button>
     <div class="sep"></div>
-    <button data-act="import">⇪ Importa credenziali</button>
-    <button data-act="backup">💾 Backup del vault</button>
-    <button data-act="sync">🔄 Sincronizza <span id="syncBadge" class="hidden"></span></button>
+    <button data-act="import"><svg class="ic ic-16" aria-hidden="true"><use href="#i-importa"/></svg>Importa credenziali</button>
+    <button data-act="backup"><svg class="ic ic-16" aria-hidden="true"><use href="#i-backup"/></svg>Backup del vault</button>
+    <button data-act="sync"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sync"/></svg>Sincronizza <span id="syncBadge" class="hidden"></span></button>
     <div class="sep"></div>
-    <button data-act="settings">⚙️ Impostazioni</button>
-    <button data-act="lock">🔒 Blocca vault</button>
+    <button data-act="settings"><svg class="ic ic-16" aria-hidden="true"><use href="#i-impostazioni"/></svg>Impostazioni</button>
+    <button data-act="lock"><svg class="ic ic-16" aria-hidden="true"><use href="#i-lucchetto"/></svg>Blocca vault</button>
   </div>
 
   <!-- MODALE IMPOSTAZIONI -->
   <div id="setModal" class="modal hidden">
     <div class="card" style="max-height:88vh;overflow:auto">
-      <div class="mhead">⚙️ Impostazioni <button class="iconbtn" id="setClose">✕</button></div>
+      <div class="mhead"><span><svg class="ic ic-20" aria-hidden="true"><use href="#i-impostazioni"/></svg>Impostazioni</span><button class="iconbtn" id="setClose" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
 
       <div class="set-section">
         <h4>Sicurezza</h4>
@@ -397,7 +662,7 @@
           <input id="cmOld" class="field" type="password" placeholder="Password attuale" />
           <input id="cmNew" class="field" type="password" placeholder="Nuova password (min 8)" />
           <input id="cmNew2" class="field" type="password" placeholder="Ripeti nuova password" />
-          <button id="cmSave" class="btn" style="background:var(--accent)">Aggiorna password</button>
+          <button id="cmSave" class="btn" style="background:var(--acc)">Aggiorna password</button>
           <div id="cmMsg" class="set-msg"></div>
         </div>
         <div class="set-row">
@@ -418,12 +683,12 @@
         <div class="set-row">
           <div><div class="lab">mind (Ollama) <span id="ollamaStatus" class="set-status off">—</span></div>
             <div class="desc">Risposte intelligenti in chat. Se spento, usa risposte standard.</div></div>
-          <div id="swOllama" class="sw ctl"></div>
+          <div id="swOllama" class="sw ctl" role="switch" tabindex="0" aria-checked="false" aria-label="Assistente locale (Ollama)"></div>
         </div>
         <div class="set-row">
           <div><div class="lab">Microfono / dettatura <span id="micStatus" class="set-status off">—</span></div>
             <div class="desc">Input vocale nella barra di ricerca.</div></div>
-          <div id="swMic" class="sw ctl"></div>
+          <div id="swMic" class="sw ctl" role="switch" tabindex="0" aria-checked="false" aria-label="Microfono e dettatura"></div>
         </div>
       </div>
 
@@ -437,7 +702,7 @@
         </div>
         <div class="set-row">
           <div><div class="lab">Includi simboli</div></div>
-          <div id="swGenSym" class="sw ctl"></div>
+          <div id="swGenSym" class="sw ctl" role="switch" tabindex="0" aria-checked="false" aria-label="Includi simboli nelle password generate"></div>
         </div>
       </div>
 
@@ -462,7 +727,7 @@
           <div class="desc" style="text-align:center">Scrivi questo codice nell'estensione:</div>
           <div style="display:flex;align-items:center;justify-content:center;gap:10px">
             <!-- selezionabile col mouse: chi non usa il pulsante lo evidenzia a mano -->
-            <div id="pairCode" style="font-family:var(--mono);font-size:30px;letter-spacing:10px;padding:8px 0;color:var(--accent);user-select:text;-webkit-user-select:text;cursor:text"></div>
+            <div id="pairCode" style="font-family:var(--mono);font-size:30px;letter-spacing:10px;padding:8px 0;color:var(--acc);user-select:text;-webkit-user-select:text;cursor:text"></div>
             <button class="iconbtn" id="pairCopy" title="Copia il codice">⧉</button>
           </div>
           <div id="pairCountdown" class="desc" style="text-align:center"></div>
@@ -489,12 +754,12 @@
   <div id="dbPanel" class="hidden">
     <div class="db-head">
       <div class="db-filter">
-        <span style="color:var(--faint)">🔍</span>
+        <span class="lente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg></span>
         <input id="dbFilter" placeholder="Filtra per titolo o tag…" />
       </div>
       <div style="display:flex;gap:8px">
-        <button id="dbClearBtn" class="iconbtn" title="Svuota tutto il database" style="border-color:#FCA5A5;color:#FCA5A5">🧹 Svuota</button>
-        <button id="dbRefreshBtn" class="iconbtn" title="Aggiorna lista">↻</button>
+        <button id="dbClearBtn" class="iconbtn pericolo" title="Svuota tutto il database"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cestino"/></svg>Svuota</button>
+        <button id="dbRefreshBtn" class="iconbtn" title="Aggiorna lista" aria-label="Aggiorna lista"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
       </div>
     </div>
     <div id="dbGrid"></div>
@@ -509,7 +774,7 @@
       <div style="flex:1"></div>
       <div style="display:flex;gap:8px">
         <button id="catNewBtn" class="iconbtn" title="Crea una categoria">＋ Nuova categoria</button>
-        <button id="catRefreshBtn" class="iconbtn" title="Aggiorna">↻</button>
+        <button id="catRefreshBtn" class="iconbtn" title="Aggiorna" aria-label="Aggiorna"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
       </div>
     </div>
     <div id="catList"></div>
@@ -518,14 +783,14 @@
 
   <div class="composer">
     <div class="inner">
-      <button class="iconbtn" id="addBtn" title="Aggiungi credenziale" style="border-color:var(--cyan);color:var(--cyan)">＋</button>
-      <button class="iconbtn" id="importBtn" title="Import intelligente (incolla testo)" style="border-color:var(--violet);color:var(--violet)">⇪</button>
+      <button class="iconbtn" id="addBtn" title="Aggiungi credenziale" style="border-color:var(--acc);color:var(--acc)">＋</button>
+      <button class="iconbtn tinta-vio" id="importBtn" title="Import intelligente (incolla testo)" aria-label="Import intelligente"><svg class="ic" aria-hidden="true"><use href="#i-importa"/></svg></button>
       <div class="searchbox">
-        <span style="color:var(--faint)">🔍</span>
+        <span class="lente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg></span>
         <input id="q" placeholder="Chiedi una credenziale…" />
       </div>
-      <button class="iconbtn" id="micBtn" title="Detta la richiesta (vocale, in locale)" style="border-color:var(--green);color:var(--green)">🎤</button>
-      <button class="send" id="sendBtn">➤</button>
+      <button class="iconbtn tinta-ok" id="micBtn" title="Detta la richiesta (vocale, in locale)" aria-label="Detta la richiesta"><svg class="ic" aria-hidden="true"><use href="#i-microfono"/></svg></button>
+      <button class="send" id="sendBtn" aria-label="Invia"><svg class="ic" aria-hidden="true"><use href="#i-invia"/></svg></button>
     </div>
   </div>
 </div>
@@ -536,8 +801,8 @@
      loopback. Chi non ha la chiave di questo vault non riceve nemmeno una
      risposta: per lui, su questa rete, VaultMind non esiste. -->
 <div id="syncModal" class="modal hidden">
-  <div class="card modalcard rise" style="width:min(94vw,620px);max-height:88vh;overflow-y:auto">
-    <div class="mhead"><span>🔄 Sincronizza</span><button id="closeSync" class="iconbtn">✕</button></div>
+  <div class="card modalcard larga rise">
+    <div class="mhead"><span><svg class="ic ic-20" aria-hidden="true"><use href="#i-sync"/></svg>Sincronizza</span><button id="closeSync" class="iconbtn" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
 
     <div class="crit-row" style="margin-top:0">
       <div class="txt">
@@ -555,15 +820,15 @@
     <div id="syncConflitti" class="hidden" style="margin-top:16px"></div>
 
     <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-      <button id="syncCerca" class="iconbtn">🔍 Cerca dispositivi</button>
-      <button id="syncAbbina" class="iconbtn">➕ Abbina un dispositivo</button>
+      <button id="syncCerca" class="iconbtn"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg>Cerca dispositivi</button>
+      <button id="syncAbbina" class="iconbtn"><svg class="ic ic-16" aria-hidden="true"><use href="#i-piu"/></svg>Abbina un dispositivo</button>
     </div>
 
     <div id="syncCodice" class="hidden" style="margin-top:14px;padding:14px;border-radius:12px;
          background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);text-align:center">
-      <div style="font-size:11px;letter-spacing:1.4px;color:var(--faint);text-transform:uppercase">Codice di abbinamento</div>
-      <div id="syncCodiceVal" style="font-family:var(--mono);font-size:34px;letter-spacing:8px;color:var(--accent);margin:8px 0"></div>
-      <div style="font-size:12px;color:var(--soft);line-height:1.55">
+      <div style="font-size:11px;letter-spacing:1.4px;color:var(--t3);text-transform:uppercase">Codice di abbinamento</div>
+      <div id="syncCodiceVal" style="font-family:var(--mono);font-size:34px;letter-spacing:8px;color:var(--acc);margin:8px 0"></div>
+      <div style="font-size:12px;color:var(--t2);line-height:1.55">
         Scrivilo sull'altro dispositivo entro <b id="syncSecondi">120</b> secondi.<br>
         Poi <b>controlla che le sei cifre dell'impronta siano identiche</b> sui due schermi:
         è la verifica che nessuno si sia messo in mezzo.
@@ -573,7 +838,7 @@
     <div id="syncTrovati" style="margin-top:14px"></div>
 
     <div style="margin-top:18px">
-      <div style="font-size:11px;letter-spacing:1.4px;color:var(--faint);text-transform:uppercase;margin-bottom:8px">Dispositivi fidati</div>
+      <div style="font-size:11px;letter-spacing:1.4px;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Dispositivi fidati</div>
       <div id="syncFidati"></div>
     </div>
 
@@ -588,23 +853,23 @@
 <!-- SCELTA DELLE VOCI da mettere in una categoria: si parte dalla categoria e
      si spuntano le voci, non il contrario. Su 800 voci è l'unico modo umano. -->
 <div id="pickModal" class="modal hidden">
-  <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;display:flex;flex-direction:column">
-    <div class="mhead"><span id="pickTitle">Aggiungi voci</span><button id="closePick" class="iconbtn">✕</button></div>
+  <div class="card modalcard media colonna rise">
+    <div class="mhead"><span id="pickTitle">Aggiungi voci</span><button id="closePick" class="iconbtn" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
     <div class="db-filter" style="margin-bottom:10px">
-      <span style="color:var(--faint)">🔍</span>
+      <span class="lente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg></span>
       <input id="pickFilter" placeholder="Filtra fra le voci…" />
     </div>
     <div id="pickList" style="flex:1;overflow-y:auto;min-height:120px"></div>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px">
-      <div id="pickCount" style="flex:1;font-size:12px;color:var(--faint)"></div>
+      <div id="pickCount" style="flex:1;font-size:12px;color:var(--t3)"></div>
       <button id="pickConfirm" class="btn" style="margin:0;width:auto;padding:9px 18px" disabled>Aggiungi</button>
     </div>
   </div>
 </div>
 
 <div id="importModal" class="modal hidden">
-  <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;overflow-y:auto">
-    <div class="mhead"><span>Import intelligente</span><button id="closeImport" class="iconbtn">✕</button></div>
+  <div class="card modalcard media rise">
+    <div class="mhead"><span>Import intelligente</span><button id="closeImport" class="iconbtn" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
     <div id="impProgress" class="hidden" style="margin-bottom:14px">
       <div class="prg"><i></i></div>
       <div class="prg-txt"></div>
@@ -612,9 +877,9 @@
     <div id="importStep1">
       <label class="lbl">Incolla qui le credenziali, anche disordinate</label>
       <textarea id="importText" class="field" style="font-family:var(--mono);min-height:160px;resize:vertical" placeholder="Es.&#10;Google-- mario@gmail.com pass: Abc123!&#10;Steam&#10;mario99  Pwd!2024  -> recupero@gmail.com&#10;PIN sblocco: 1234"></textarea>
-      <button id="parseBtn" class="btn" style="background:var(--violet)" disabled>Analizza</button>
-      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px"><div style="flex:1;height:1px;background:var(--border)"></div><span style="font-size:11px;color:var(--faint)">oppure</span><div style="flex:1;height:1px;background:var(--border)"></div></div>
-      <button id="csvBtn" class="btn" style="background:transparent;border:1px dashed var(--cyan);color:var(--cyan);margin-top:0">📄 Importa da CSV (Bitwarden / 1Password / KeePass)</button>
+      <button id="parseBtn" class="btn pieno-vio" disabled>Analizza</button>
+      <div style="display:flex;align-items:center;gap:8px;margin:14px 0 4px"><div style="flex:1;height:1px;background:var(--brd)"></div><span style="font-size:11px;color:var(--t3)">oppure</span><div style="flex:1;height:1px;background:var(--brd)"></div></div>
+      <button id="csvBtn" class="btn tratteggiato"><svg class="ic ic-16" aria-hidden="true"><use href="#i-documento"/></svg>Importa da CSV (Bitwarden / 1Password / KeePass)</button>
       <input id="csvFile" type="file" accept=".csv,text/csv" class="hidden" />
       <p class="hint">Il testo viene analizzato in locale. Se Ollama è attivo l'estrazione è più precisa; altrimenti si usa un parser euristico. Il <b>CSV</b> esportato da un altro password manager viene letto direttamente, senza LLM. <b>Niente viene salvato finché non confermi.</b></p>
     </div>
@@ -622,7 +887,7 @@
       <p class="hint" id="importSourceNote" style="margin-top:0"></p>
       <div id="importList"></div>
       <button id="commitBtn" class="btn">Salva le voci selezionate</button>
-      <button id="backToText" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">← Torna al testo</button>
+      <button id="backToText" class="btn fantasma"><svg class="ic ic-16" aria-hidden="true"><use href="#i-indietro"/></svg>Torna al testo</button>
     </div>
   </div>
 </div>
@@ -630,15 +895,15 @@
 <!-- ADD MODAL -->
 <div id="modal" class="modal hidden">
   <div class="card modalcard rise" style="max-height:88vh;overflow-y:auto">
-    <div class="mhead"><span id="addModalTitle">Nuova credenziale</span><button id="closeModal" class="iconbtn">✕</button></div>
+    <div class="mhead"><span id="addModalTitle">Nuova credenziale</span><button id="closeModal" class="iconbtn" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
     <div><label class="lbl">Titolo (anche disordinato)</label><input id="f_title" class="field" placeholder="es. quella roba di amazon, oppure CIE"></div>
     <div style="margin-top:14px"><label class="lbl">Campi</label></div>
     <div id="addFields"></div>
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
-      <button id="addFieldRow" class="btn" style="background:transparent;border:1px dashed var(--cyan);color:var(--cyan);margin-top:0;padding:8px;flex:1 1 40%">+ Aggiungi campo</button>
-      <button id="addOtpRow" class="btn" style="background:transparent;border:1px dashed var(--green);color:var(--green);margin-top:0;padding:8px;flex:0 0 auto" title="Inserisci a mano il secret 2FA">+ 2FA / OTP</button>
-      <button id="qrBtn" class="btn" style="background:transparent;border:1px dashed var(--violet);color:var(--violet);margin-top:0;padding:8px;flex:0 0 auto" title="Leggi un QR (screenshot di setup o export authenticator)">📷 Da QR</button>
-      <button id="genBtn" class="btn" style="background:transparent;border:1px dashed var(--violet);color:var(--violet);margin-top:0;padding:8px;flex:0 0 auto" title="Genera una password sicura">🎲 Genera</button>
+      <button id="addFieldRow" class="btn tratteggiato compatto" style="flex:1 1 40%">+ Aggiungi campo</button>
+      <button id="addOtpRow" class="btn" style="background:transparent;border:1px dashed var(--ok);color:var(--ok);margin-top:0;padding:8px;flex:0 0 auto" title="Inserisci a mano il secret 2FA">+ 2FA / OTP</button>
+      <button id="qrBtn" class="btn tratteggiato vio compatto" title="Leggi un QR (screenshot di setup o export authenticator)"><svg class="ic ic-16" aria-hidden="true"><use href="#i-qr"/></svg>Da QR</button>
+      <button id="genBtn" class="btn tratteggiato vio compatto" title="Genera una password sicura"><svg class="ic ic-16" aria-hidden="true"><use href="#i-dado"/></svg>Genera</button>
     </div>
     <div id="genPop" class="gen-pop hidden"></div>
     <input id="qrFile" type="file" accept="image/*" class="hidden" />
@@ -650,31 +915,41 @@
       <select id="f_category" class="field" style="font-family:var(--body)"></select></div>
     <div class="crit-row">
       <div class="txt">
-        <div class="t1">⚠️ Voce critica</div>
+        <div class="t1"><svg class="ic ic-16" aria-hidden="true"><use href="#i-avviso"/></svg>Voce critica</div>
         <div class="t2">Gli account da cui si rimette mano a tutto il resto: banca, email principale, SPID.</div>
       </div>
       <div id="swCritical" class="sw"></div>
     </div>
     <div id="critWarn" class="crit-warn hidden"></div>
     <button id="saveCred" class="btn" style="margin-top:14px" disabled>Salva nel vault</button>
-    <p class="hint">Per la 2FA: il <b>secret</b> lo vedi <b>solo quando attivi la 2FA</b> sul sito (la chiave sotto il QR, o "inserimento manuale"). Già configurata nell'app authenticator? Non è più estraibile a mano — ma puoi usare <b>📷 Da QR</b>: fai uno screenshot del QR di setup, oppure del QR di <b>"Esporta/Trasferisci account"</b> di Google Authenticator (importa tutti i secret in un colpo). La lettura del QR avviene <b>in locale nel browser</b>.</p>
+    <p class="hint">Per la 2FA: il <b>secret</b> lo vedi <b>solo quando attivi la 2FA</b> sul sito (la chiave sotto il QR, o "inserimento manuale"). Già configurata nell'app authenticator? Non è più estraibile a mano — ma puoi usare <b>Da QR</b>: fai uno screenshot del QR di setup, oppure del QR di <b>"Esporta/Trasferisci account"</b> di Google Authenticator (importa tutti i secret in un colpo). La lettura del QR avviene <b>in locale nel browser</b>.</p>
   </div>
 </div>
 
 <!-- ONBOARDING MODAL -->
 <div id="onboardModal" class="modal hidden">
-  <div class="card modalcard rise" style="width:min(94vw,560px);max-height:88vh;overflow-y:auto">
-    <div class="mhead"><span>Configurazione iniziale</span><button id="closeOnboard" class="iconbtn">✕</button></div>
+  <div class="card modalcard media rise">
+    <div class="mhead"><span>Configurazione iniziale</span><button id="closeOnboard" class="iconbtn" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
     <p class="hint" style="margin-top:0">Inserisci subito i tuoi dati più importanti. Compila quello che vuoi (anche solo alcuni campi) e attiva la voce con la spunta; il resto lo aggiungi quando vuoi. <b>Tutto resta cifrato in locale.</b></p>
     <div id="onboardList"></div>
     <button id="onboardSave" class="btn" style="margin-top:14px">Salva e inizia</button>
-    <button id="onboardSkip" class="btn" style="background:transparent;border:1px solid var(--border);color:var(--soft);margin-top:8px">Salta per ora</button>
+    <button id="onboardSkip" class="btn fantasma">Salta per ora</button>
   </div>
 </div>
 
 <script src="/static/jsQR.js"></script>
 <script>
 const $ = (s)=>document.querySelector(s);
+
+/* Un'icona come stringa, per i punti in cui e' il JS a riempire un pulsante.
+   Un'emoji era testo e bastava `textContent`; un'icona e' markup, quindi
+   quegli stessi punti passano a `innerHTML`. Il nome e' quello di
+   design/icone.json. */
+function ic(nome, cls){ return `<svg class="ic${cls?" "+cls:""}" aria-hidden="true"><use href="#i-${nome}"/></svg>`; }
+
+/* La pill del conteggio si scriveva in sette punti diversi, ognuno con la sua
+   emoji ripetuta a mano. */
+function scriviConteggio(n){ $("#pillDb").innerHTML = ic("database","ic-14")+" "+n+" voci"; }
 
 /* ---- TOKEN DI SESSIONE ----
    Iniettato dal server dentro questa pagina, che nessun altro sito può leggere
@@ -744,7 +1019,7 @@ async function doUnlock(){
   $("#unlockBtn").textContent = idle;
   if(!ok){ $("#lockErr").textContent = j.detail||"Errore"; $("#unlockBtn").disabled=false; return; }
   $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
-  $("#pillDb").textContent = "🗄️ "+j.count+" voci";
+  scriviConteggio(j.count);
   window.AUDIO_READY = !!j.audio_ready;
   if(!j.audio_ready){ $("#micBtn").style.opacity=".5"; }
   if(j.llm) $("#pillLlm").classList.remove("hidden");
@@ -793,7 +1068,7 @@ function addAIPath(text, path){
   const cp=document.createElement("button"); cp.className="iconbtn"; cp.textContent="⧉";
   cp.title="Copia il percorso";
   cp.onclick=async()=>{ try{await navigator.clipboard.writeText(path);}catch(e){}
-    cp.textContent="✓"; setTimeout(()=>{cp.textContent="⧉";},1200); };
+    cp.innerHTML=ic("spunta"); setTimeout(()=>{cp.innerHTML=ic("copia");},1200); };
   box.appendChild(p); box.appendChild(cp);
   wrap.appendChild(box);
   r.appendChild(wrap); $("#chat").appendChild(r); scroll();
@@ -815,10 +1090,10 @@ function isHttpUrl(v){ return /^https?:\/\//i.test((v||"").trim()); }
 
 function credCard(c, picker){
   const card=document.createElement("div"); card.className="cred rise";
-  card.innerHTML = `<div class="accent"></div><div class="title">🔑 <span>${esc(c.title)}</span>`
+  card.innerHTML = `<div class="accent"></div><div class="title">${ic("chiave","ic-16")}<span>${esc(c.title)}</span>`
     + (c.critical ? '<span class="badge-crit">critica</span>' : "") + `</div>`;
   if(picker){
-    const btn=document.createElement("button"); btn.className="pickbtn"; btn.textContent="Mostra questa →";
+    const btn=document.createElement("button"); btn.className="pickbtn"; btn.innerHTML="Mostra questa "+ic("avanti","ic-16");
     btn.onclick=async()=>{ const {j}=await api("/api/reveal",{text:String(c.id)}); addAI(c.title+":", [j], false); };
     card.appendChild(btn);
   } else {
@@ -826,8 +1101,8 @@ function credCard(c, picker){
     if(c.id!=null && (c.fields||[]).some(f=>labelLooksOtp(f.label))) attachTotp(card, c.id);
     if(c.id!=null && c.fields){
       const edit=document.createElement("button"); edit.className="pickbtn";
-      edit.style.background="rgba(167,139,250,.08)"; edit.style.borderColor="var(--violet)"; edit.style.color="var(--violet)";
-      edit.textContent="✎ Modifica / completa";
+      edit.style.background="rgba(167,139,250,.08)"; edit.style.borderColor="var(--vio)"; edit.style.color="var(--vio)";
+      edit.innerHTML=ic("matita","ic-16")+" Modifica / completa";
       edit.onclick=()=>openEdit(c);
       card.appendChild(edit);
     }
@@ -846,7 +1121,7 @@ async function attachTotp(card, id){
     const codeEl=w.querySelector(".tcode"), bar=w.querySelector(".tbar i"), copy=w.querySelector(".tcopy");
     let cur=o;
     const paint=()=>{ codeEl.textContent=cur.code.slice(0,3)+" "+cur.code.slice(3); bar.style.width=Math.max(0,Math.round(cur.remaining/cur.period*100))+"%"; };
-    copy.onclick=async()=>{ try{await navigator.clipboard.writeText(cur.code);}catch(e){} copy.textContent="✓"; copy.style.color="var(--green)"; setTimeout(()=>{copy.textContent="⧉";copy.style.color="";},8000); };
+    copy.onclick=async()=>{ try{await navigator.clipboard.writeText(cur.code);}catch(e){} copy.innerHTML=ic("spunta"); copy.style.color="var(--ok)"; setTimeout(()=>{copy.innerHTML=ic("copia");copy.style.color="";},8000); };
     paint(); card.appendChild(w);
     const tick=setInterval(async()=>{
       if(!document.body.contains(w)){ clearInterval(tick); return; }
@@ -871,15 +1146,15 @@ function maskedLine(label, value){
     meta.querySelector(".v").textContent=value;
     const acts=document.createElement("div"); acts.className="acts";
     if(isHttpUrl(value)){
-      const open=document.createElement("button"); open.className="iconbtn"; open.textContent="↗";
+      const open=document.createElement("button"); open.className="iconbtn"; open.setAttribute("aria-label","Apri nel browser"); open.innerHTML=ic("esterno");
       open.title="Apri nel browser";
       open.onclick=async()=>{ const r=await api("/api/open_url",{url:value});
-        if(!r.ok){ open.textContent="✕"; setTimeout(()=>open.textContent="↗",3000); } };
+        if(!r.ok){ open.innerHTML=ic("chiudi"); setTimeout(()=>open.innerHTML=ic("esterno"),3000); } };
       acts.appendChild(open);
     }
     const copyU=document.createElement("button"); copyU.className="iconbtn"; copyU.textContent="⧉"; copyU.title="Copia l'indirizzo";
     copyU.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){}
-      copyU.textContent="✓"; copyU.style.color="var(--green)";
+      copyU.innerHTML=ic("spunta"); copyU.style.color="var(--ok)";
       setTimeout(()=>{copyU.textContent="⧉";copyU.style.color="";},6000); };
     acts.appendChild(copyU);
     line.appendChild(meta); line.appendChild(acts);
@@ -890,11 +1165,11 @@ function maskedLine(label, value){
   const vEl=meta.querySelector(".v");
   const acts=document.createElement("div"); acts.className="acts";
   let shown=false, hideT=null;
-  const eye=document.createElement("button"); eye.className="iconbtn"; eye.textContent="👁";
+  const eye=document.createElement("button"); eye.className="iconbtn"; eye.setAttribute("aria-label","Mostra o nascondi"); eye.innerHTML=ic("occhio");
   eye.onclick=()=>{ shown=!shown; vEl.textContent=shown?value:"•".repeat(Math.min(value.length,14)); vEl.classList.toggle("shown",shown);
     clearTimeout(hideT); if(shown) hideT=setTimeout(()=>{shown=false;vEl.textContent="•".repeat(Math.min(value.length,14));vEl.classList.remove("shown");},15000); };
   const copy=document.createElement("button"); copy.className="iconbtn"; copy.textContent="⧉";
-  copy.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){} copy.textContent="✓"; copy.style.color="var(--green)";
+  copy.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){} copy.innerHTML=ic("spunta"); copy.style.color="var(--ok)";
     setTimeout(()=>{ navigator.clipboard.writeText("").catch(()=>{}); copy.textContent="⧉"; copy.style.color=""; },12000); };
   acts.appendChild(eye); acts.appendChild(copy);
   line.appendChild(meta); line.appendChild(acts);
@@ -932,13 +1207,13 @@ function addFieldRow(label, value){
   });
   // L'ordine dei campi è quello con cui verranno mostrati: si sceglie qui.
   const mov=document.createElement("div"); mov.className="movecol";
-  const up=document.createElement("button"); up.type="button"; up.textContent="▲"; up.title="Sposta su";
+  const up=document.createElement("button"); up.type="button"; up.innerHTML=ic("su","ic-14"); up.title="Sposta su"; up.setAttribute("aria-label","Sposta su");
   up.onclick=()=>{ const p=row.previousElementSibling; if(p) row.parentNode.insertBefore(row,p); };
-  const dn=document.createElement("button"); dn.type="button"; dn.textContent="▼"; dn.title="Sposta giù";
+  const dn=document.createElement("button"); dn.type="button"; dn.innerHTML=ic("giu","ic-14"); dn.title="Sposta giu"; dn.setAttribute("aria-label","Sposta giu");
   dn.onclick=()=>{ const n=row.nextElementSibling; if(n) row.parentNode.insertBefore(n,row); };
   mov.appendChild(up); mov.appendChild(dn);
 
-  const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕";
+  const rm=document.createElement("button"); rm.className="rmrow"; rm.setAttribute("aria-label","Togli la riga"); rm.innerHTML=ic("chiudi","ic-16");
   rm.onclick=()=>{ row.remove(); checkAddValid(); };
   l.oninput=checkAddValid; v.oninput=checkAddValid;
   row.appendChild(l); row.appendChild(v); row.appendChild(mov); row.appendChild(rm);
@@ -1033,7 +1308,7 @@ function buildGenPop(){
     <div class="gen-out">
       <input id="genOut" class="field" readonly style="margin-top:0" />
       <button id="genCopy" class="iconbtn" title="Copia">⧉</button>
-      <button id="genRefresh" class="iconbtn" title="Rigenera">↻</button>
+      <button id="genRefresh" class="iconbtn" title="Rigenera" aria-label="Rigenera"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
     </div>
     <div class="gen-row">Lunghezza <input id="genLen" type="range" min="8" max="40" value="${dLen}"><span class="len" id="genLenVal">${dLen}</span></div>
     <div class="gen-toggles">
@@ -1042,7 +1317,7 @@ function buildGenPop(){
       <label class="gen-tg"><input type="checkbox" id="genDig" checked> 0-9</label>
       <label class="gen-tg"><input type="checkbox" id="genSym" ${dSym?"checked":""}> !@#</label>
     </div>
-    <button id="genUse" class="btn" style="margin-top:12px;background:var(--accent)">Usa questa password</button>`;
+    <button id="genUse" class="btn">Usa questa password</button>`;
   const regen=()=>{
     const len=+$("#genLen").value; $("#genLenVal").textContent=len;
     $("#genOut").value=genPassword(len, $("#genUp").checked, $("#genLow").checked, $("#genDig").checked, $("#genSym").checked);
@@ -1050,7 +1325,7 @@ function buildGenPop(){
   pop.querySelectorAll("input").forEach(el=> el.addEventListener("input", regen));
   $("#genRefresh").onclick=regen;
   $("#genCopy").onclick=async()=>{ try{await navigator.clipboard.writeText($("#genOut").value);}catch(e){}
-    $("#genCopy").textContent="✓"; $("#genCopy").style.color="var(--green)"; setTimeout(()=>{$("#genCopy").textContent="⧉";$("#genCopy").style.color="";},6000); };
+    $("#genCopy").innerHTML=ic("spunta"); $("#genCopy").style.color="var(--ok)"; setTimeout(()=>{$("#genCopy").innerHTML=ic("copia");$("#genCopy").style.color="";},6000); };
   $("#genUse").onclick=()=>{
     const pw=$("#genOut").value; if(!pw) return;
     // cerca un campo Password vuoto, altrimenti il primo campo Password, altrimenti ne crea uno
@@ -1089,7 +1364,7 @@ $("#saveCred").onclick=async()=>{
   else { res=await api("/api/add",payload); }
   const {ok,j}=res;
   if(ok){
-    $("#pillDb").textContent="🗄️ "+j.count+" voci"; $("#modal").classList.add("hidden");
+    scriviConteggio(j.count); $("#modal").classList.add("hidden");
     addAI(editId!=null ? "Credenziale aggiornata. Rifai la ricerca per vederla completa."
                        : "Salvata nel vault locale. Ora puoi chiederla in linguaggio naturale.");
     editId=null;
@@ -1122,7 +1397,7 @@ $("#restoreFile").addEventListener("change", async (e)=>{
   if(ok){
     // il vault ora esiste: si torna alla modalita' "sblocca", non "crea"
     FIRST_RUN=false; $("#master").value=""; $("#master2").value=""; applyLockMode();
-    $("#lockErr").style.color="var(--green)"; $("#lockErr").textContent="Backup ripristinato. Sblocca con la master password del dispositivo di origine."; }
+    $("#lockErr").style.color="var(--ok)"; $("#lockErr").textContent="Backup ripristinato. Sblocca con la master password del dispositivo di origine."; }
   else { $("#lockErr").style.color=""; $("#lockErr").textContent = j.detail||"Ripristino non riuscito."; }
   e.target.value="";
 });
@@ -1254,7 +1529,7 @@ async function renderImportList(entries, source){
   for(let i=0;i<entries.length;i++){
     const e=entries[i];
     const card=document.createElement("div"); card.className="cred imp-card"; card.style.marginTop="10px"; card.dataset.i=i;
-    card.innerHTML = `<div class="accent" style="background:var(--violet)"></div>`;
+    card.innerHTML = `<div class="accent" style="background:var(--vio)"></div>`;
     const head=document.createElement("div"); head.style.display="flex"; head.style.alignItems="center"; head.style.gap="8px"; head.style.marginBottom="8px";
     const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=true; chk.className="imp-chk";
     const ttlIn=document.createElement("input"); ttlIn.className="field imp-title"; ttlIn.value=e.title||""; ttlIn.style.padding="7px 10px"; ttlIn.style.fontSize="14px"; ttlIn.style.fontWeight="600"; ttlIn.style.color="#fff";
@@ -1265,7 +1540,7 @@ async function renderImportList(entries, source){
     card.appendChild(fieldsBox);
 
     const addRowBtn=document.createElement("button"); addRowBtn.className="btn"; addRowBtn.textContent="+ Campo";
-    addRowBtn.style.background="transparent"; addRowBtn.style.border="1px dashed var(--violet)"; addRowBtn.style.color="var(--violet)";
+    addRowBtn.style.background="transparent"; addRowBtn.style.border="1px dashed var(--vio)"; addRowBtn.style.color="var(--vio)";
     addRowBtn.style.marginTop="8px"; addRowBtn.style.padding="6px 10px"; addRowBtn.style.fontSize="12px";
     addRowBtn.onclick=()=> fieldsBox.appendChild(impFieldRow("",""));
     card.appendChild(addRowBtn);
@@ -1293,9 +1568,9 @@ function impFieldRow(label, value){
   l.style.fontFamily="var(--disp)"; l.style.fontSize="11px"; l.style.letterSpacing=".5px";
   const v=document.createElement("input"); v.className="field val-in imp-fvalue"; v.placeholder="Valore"; v.value=value||"";
   v.style.fontFamily="var(--mono)";
-  if(!value){ v.style.borderColor="#FBBF24"; }
-  v.oninput=()=>{ v.style.borderColor="var(--border)"; };
-  const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕";
+  if(!value){ v.style.borderColor="var(--warn)"; }
+  v.oninput=()=>{ v.style.borderColor="var(--brd)"; };
+  const rm=document.createElement("button"); rm.className="rmrow"; rm.setAttribute("aria-label","Togli la riga"); rm.innerHTML=ic("chiudi","ic-16");
   rm.onclick=()=> row.remove();
   row.appendChild(l); row.appendChild(v); row.appendChild(rm);
   return row;
@@ -1341,7 +1616,7 @@ $("#commitBtn").onclick=async()=>{
   }
   impProgress(false);
   $("#commitBtn").textContent="Salva le voci selezionate"; $("#commitBtn").disabled=false;
-  if(count!=null) $("#pillDb").textContent="🗄️ "+count+" voci";
+  if(count!=null) scriviConteggio(count);
   if(failed){ alert(failed + (saved ? `\n\nLe prime ${saved} voci sono state salvate comunque.` : "")); return; }
   $("#importModal").classList.add("hidden");
   let msg = `Importate ${saved} voci nel vault locale. Ora puoi chiederle in chat.`;
@@ -1367,25 +1642,25 @@ $("#micBtn").onclick=async()=>{
     mediaRec.ondataavailable=e=>{ if(e.data && e.data.size) audioChunks.push(e.data); };
     mediaRec.onstop=async()=>{
       stream.getTracks().forEach(t=>t.stop());
-      recording=false; $("#micBtn").classList.remove("rec"); $("#micBtn").textContent="⏳";
+      recording=false; $("#micBtn").classList.remove("rec"); $("#micBtn").innerHTML=ic("orologio");
       const blob=new Blob(audioChunks,{type:(mediaRec.mimeType||"audio/webm")});
       const fd=new FormData(); fd.append("file", blob, "audio.webm");
       try{
         const res=await fetch("/api/transcribe",{method:"POST",body:fd});
-        const j=await res.json(); $("#micBtn").textContent="🎤";
+        const j=await res.json(); $("#micBtn").innerHTML=ic("microfono");
         if(!res.ok){ addAI(j.detail||"Trascrizione non riuscita."); return; }
         if(j.text){ $("#q").value=j.text; $("#q").focus(); }
         else addAI("Non ho capito l'audio, riprova.");
-      }catch(e){ $("#micBtn").textContent="🎤"; addAI("Errore durante la trascrizione."); }
+      }catch(e){ $("#micBtn").innerHTML=ic("microfono"); addAI("Errore durante la trascrizione."); }
     };
-    mediaRec.start(); recording=true; $("#micBtn").textContent="⏹"; $("#micBtn").classList.add("rec");
+    mediaRec.start(); recording=true; $("#micBtn").innerHTML=ic("stop"); $("#micBtn").classList.add("rec");
   }catch(e){ addAI("Permesso microfono negato o non disponibile."); }
 };
 
 /* ---- ONBOARDING (primo avvio): CIE + Home banking precompilati ---- */
-const CIE_TEMPLATE  = {icon:"🪪", title:"CIE — Carta d'identità elettronica", tags:"cie, documento, identita, spid",
+const CIE_TEMPLATE  = {icon:ic("identita","ic-16"), title:"CIE — Carta d'identità elettronica", tags:"cie, documento, identita, spid",
    fields:[["Numero documento",""],["PIN",""],["PUK",""],["Scadenza",""]]};
-const BANK_TEMPLATE = {icon:"🏦", tags:"banca, conto, homebanking",
+const BANK_TEMPLATE = {icon:ic("banca","ic-16"), tags:"banca, conto, homebanking",
    fields:[["Banca (nome)",""],["Utente / Codice cliente",""],["Password",""],["PIN dispositivo",""],["IBAN",""]]};
 
 function onbSection(kind, icon, titleText, fields, tags, removable){
@@ -1393,7 +1668,7 @@ function onbSection(kind, icon, titleText, fields, tags, removable){
   const head=document.createElement("label"); head.className="onb-head";
   const chk=document.createElement("input"); chk.type="checkbox"; chk.className="onb-chk"; chk.checked=true; head.appendChild(chk);
   const ttl=document.createElement("span"); ttl.innerHTML=` ${icon} ${esc(titleText)}`; ttl.style.flex="1"; head.appendChild(ttl);
-  if(removable){ const rm=document.createElement("button"); rm.className="iconbtn"; rm.textContent="✕"; rm.style.marginLeft="auto";
+  if(removable){ const rm=document.createElement("button"); rm.className="iconbtn"; rm.setAttribute("aria-label","Togli"); rm.innerHTML=ic("chiudi","ic-16"); rm.style.marginLeft="auto";
     rm.onclick=(e)=>{ e.preventDefault(); sec.remove(); }; head.appendChild(rm); }
   sec.appendChild(head);
   const fb=document.createElement("div"); fb.className="onb-fields"; fb.style.marginTop="8px";
@@ -1411,7 +1686,7 @@ function openOnboarding(){
   banks.appendChild(onbSection("bank", BANK_TEMPLATE.icon, "Home banking", BANK_TEMPLATE.fields, BANK_TEMPLATE.tags, false));
   box.appendChild(banks);
   const addBank=document.createElement("button"); addBank.className="btn";
-  addBank.style.cssText="background:transparent;border:1px dashed var(--cyan);color:var(--cyan);margin-top:10px;padding:8px";
+  addBank.className="btn tratteggiato compatto"; addBank.style.marginTop="10px";
   addBank.textContent="+ Aggiungi un'altra banca";
   addBank.onclick=()=> banks.appendChild(onbSection("bank", BANK_TEMPLATE.icon, "Home banking", BANK_TEMPLATE.fields, BANK_TEMPLATE.tags, true));
   box.appendChild(addBank);
@@ -1423,7 +1698,7 @@ function onbFieldRow(label, value){
   l.style.fontFamily="var(--disp)"; l.style.fontSize="11px"; l.style.letterSpacing=".5px";
   const v=document.createElement("input"); v.className="field val-in onb-fvalue"; v.placeholder="Valore (lascia vuoto se non ce l'hai)"; v.value=value||"";
   v.style.fontFamily="var(--mono)";
-  const rm=document.createElement("button"); rm.className="rmrow"; rm.innerHTML="✕"; rm.onclick=()=>row.remove();
+  const rm=document.createElement("button"); rm.className="rmrow"; rm.setAttribute("aria-label","Togli la riga"); rm.innerHTML=ic("chiudi","ic-16"); rm.onclick=()=>row.remove();
   row.appendChild(l); row.appendChild(v); row.appendChild(rm);
   return row;
 }
@@ -1450,7 +1725,7 @@ $("#onboardSave").onclick=async()=>{
       title = CIE_TEMPLATE.title;
     }
     const {ok,j}=await api("/api/add",{title, fields, tags});
-    if(ok){ saved++; $("#pillDb").textContent="🗄️ "+j.count+" voci"; }
+    if(ok){ saved++; scriviConteggio(j.count); }
   }
   $("#onboardSave").disabled=false; $("#onboardSave").textContent="Salva e inizia";
   $("#onboardModal").classList.add("hidden");
@@ -1524,13 +1799,13 @@ async function mergeOrCreateOtp(issuer, name, secret){
       const r=j.results[0];
       const fields=(r.fields||[]).filter(f=>!labelLooksOtp(f.label)).concat([{label:"OTP (2FA)", value:secret}]);
       const u=await api("/api/update",{id:r.id, title:r.title, fields, tags:(r.tags||[]).join(", ")});
-      if(u.ok){ $("#pillDb").textContent="🗄️ "+u.j.count+" voci"; return {merged:true, title:r.title}; }
+      if(u.ok){ scriviConteggio(u.j.count); return {merged:true, title:r.title}; }
     }
   }
   const title=(issuer && name && issuer!==name) ? `${issuer} (${name})` : (issuer||name||"Account 2FA");
   const tags=[issuer,"2fa","otp"].filter(Boolean).join(", ");
   const a=await api("/api/add",{title, fields:[{label:"OTP (2FA)", value:secret}], tags});
-  if(a.ok) $("#pillDb").textContent="🗄️ "+a.j.count+" voci";
+  if(a.ok) scriviConteggio(a.j.count);
   return {merged:false, title};
 }
 
@@ -1601,7 +1876,8 @@ document.addEventListener("click",(e)=>{
 
 /* ===== IMPOSTAZIONI ===== */
 let SETTINGS={};
-function setSw(el,on){ el.classList.toggle("on",!!on); }
+function setSw(el,on){ el.classList.toggle("on",!!on);
+  el.setAttribute("aria-checked", String(!!on)); }
 async function openSettings(){
   const {ok,j}=await fetch("/api/settings").then(r=>r.json().then(d=>({ok:r.ok,j:d})));
   if(ok){
@@ -1633,6 +1909,12 @@ function flashSet(msg,kind){ const m=$("#setMsg"); m.textContent=msg; m.classNam
 
 $("#setAutolock").addEventListener("change",e=>{ saveSetting({autolock_minutes:parseInt(e.target.value)}); resetAutolock(); });
 $("#setGenLen").addEventListener("change",e=>saveSetting({gen_length:parseInt(e.target.value)}));
+/* Gli interruttori sono <div>, non <input type=checkbox>: la barra spaziatrice
+   e Invio non li azionano da soli come farebbero su un pulsante vero. Adesso
+   che sono raggiungibili col Tab, servono. */
+document.querySelectorAll(".sw").forEach(sw=> sw.addEventListener("keydown", (e)=>{
+  if(e.key===" "||e.key==="Enter"){ e.preventDefault(); sw.click(); }
+}));
 $("#swOllama").addEventListener("click",()=>{ const on=!$("#swOllama").classList.contains("on"); setSw($("#swOllama"),on); saveSetting({use_ollama:on}); });
 $("#swMic").addEventListener("click",()=>{ const on=!$("#swMic").classList.contains("on"); setSw($("#swMic"),on); saveSetting({mic_enabled:on}); applyMicSetting(on); });
 $("#swGenSym").addEventListener("click",()=>{ const on=!$("#swGenSym").classList.contains("on"); setSw($("#swGenSym"),on); saveSetting({gen_symbols:on}); });
@@ -1666,7 +1948,7 @@ async function loadExtList(){
   else { $("#extFolderBox").classList.add("hidden"); }
   const exts=j.extensions||[];
   box.innerHTML=exts.map(e=>
-    `<div class="set-row"><div><div class="lab">🧩 ${esc(e.name)}</div>
+    `<div class="set-row"><div><div class="lab">${ic("estensione","ic-16")} ${esc(e.name)}</div>
        <div class="desc">ID ${esc(_idBreve(e.origin))} · abbinata il ${esc(_dataIt(e.created))}</div></div>
        <button class="iconbtn ctl" data-revoke="${_escAttr(e.origin)}">Revoca</button></div>`).join("");
   box.querySelectorAll("[data-revoke]").forEach(b=>b.onclick=async()=>{
@@ -1680,13 +1962,13 @@ $("#extFolderCopy").onclick=async()=>{
   const p=$("#extFolder").textContent.trim();
   if(!p) return;
   try{ await navigator.clipboard.writeText(p); }catch(e){}
-  $("#extFolderCopy").textContent="✓"; setTimeout(()=>{$("#extFolderCopy").textContent="⧉";},1200);
+  $("#extFolderCopy").innerHTML=ic("spunta"); setTimeout(()=>{$("#extFolderCopy").innerHTML=ic("copia");},1200);
 };
 $("#pairCopy").onclick=async()=>{
   const c=$("#pairCode").textContent.trim();
   if(!c) return;
   try{ await navigator.clipboard.writeText(c); }catch(e){}
-  $("#pairCopy").textContent="✓"; setTimeout(()=>{$("#pairCopy").textContent="⧉";},1200);
+  $("#pairCopy").innerHTML=ic("spunta"); setTimeout(()=>{$("#pairCopy").innerHTML=ic("copia");},1200);
 };
 $("#pairStart").onclick=async()=>{
   const {ok,j}=await api("/api/pair/start",{});
@@ -1787,14 +2069,14 @@ function avviso(testo, importante){
     box.id = "avvisoSync";
     box.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);"
       + "bottom:22px;z-index:60;max-width:70vw;padding:9px 16px;border-radius:9px;"
-      + "font-size:12.5px;line-height:1.5;border:1px solid var(--border);"
-      + "background:var(--bar);box-shadow:0 6px 24px rgba(0,0,0,.28);cursor:pointer";
+      + "font-size:12.5px;line-height:1.5;border:1px solid var(--brd);"
+      + "background:var(--gl-bg);box-shadow:0 6px 24px rgba(0,0,0,.28);cursor:pointer";
     box.addEventListener("click", ()=>box.classList.add("hidden"));
     document.body.appendChild(box);
   }
   box.textContent = testo;
-  box.style.borderColor = importante ? "#FBBF24" : "var(--border)";
-  box.style.color = importante ? "#FBBF24" : "var(--fg)";
+  box.style.borderColor = importante ? "var(--warn)" : "var(--brd)";
+  box.style.color = importante ? "var(--warn)" : "var(--fg)";
   box.classList.remove("hidden");
   clearTimeout(_avvisoTimer);
   _avvisoTimer = setTimeout(()=>box.classList.add("hidden"), importante ? 9000 : 4000);
@@ -1862,7 +2144,7 @@ $("#syncNow").addEventListener("click", async ()=>{
   if(b.disabled) return;
   b.disabled = true; b.textContent = "…";
   const {ok,j} = await api("/api/sync/adesso", {});
-  b.disabled = false; b.textContent = "🔄";
+  b.disabled = false; b.innerHTML = ic("sync");
   if(!ok){ avviso(j.detail || "Sincronizzazione non riuscita.", true); return; }
   if(!j.ok){ avviso(j.motivo || "Sincronizzazione non riuscita.", true); return; }
   if(!j.abbinati){
@@ -1904,14 +2186,14 @@ function aggiornaBadge(n){
   const b = $("#syncBadge");
   b.textContent = n ? `(${n})` : "";
   b.classList.toggle("hidden", !n);
-  b.style.color = "#FBBF24";
+  b.style.color = "var(--warn)";
 }
 
 function renderFidati(lista){
   const box = $("#syncFidati"); box.innerHTML = "";
   if(!lista.length){
     const p = document.createElement("div");
-    p.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55";
+    p.style.cssText = "font-size:12.5px;color:var(--t3);line-height:1.55";
     p.textContent = "Nessuno ancora. «Abbina un dispositivo» mostra un codice da scrivere sull'altro.";
     box.appendChild(p); return;
   }
@@ -1920,11 +2202,11 @@ function renderFidati(lista){
     const t = document.createElement("span"); t.className = "t";
     t.textContent = d.nome || "dispositivo";
     const q = document.createElement("span");
-    q.style.cssText = "font-size:11px;color:var(--faint);margin-right:8px";
+    q.style.cssText = "font-size:11px;color:var(--t3);margin-right:8px";
     q.textContent = d.quando ? new Date(d.quando*1000).toLocaleDateString() : "";
     const b = document.createElement("button");
     b.className = "iconbtn"; b.textContent = "Revoca";
-    b.style.cssText = "padding:4px 10px;font-size:12px;border-color:#FCA5A5;color:#FCA5A5";
+    b.style.cssText = "padding:4px 10px;font-size:12px;border-color:var(--err);color:var(--err)";
     b.addEventListener("click", async ()=>{
       if(!confirm(`Revocare "${d.nome}"?\n\nDa quel momento non potrà più sincronizzare senza essere abbinato di nuovo.`)) return;
       await api("/api/sync/revoca", {id: d.id});
@@ -1965,7 +2247,7 @@ async function cercaDispositivi(){
   const box = $("#syncTrovati");
   box.innerHTML = "";
   const att = document.createElement("div");
-  att.style.cssText = "font-size:12.5px;color:var(--faint)";
+  att.style.cssText = "font-size:12.5px;color:var(--t3)";
   att.textContent = "Cerco sulla rete locale…";
   box.appendChild(att);
 
@@ -1978,7 +2260,7 @@ async function cercaDispositivi(){
     const t = document.createElement("span"); t.className = "t";
     t.textContent = d.nome || "dispositivo";
     const w = document.createElement("span");
-    w.style.cssText = "font-size:11px;color:var(--faint);margin-right:8px";
+    w.style.cssText = "font-size:11px;color:var(--t3);margin-right:8px";
     w.textContent = d.conosciuto ? "già abbinato" : (d.abbinabile ? "pronto ad abbinarsi" : "da abbinare");
     const b = document.createElement("button");
     b.className = "iconbtn"; b.textContent = d.conosciuto ? "Sincronizza" : "Abbina";
@@ -2012,14 +2294,14 @@ async function mostraDiagnosi(box){
 
   (d.certi || []).forEach(m=>{
     const p = document.createElement("div");
-    p.style.cssText = "font-size:12.5px;color:#FBBF24;line-height:1.55;margin-bottom:4px";
+    p.style.cssText = "font-size:12.5px;color:var(--warn);line-height:1.55;margin-bottom:4px";
     p.textContent = "• " + m;
     box.appendChild(p);
   });
 
   (d.da_provare || []).forEach(m=>{
     const p = document.createElement("div");
-    p.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55;margin-bottom:4px";
+    p.style.cssText = "font-size:12.5px;color:var(--t3);line-height:1.55;margin-bottom:4px";
     p.textContent = "• " + m;
     box.appendChild(p);
   });
@@ -2037,9 +2319,9 @@ async function mostraDiagnosi(box){
      isolano i dispositivi fra loro. Una volta collegati l'indirizzo se lo
      ricorda l'app, quindi questo campo si usa una volta sola. */
   const riga = document.createElement("div");
-  riga.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--border)";
+  riga.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--brd)";
   const et = document.createElement("div");
-  et.style.cssText = "font-size:12.5px;color:var(--faint);line-height:1.55;margin-bottom:6px";
+  et.style.cssText = "font-size:12.5px;color:var(--t3);line-height:1.55;margin-bottom:6px";
   et.textContent = "Sai già dov'è? Scrivi il suo indirizzo: da una VPN la domanda "
                  + "non passa, ma il collegamento sì. Poi l'app se lo ricorda.";
   const inp = document.createElement("input");
@@ -2068,7 +2350,7 @@ async function mostraDiagnosi(box){
 
   if(d.ip){
     const n = document.createElement("div");
-    n.style.cssText = "font-size:11px;color:var(--faint);margin-top:8px";
+    n.style.cssText = "font-size:11px;color:var(--t3);margin-top:8px";
     n.textContent = `Questo PC è ${d.ip}, in ascolto sulla porta ${d.porta_sync}.`;
     box.appendChild(n);
   }
@@ -2096,7 +2378,7 @@ async function sistemaFirewall(bottone){
 function chiediCodice(riga, d){
   riga.innerHTML = "";
   const t = document.createElement("span");
-  t.style.cssText = "font-size:12.5px;color:var(--soft);margin-right:8px";
+  t.style.cssText = "font-size:12.5px;color:var(--t2);margin-right:8px";
   t.textContent = "Codice mostrato su quel dispositivo:";
   const inp = document.createElement("input");
   inp.className = "field"; inp.inputMode = "numeric"; inp.maxLength = 6;
@@ -2149,12 +2431,12 @@ async function caricaConflitti(){
 
   conflitti.forEach(c=>{
     const card = document.createElement("div");
-    card.style.cssText = "border:1px solid var(--border);border-radius:12px;padding:12px;margin-top:10px;background:var(--panel2)";
+    card.style.cssText = "border:1px solid var(--brd);border-radius:12px;padding:12px;margin-top:10px;background:var(--s1)";
     const t = document.createElement("div");
-    t.style.cssText = "font-weight:600;color:#fff;font-size:14px";
+    t.style.cssText = "font-weight:600;color:var(--t1);font-size:14px";
     t.textContent = c.titolo;
     const m = document.createElement("div");
-    m.style.cssText = "font-size:11.5px;color:var(--faint);margin-top:2px";
+    m.style.cssText = "font-size:11.5px;color:var(--t3);margin-top:2px";
     m.textContent = {
       "entrambi-modificata": "modificata su tutti e due",
       "modificata-qui-cancellata-la": "modificata qui, cancellata sull'altro",
@@ -2270,8 +2552,8 @@ function catRow(nome, vera){
 
   const head = document.createElement("div"); head.className = "cathead";
   const freccia = document.createElement("span");
-  freccia.style.color = "var(--faint)";
-  freccia.textContent = CAT_APERTE.has(nome) ? "▾" : "▸";
+  freccia.style.color = "var(--t3)";
+  freccia.innerHTML = ic(CAT_APERTE.has(nome) ? "chevron-giu" : "chevron-destra", "ic-16");
   const nm = document.createElement("span"); nm.className = "nm";
   nm.textContent = vera ? nome : "Senza categoria";
   const cnt = document.createElement("span"); cnt.className = "cnt";
@@ -2283,8 +2565,8 @@ function catRow(nome, vera){
     head.appendChild(catBtn("＋ Voci", "Scegli quali voci mettere qui", (e)=>{
       e.stopPropagation(); openPick(nome);
     }));
-    head.appendChild(catBtn("✎", "Rinomina", (e)=>{ e.stopPropagation(); rinominaCat(row, nome); }));
-    const del = catBtn("🗑", "Elimina la categoria", async (e)=>{
+    head.appendChild(catBtn("matita", "Rinomina", (e)=>{ e.stopPropagation(); rinominaCat(row, nome); }));
+    const del = catBtn("cestino", "Elimina la categoria", async (e)=>{
       e.stopPropagation();
       const avviso = voci.length
         ? `Eliminare la categoria "${nome}"?\n\nLe ${voci.length} voci che contiene NON vengono eliminate: restano nel vault, senza categoria.`
@@ -2295,7 +2577,7 @@ function catRow(nome, vera){
       CAT_APERTE.delete(nome);
       loadCats();
     });
-    del.style.borderColor = "#FCA5A5"; del.style.color = "#FCA5A5";
+    del.style.borderColor = "var(--err)"; del.style.color = "var(--err)";
     head.appendChild(del);
   }
 
@@ -2317,7 +2599,7 @@ function catRow(nome, vera){
       const t = document.createElement("span"); t.className = "t"; t.textContent = c.title;
       r.append(t);
       if(vera){
-        r.appendChild(catBtn("✕", "Togli dalla categoria", async ()=>{
+        r.appendChild(catBtn("chiudi", "Togli dalla categoria", async ()=>{
           const {ok,j} = await api("/api/set_category", {ids:[c.id], name:""});
           if(!ok){ alert(j.detail || "Non riuscito."); return; }
           loadCats();
@@ -2332,7 +2614,8 @@ function catRow(nome, vera){
 
 function catBtn(testo, titolo, onclick){
   const b = document.createElement("button");
-  b.className = "iconbtn"; b.textContent = testo; b.title = titolo;
+  b.className = "iconbtn"; b.innerHTML = ic(testo, "ic-16"); b.title = titolo;
+  b.setAttribute("aria-label", titolo);
   b.style.padding = "5px 9px"; b.style.fontSize = "12px";
   b.addEventListener("click", onclick);
   return b;
@@ -2450,13 +2733,13 @@ function dbCard(c){
   const head=document.createElement("div");
   head.style.cssText="display:flex;align-items:flex-start;justify-content:space-between;gap:8px";
   const titleEl=document.createElement("div"); titleEl.className="dbtitle";
-  titleEl.innerHTML="🔑 "+esc(c.title)
+  titleEl.innerHTML=ic("chiave","ic-16")+" "+esc(c.title)
     + (c.critical ? ' <span class="badge-crit">critica</span>' : "");
   const acts=document.createElement("div"); acts.style.cssText="display:flex;gap:4px;flex-shrink:0";
-  const editBtn=document.createElement("button"); editBtn.className="iconbtn"; editBtn.title="Modifica"; editBtn.textContent="✎";
-  editBtn.style.cssText="border-color:var(--violet);color:var(--violet)"; editBtn.onclick=()=>openEdit(c);
-  const delBtn=document.createElement("button"); delBtn.className="iconbtn"; delBtn.title="Elimina"; delBtn.textContent="🗑";
-  delBtn.style.cssText="border-color:#FCA5A5;color:#FCA5A5"; delBtn.onclick=()=>showDeleteConfirm(card,c);
+  const editBtn=document.createElement("button"); editBtn.className="iconbtn"; editBtn.title="Modifica"; editBtn.setAttribute("aria-label","Modifica"); editBtn.innerHTML=ic("matita");
+  editBtn.style.cssText="border-color:var(--vio);color:var(--vio)"; editBtn.onclick=()=>openEdit(c);
+  const delBtn=document.createElement("button"); delBtn.className="iconbtn"; delBtn.title="Elimina"; delBtn.setAttribute("aria-label","Elimina"); delBtn.innerHTML=ic("cestino");
+  delBtn.style.cssText="border-color:var(--err);color:var(--err)"; delBtn.onclick=()=>showDeleteConfirm(card,c);
   acts.appendChild(editBtn); acts.appendChild(delBtn);
   head.appendChild(titleEl); head.appendChild(acts); card.appendChild(head);
 
@@ -2479,10 +2762,10 @@ function showDeleteConfirm(card, c){
   const msg=document.createElement("span"); msg.className="msg"; msg.textContent="Eliminare questa voce?";
   const btns=document.createElement("div"); btns.style.cssText="display:flex;gap:6px";
   const yes=document.createElement("button"); yes.className="iconbtn"; yes.textContent="Sì, elimina";
-  yes.style.cssText="border-color:#FCA5A5;color:#FCA5A5;font-size:12px;padding:4px 10px";
+  yes.style.cssText="border-color:var(--err);color:var(--err);font-size:12px;padding:4px 10px";
   yes.onclick=async()=>{
     const r=await fetch("/api/delete/"+c.id,{method:"DELETE"}); const j=await r.json();
-    if(r.ok){ $("#pillDb").textContent="🗄️ "+j.count+" voci";
+    if(r.ok){ scriviConteggio(j.count);
       DB_ENTRIES = DB_ENTRIES.filter(x=>x.id!==c.id); card.remove();
       if(!$("#dbGrid").children.length) $("#dbEmpty").classList.remove("hidden"); }
     else alert(j.detail||"Errore");
@@ -2498,19 +2781,19 @@ $("#dbRefreshBtn").addEventListener("click", loadDb);
 function promptClearAll(){
   // conferma in chat con bottoni espliciti
   const r=rowEl(""); const wrap=document.createElement("div"); wrap.style.maxWidth="88%";
-  const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="⚠️ Conferma"; wrap.appendChild(tag);
+  const tag=document.createElement("div"); tag.className="ai-tag"; tag.innerHTML=ic("avviso","ic-14")+" Conferma"; wrap.appendChild(tag);
   const b=document.createElement("div"); b.className="bubble b-ai";
   b.innerHTML="Stai per <b>eliminare TUTTE le voci</b> del vault. L'operazione è irreversibile (puoi però ripristinare da un backup). Confermi?";
   wrap.appendChild(b);
   const btns=document.createElement("div"); btns.style.cssText="display:flex;gap:8px;margin-top:10px";
-  const yes=document.createElement("button"); yes.className="pickbtn"; yes.style.cssText="width:auto;background:rgba(252,165,165,.1);border-color:#FCA5A5;color:#FCA5A5";
+  const yes=document.createElement("button"); yes.className="pickbtn"; yes.style.cssText="width:auto;background:var(--err-velo);border-color:var(--err);color:var(--err)";
   yes.textContent="Sì, svuota tutto";
   const no=document.createElement("button"); no.className="pickbtn"; no.style.cssText="width:auto";
   no.textContent="Annulla";
   yes.onclick=async()=>{
     yes.disabled=true; no.disabled=true; yes.textContent="Svuoto…";
     const {ok,j}=await api("/api/clear");
-    if(ok){ $("#pillDb").textContent="🗄️ "+j.count+" voci";
+    if(ok){ scriviConteggio(j.count);
       addAI(`Database svuotato: rimosse ${j.removed} voci. Puoi aggiungerne di nuove col pulsante ＋ o con l'import.`);
       if(!$("#dbPanel").classList.contains("hidden")) loadDb();
     } else addAI(j.detail||"Errore durante lo svuotamento.");

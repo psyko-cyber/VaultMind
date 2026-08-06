@@ -23,6 +23,7 @@ import 'database.dart';
 import 'impostazioni.dart';
 import 'sblocco.dart';
 import 'sincronizza.dart';
+import '../icone.dart';
 
 class SchermataCasa extends StatefulWidget {
   final Sessione sessione;
@@ -171,7 +172,11 @@ class _SchermataCasaState extends State<SchermataCasa>
         valueListenable: widget.sessione,
         builder: (context, vault, _) => Scaffold(
           appBar: AppBar(
-            title: const Text('VaultMind', style: TextStyle(letterSpacing: 1.5)),
+            title: const Text('VaultMind',
+                style: TextStyle(
+                    fontFamily: 'Space Grotesk',
+                    fontWeight: FontWeight.w600,
+                    letterSpacing: 0.2)),
             actions: [
               Center(
                 child: Text('${vault.credenziali.length} voci',
@@ -193,13 +198,13 @@ class _SchermataCasaState extends State<SchermataCasa>
                           child: CircularProgressIndicator(
                               strokeWidth: 2, color: context.cTenue),
                         )
-                      : const Icon(Icons.sync),
+                      : const IconaVM(Icone.sync),
                 ),
                 tooltip: 'Sincronizza ora',
                 onPressed: _syncInCorso ? null : () => _syncAutomatico(aMano: true),
               ),
               IconButton(
-                icon: const Icon(Icons.settings_outlined),
+                icon: const IconaVM(Icone.impostazioni),
                 tooltip: 'Impostazioni',
                 onPressed: () {
                   Navigator.of(context)
@@ -213,7 +218,7 @@ class _SchermataCasaState extends State<SchermataCasa>
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.lock_outline),
+                icon: const IconaVM(Icone.lucchetto),
                 tooltip: 'Blocca',
                 onPressed: _blocca,
               ),
@@ -234,16 +239,16 @@ class _SchermataCasaState extends State<SchermataCasa>
             onDestinationSelected: (i) => setState(() => _sezione = i),
             destinations: const [
               NavigationDestination(
-                  icon: Icon(Icons.forum_outlined),
-                  selectedIcon: Icon(Icons.forum),
+                  icon: IconaVM(Icone.chat),
+                  selectedIcon: IconaVM(Icone.chat),
                   label: 'Chat'),
               NavigationDestination(
-                  icon: Icon(Icons.list_alt_outlined),
-                  selectedIcon: Icon(Icons.list_alt),
+                  icon: IconaVM(Icone.elenco),
+                  selectedIcon: IconaVM(Icone.elenco),
                   label: 'Database'),
               NavigationDestination(
-                  icon: Icon(Icons.folder_outlined),
-                  selectedIcon: Icon(Icons.folder),
+                  icon: IconaVM(Icone.cartella),
+                  selectedIcon: IconaVM(Icone.cartella),
                   label: 'Categorie'),
             ],
           ),

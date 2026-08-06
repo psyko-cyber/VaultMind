@@ -17,6 +17,7 @@ import '../vault.dart';
 import 'dialoghi.dart';
 import 'modulo_voce.dart';
 import 'scheda_voce.dart';
+import '../icone.dart';
 
 class SezioneDatabase extends StatefulWidget {
   final Sessione sessione;
@@ -130,7 +131,7 @@ class _SezioneDatabaseState extends State<SezioneDatabase> {
         backgroundColor: context.cAccento,
         foregroundColor: context.cSuAccento,
         tooltip: 'Nuova voce',
-        child: const Icon(Icons.add),
+        child: const IconaVM(Icone.piu),
       ),
       body: Column(
         children: [
@@ -140,11 +141,11 @@ class _SezioneDatabaseState extends State<SezioneDatabase> {
               controller: _ricerca,
               decoration: InputDecoration(
                 hintText: 'Cerca…',
-                prefixIcon: Icon(Icons.search, color: context.cTenue),
+                prefixIcon: IconaVM(Icone.cerca, color: context.cTenue),
                 suffixIcon: _ricerca.text.isEmpty
                     ? null
                     : IconButton(
-                        icon: Icon(Icons.clear, color: context.cTenue),
+                        icon: IconaVM(Icone.chiudi, color: context.cTenue),
                         onPressed: () => _ricerca.clear(),
                       ),
               ),

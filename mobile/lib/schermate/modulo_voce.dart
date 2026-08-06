@@ -10,6 +10,8 @@ import '../sessione.dart';
 import '../tema.dart';
 import '../totp.dart';
 import '../vault.dart';
+import '../icone.dart';
+import '../interruttore.dart';
 
 /// Le etichette proposte quando si aggiunge un campo: sono quelle che ricorrono
 /// nel 90% delle voci, e sceglierle da un elenco evita che la stessa cosa si
@@ -184,7 +186,7 @@ class _ModuloVoceState extends State<ModuloVoce> {
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
               onPressed: () => _aggiungiCampo(),
-              icon: Icon(Icons.add, size: 18, color: context.cAccento),
+              icon: IconaVM(Icone.piu, size: 18, color: context.cAccento),
               label: Text('Aggiungi campo',
                   style: TextStyle(color: context.cAccento, fontSize: 13)),
             ),
@@ -220,16 +222,13 @@ class _ModuloVoceState extends State<ModuloVoce> {
             ),
 
           const SizedBox(height: 12),
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: _critica,
+          RigaInterruttore(
+            acceso: _critica,
             onChanged: (v) => setState(() => _critica = v),
-            activeThumbColor: context.cAccento,
-            title: const Text('Voce critica', style: TextStyle(fontSize: 14)),
-            subtitle: Text(
-              'Account da cui si rimette le mani su tutto il resto: banca, email principale.',
-              style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.4),
-            ),
+            icona: const IconaVM(Icone.avviso, size: 20),
+            titolo: 'Voce critica',
+            descrizione:
+                'Account da cui si rimette le mani su tutto il resto: banca, email principale.',
           ),
 
           if (_critica && _duefattoriInsieme) _avviso2FA(context),
@@ -307,7 +306,7 @@ class _ModuloVoceState extends State<ModuloVoce> {
           IconButton(
             iconSize: 18,
             tooltip: 'Togli il campo',
-            icon: Icon(Icons.close, color: context.cTenue),
+            icon: IconaVM(Icone.chiudi, color: context.cTenue),
             onPressed: () => _togliCampo(i),
           ),
         ],
@@ -326,7 +325,7 @@ class _ModuloVoceState extends State<ModuloVoce> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.info_outline, size: 18, color: context.cAccento),
+            IconaVM(Icone.info, size: 18, color: context.cAccento),
             const SizedBox(width: 10),
             Expanded(
               child: Text(

@@ -19,6 +19,7 @@ import '../vault.dart';
 import 'dialoghi.dart';
 import 'modulo_voce.dart';
 import 'scheda_voce.dart';
+import '../icone.dart';
 
 class SezioneCategorie extends StatefulWidget {
   final Sessione sessione;
@@ -111,7 +112,7 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
             onPressed: _crea,
             backgroundColor: context.cAccento,
             foregroundColor: context.cSuAccento,
-            icon: const Icon(Icons.create_new_folder_outlined),
+            icon: const IconaVM(Icone.cartellaPiu),
             label: const Text('Nuova categoria'),
           ),
           body: vault.categorie.isEmpty && senza.isEmpty
@@ -189,7 +190,7 @@ class _Gruppo extends StatelessWidget {
         child: ExpansionTile(
           shape: const Border(),
           collapsedShape: const Border(),
-          leading: Icon(vera ? Icons.folder : Icons.folder_off_outlined,
+          leading: IconaVM(vera ? Icone.cartella : Icone.cartellaOff,
               color: vera ? colore : context.cTenue),
           title: Text(titolo,
               style: const TextStyle(fontSize: 14.5, fontWeight: FontWeight.w600)),
@@ -200,7 +201,7 @@ class _Gruppo extends StatelessWidget {
           trailing: !vera
               ? null
               : PopupMenuButton<String>(
-                  icon: Icon(Icons.more_vert, color: context.cTenue),
+                  icon: IconaVM(Icone.altro, color: context.cTenue),
                   color: context.cPannello,
                   onSelected: (v) {
                     if (v == 'rinomina') onRinomina!();
@@ -219,7 +220,7 @@ class _Gruppo extends StatelessWidget {
                   children: [
                     TextButton.icon(
                       onPressed: onAggiungi,
-                      icon: Icon(Icons.add, size: 18, color: context.cAccento),
+                      icon: IconaVM(Icone.piu, size: 18, color: context.cAccento),
                       label: Text('Aggiungi voci',
                           style: TextStyle(color: context.cAccento, fontSize: 13)),
                     ),
@@ -228,7 +229,7 @@ class _Gruppo extends StatelessWidget {
                         builder: (_) => ModuloVoce(
                             sessione: sessione, categoriaIniziale: titolo),
                       )),
-                      icon: Icon(Icons.note_add_outlined,
+                      icon: IconaVM(Icone.piu,
                           size: 17, color: context.cTenue),
                       label: Text('Nuova voce qui',
                           style: TextStyle(color: context.cTenue, fontSize: 13)),
@@ -255,7 +256,7 @@ class _Gruppo extends StatelessWidget {
                             IconButton(
                               iconSize: 18,
                               tooltip: 'Togli dalla categoria',
-                              icon: Icon(Icons.remove_circle_outline,
+                              icon: IconaVM(Icone.menoCerchio,
                                   color: context.cTenue),
                               onPressed: () => onTogli!(c),
                             ),
@@ -335,7 +336,7 @@ class _SceltaVociState extends State<_SceltaVoci> {
               controller: _ricerca,
               decoration: InputDecoration(
                 hintText: 'Cerca fra le voci…',
-                prefixIcon: Icon(Icons.search, color: context.cTenue),
+                prefixIcon: IconaVM(Icone.cerca, color: context.cTenue),
               ),
             ),
           ),

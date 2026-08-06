@@ -43,6 +43,7 @@ import '../sync_rete.dart';
 import '../tema.dart';
 import '../vault.dart';
 import 'casa.dart';
+import '../icone.dart';
 
 class SchermataTravaso extends StatefulWidget {
   const SchermataTravaso({super.key});
@@ -197,7 +198,7 @@ class _SchermataTravasoState extends State<SchermataTravaso> {
                 enabled: !_occupato,
                 decoration: InputDecoration(
                   labelText: 'Master password del PC',
-                  prefixIcon: Icon(Icons.lock_outline, color: context.cTenue),
+                  prefixIcon: IconaVM(Icone.lucchetto, color: context.cTenue),
                 ),
               ),
               const SizedBox(height: 14),
@@ -211,7 +212,7 @@ class _SchermataTravasoState extends State<SchermataTravaso> {
                   labelText: 'Codice mostrato sul PC',
                   hintText: '000000',
                   counterText: '',
-                  prefixIcon: Icon(Icons.pin_outlined, color: context.cTenue),
+                  prefixIcon: IconaVM(Icone.tastierino, color: context.cTenue),
                 ),
               ),
               const SizedBox(height: 18),

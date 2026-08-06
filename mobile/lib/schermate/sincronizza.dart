@@ -13,6 +13,8 @@ import '../sync_gestore.dart';
 import '../sync_rete.dart';
 import '../tema.dart';
 import 'dialoghi.dart';
+import '../icone.dart';
+import '../interruttore.dart';
 
 class SchermataSincronizza extends StatefulWidget {
   final GestoreSync gestore;
@@ -146,7 +148,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
               keyboardType: TextInputType.number,
               maxLength: 6,
               style: const TextStyle(
-                  fontSize: 22, letterSpacing: 8, fontFamily: 'monospace'),
+                  fontSize: 22, letterSpacing: 8, fontFamily: 'JetBrains Mono'),
               decoration: const InputDecoration(counterText: '', hintText: '000000'),
               onSubmitted: (_) => Navigator.pop(dc, true),
             ),
@@ -178,20 +180,16 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          SwitchListTile(
-            contentPadding: EdgeInsets.zero,
-            value: g.acceso,
+          RigaInterruttore(
+            acceso: g.acceso,
             onChanged: (v) => g.imposta(acceso: v),
-            activeThumbColor: context.cAccento,
-            title: const Text('Sincronizzazione', style: TextStyle(fontSize: 14)),
-            subtitle: Text(
-              !g.acceso
-                  ? 'Spenta. Nessuna porta aperta, questo telefono non risponde a nessuno.'
-                  : (g.inAscolto
-                      ? 'Accesa: risponde solo a chi ha la chiave di questo vault.'
-                      : 'Accesa, ma la porta non si è aperta. Il sync a mano funziona lo stesso.'),
-              style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.4),
-            ),
+            icona: const IconaVM(Icone.sync, size: 20),
+            titolo: 'Sincronizzazione',
+            descrizione: !g.acceso
+                ? 'Spenta. Nessuna porta aperta, questo telefono non risponde a nessuno.'
+                : (g.inAscolto
+                    ? 'Accesa: risponde solo a chi ha la chiave di questo vault.'
+                    : 'Accesa, ma la porta non si è aperta. Il sync a mano funziona lo stesso.'),
           ),
           const SizedBox(height: 8),
           TextField(
@@ -226,7 +224,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: g.acceso ? _cerca : null,
-                  icon: Icon(Icons.search, size: 18, color: context.cAccento),
+                  icon: IconaVM(Icone.cerca, size: 18, color: context.cAccento),
                   label: Text(_cerco ? 'Cerco…' : 'Cerca',
                       style: TextStyle(color: context.cAccento)),
                   style: OutlinedButton.styleFrom(
@@ -243,7 +241,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
                           _cerca();
                         }
                       : null,
-                  icon: Icon(Icons.add_link, size: 18, color: context.cAccento),
+                  icon: IconaVM(Icone.piu, size: 18, color: context.cAccento),
                   label: Text('Abbina', style: TextStyle(color: context.cAccento)),
                   style: OutlinedButton.styleFrom(
                       side: BorderSide(color: context.cBordo),
@@ -328,7 +326,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
                 style: TextStyle(
                     fontSize: 32,
                     letterSpacing: 8,
-                    fontFamily: 'monospace',
+                    fontFamily: 'JetBrains Mono',
                     color: context.cAccento)),
             const SizedBox(height: 8),
             Text(
@@ -345,7 +343,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   Widget _rigaTrovato(BuildContext context, Trovato d) => Card(
         margin: const EdgeInsets.only(bottom: 8),
         child: ListTile(
-          leading: Icon(d.conosciuto ? Icons.devices : Icons.device_unknown,
+          leading: IconaVM(d.conosciuto ? Icone.dispositivi : Icone.dispositivo,
               color: d.conosciuto ? context.cAccento : context.cTenue),
           title: Text(d.etichetta, style: const TextStyle(fontSize: 14)),
           subtitle: Text(
@@ -369,7 +367,7 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   Widget _rigaFidato(BuildContext context, String id, String nome) => Card(
         margin: const EdgeInsets.only(bottom: 8),
         child: ListTile(
-          leading: Icon(Icons.verified_user_outlined, color: context.cAccento),
+          leading: IconaVM(Icone.scudoOk, color: context.cAccento),
           title: Text(nome, style: const TextStyle(fontSize: 14)),
           trailing: TextButton(
             onPressed: () async {

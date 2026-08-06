@@ -1,0 +1,508 @@
+{
+  "_leggimi": [
+    "SORGENTE UNICA delle icone di VaultMind. Non si modificano index.html,",
+    "popup.html o icone.dart a mano: si cambia qui e si riesegue",
+    "`py -3 design/genera_icone.py`.",
+    "",
+    "Perche' una sorgente sola: le tre app disegnano le stesse cose (un",
+    "lucchetto, una chiave, un database). Tre copie divergono in silenzio, ed e'",
+    "esattamente cio' che era gia' successo ai colori, che infatti hanno un",
+    "commento in ogni file che implora di aggiornarli tutti e tre.",
+    "",
+    "Griglia 24x24, tratto 1.5, terminazioni e giunzioni tonde, nessun",
+    "riempimento. Tutto sta fra 2.5 e 21.5 cosi' il tratto non viene tagliato",
+    "dal viewBox.",
+    "",
+    "Forme ammesse (di piu' non servono, e ognuna in piu' e' codice nel",
+    "generatore E in Dart):",
+    "  {\"d\": \"...\"}                 tracciato SVG (M L H V C S Q T A Z, anche minuscole)",
+    "  {\"cerchio\": [cx, cy, r]}",
+    "  {\"rett\": [x, y, larg, alt, r]}"
+  ],
+
+  "icone": {
+
+    "lucchetto": {
+      "titolo": "Vault bloccato",
+      "forme": [
+        {"rett": [4, 10.5, 16, 10.5, 2.5]},
+        {"d": "M7.75 10.5V7a4.25 4.25 0 0 1 8.5 0v3.5"},
+        {"d": "M12 14.75v2.5"}
+      ]
+    },
+    "lucchetto-aperto": {
+      "titolo": "Vault sbloccato",
+      "forme": [
+        {"rett": [4, 10.5, 16, 10.5, 2.5]},
+        {"d": "M7.75 10.5V7a4.25 4.25 0 0 1 8.16-1.7"},
+        {"d": "M12 14.75v2.5"}
+      ]
+    },
+    "chiave": {
+      "_nota": "Orizzontale, non in diagonale: in diagonale erano un cerchio e una linea obliqua, cioe' la stessa figura di 'cerca'. Fra 40 icone due che si somigliano si scambiano, e questa e' l'icona della credenziale.",
+      "titolo": "Credenziale",
+      "forme": [
+        {"cerchio": [7.2, 12, 4]},
+        {"cerchio": [7.2, 12, 1.3]},
+        {"d": "M11.2 12H20.8"},
+        {"d": "M17.2 12v3.4"},
+        {"d": "M20.4 12v2.6"}
+      ]
+    },
+    "scudo": {
+      "titolo": "Sicurezza",
+      "forme": [
+        {"d": "M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"}
+      ]
+    },
+    "scudo-ok": {
+      "titolo": "Protetto e verificato",
+      "forme": [
+        {"d": "M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"},
+        {"d": "M9 11.9 11.3 14.2 15.4 10.1"}
+      ]
+    },
+    "database": {
+      "titolo": "Database delle voci",
+      "forme": [
+        {"d": "M4 6c0-1.66 3.58-3 8-3s8 1.34 8 3-3.58 3-8 3-8-1.34-8-3z"},
+        {"d": "M4 6v6c0 1.66 3.58 3 8 3s8-1.34 8-3V6"},
+        {"d": "M4 12v6c0 1.66 3.58 3 8 3s8-1.34 8-3v-6"}
+      ]
+    },
+    "cartella": {
+      "titolo": "Categoria",
+      "forme": [
+        {"d": "M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"}
+      ]
+    },
+    "cartella-piu": {
+      "titolo": "Nuova categoria",
+      "forme": [
+        {"d": "M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"},
+        {"d": "M12 10.8v5.6"},
+        {"d": "M9.2 13.6h5.6"}
+      ]
+    },
+    "cartella-off": {
+      "_nota": "Le voci senza categoria. La barra e' la stessa di 'occhio-barrato': nell'insieme una diagonale vuol dire sempre 'questo non c'e''.",
+      "titolo": "Senza categoria",
+      "forme": [
+        {"d": "M3.5 7a2 2 0 0 1 2-2h3.3l2.2 2.6h7.5a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"},
+        {"d": "M3.2 3.2 20.8 20.8"}
+      ]
+    },
+    "tastierino": {
+      "titolo": "Codice numerico",
+      "forme": [
+        {"rett": [3.4, 3.4, 17.2, 17.2, 3]},
+        {"cerchio": [8.4, 8.4, 1.15]},
+        {"cerchio": [15.6, 8.4, 1.15]},
+        {"cerchio": [8.4, 15.6, 1.15]},
+        {"cerchio": [15.6, 15.6, 1.15]}
+      ]
+    },
+    "chat": {
+      "titolo": "Chat",
+      "forme": [
+        {"rett": [3, 4.5, 18, 12.5, 3]},
+        {"d": "M8 17v4l4.4-4"}
+      ]
+    },
+    "impostazioni": {
+      "titolo": "Impostazioni",
+      "forme": [
+        {"d": "M3.5 7.5h8"},
+        {"d": "M16.5 7.5h4"},
+        {"d": "M3.5 16.5h4"},
+        {"d": "M12.5 16.5h8"},
+        {"cerchio": [14, 7.5, 2.5]},
+        {"cerchio": [10, 16.5, 2.5]}
+      ]
+    },
+    "tema": {
+      "titolo": "Tema",
+      "forme": [
+        {"cerchio": [12, 12, 8.5]},
+        {"d": "M12 3.5a8.5 8.5 0 0 1 0 17z"}
+      ]
+    },
+    "sole": {
+      "titolo": "Tema chiaro",
+      "forme": [
+        {"cerchio": [12, 12, 4]},
+        {"d": "M12 2.8v2.2"},
+        {"d": "M12 19v2.2"},
+        {"d": "M2.8 12h2.2"},
+        {"d": "M19 12h2.2"},
+        {"d": "M5.5 5.5 7 7"},
+        {"d": "M17 17l1.5 1.5"},
+        {"d": "M18.5 5.5 17 7"},
+        {"d": "M7 17l-1.5 1.5"}
+      ]
+    },
+    "luna": {
+      "titolo": "Tema scuro",
+      "forme": [
+        {"d": "M20.2 14.6A8.7 8.7 0 0 1 9.4 3.8a8.7 8.7 0 1 0 10.8 10.8z"}
+      ]
+    },
+    "notte": {
+      "titolo": "Tema notte e oro",
+      "forme": [
+        {"d": "M20.4 15.3A8.4 8.4 0 0 1 10.1 5a8.4 8.4 0 1 0 10.3 10.3z"},
+        {"d": "M16.6 3.2l.7 1.9 1.9.7-1.9.7-.7 1.9-.7-1.9-1.9-.7 1.9-.7z"}
+      ]
+    },
+    "backup": {
+      "titolo": "Backup del vault",
+      "forme": [
+        {"d": "M12 3.2v10.3"},
+        {"d": "M8.2 9.7 12 13.5 15.8 9.7"},
+        {"d": "M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"}
+      ]
+    },
+    "importa": {
+      "titolo": "Importa credenziali",
+      "forme": [
+        {"d": "M12 13.5V3.2"},
+        {"d": "M8.2 7 12 3.2 15.8 7"},
+        {"d": "M4.5 15.6v2.9a2 2 0 0 0 2 2h11a2 2 0 0 0 2-2v-2.9"}
+      ]
+    },
+    "sync": {
+      "titolo": "Sincronizza",
+      "forme": [
+        {"d": "M20.4 12.6a8.5 8.5 0 0 1-14.3 5.7"},
+        {"d": "M3.6 11.4a8.5 8.5 0 0 1 14.3-5.7"},
+        {"d": "M17.4 2.6v3.3h-3.3"},
+        {"d": "M6.6 21.4v-3.3h3.3"}
+      ]
+    },
+    "aggiorna": {
+      "titolo": "Aggiorna",
+      "forme": [
+        {"d": "M20.3 9.6A8.6 8.6 0 1 0 20.5 14"},
+        {"d": "M20.6 3.9v5.7h-5.7"}
+      ]
+    },
+    "cerca": {
+      "titolo": "Cerca",
+      "forme": [
+        {"cerchio": [11, 11, 6.8]},
+        {"d": "M15.9 15.9 21 21"}
+      ]
+    },
+    "occhio": {
+      "titolo": "Mostra",
+      "forme": [
+        {"d": "M2.6 12S6.1 5.6 12 5.6 21.4 12 21.4 12 17.9 18.4 12 18.4 2.6 12 2.6 12z"},
+        {"cerchio": [12, 12, 3]}
+      ]
+    },
+    "occhio-barrato": {
+      "titolo": "Nascondi",
+      "forme": [
+        {"d": "M10.1 5.8A9.5 9.5 0 0 1 12 5.6c5.9 0 9.4 6.4 9.4 6.4a17.4 17.4 0 0 1-2.9 3.8"},
+        {"d": "M6.4 7.9A17.4 17.4 0 0 0 2.6 12S6.1 18.4 12 18.4a9.5 9.5 0 0 0 4-.9"},
+        {"d": "M10 10a2.8 2.8 0 0 0 4 4"},
+        {"d": "M3.2 3.2 20.8 20.8"}
+      ]
+    },
+    "copia": {
+      "titolo": "Copia",
+      "forme": [
+        {"rett": [9, 9, 11.5, 11.5, 2.5]},
+        {"d": "M6 15h-.5A2.5 2.5 0 0 1 3 12.5v-7A2.5 2.5 0 0 1 5.5 3h7A2.5 2.5 0 0 1 15 5.5V6"}
+      ]
+    },
+    "spunta": {
+      "titolo": "Fatto",
+      "forme": [
+        {"d": "M4.5 12.6 9.6 17.7 19.5 6.6"}
+      ]
+    },
+    "chiudi": {
+      "titolo": "Chiudi",
+      "forme": [
+        {"d": "M6.2 6.2 17.8 17.8"},
+        {"d": "M17.8 6.2 6.2 17.8"}
+      ]
+    },
+    "piu": {
+      "titolo": "Aggiungi",
+      "forme": [
+        {"d": "M12 4.8v14.4"},
+        {"d": "M4.8 12h14.4"}
+      ]
+    },
+    "meno-cerchio": {
+      "titolo": "Togli",
+      "forme": [
+        {"cerchio": [12, 12, 8.5]},
+        {"d": "M8 12h8"}
+      ]
+    },
+    "matita": {
+      "titolo": "Modifica",
+      "forme": [
+        {"d": "M16.4 3.6a2.15 2.15 0 0 1 3 3L7.4 18.6 3 20l1.4-4.4z"},
+        {"d": "M14.4 5.6 17.4 8.6"}
+      ]
+    },
+    "cestino": {
+      "titolo": "Elimina",
+      "forme": [
+        {"d": "M4 6.6h16"},
+        {"d": "M9.6 6.6V4.8a1.2 1.2 0 0 1 1.2-1.2h2.4a1.2 1.2 0 0 1 1.2 1.2v1.8"},
+        {"d": "M6.2 6.6l.9 12.7a2 2 0 0 0 2 1.9h5.8a2 2 0 0 0 2-1.9l.9-12.7"},
+        {"d": "M10.2 10.8v6.2"},
+        {"d": "M13.8 10.8v6.2"}
+      ]
+    },
+    "microfono": {
+      "titolo": "Detta",
+      "forme": [
+        {"rett": [9, 2.6, 6, 11.4, 3]},
+        {"d": "M5.6 11.6a6.4 6.4 0 0 0 12.8 0"},
+        {"d": "M12 18v3.4"},
+        {"d": "M8.6 21.4h6.8"}
+      ]
+    },
+    "stop": {
+      "titolo": "Ferma",
+      "forme": [
+        {"rett": [6.6, 6.6, 10.8, 10.8, 2.5]}
+      ]
+    },
+    "orologio": {
+      "titolo": "In corso",
+      "forme": [
+        {"cerchio": [12, 12, 8.5]},
+        {"d": "M12 7.2V12l3.4 2"}
+      ]
+    },
+    "invia": {
+      "titolo": "Invia",
+      "forme": [
+        {"d": "M21 3 3 9.8l7.4 3.4L13.8 21z"},
+        {"d": "M21 3 10.4 13.2"}
+      ]
+    },
+    "menu": {
+      "titolo": "Menu",
+      "forme": [
+        {"d": "M4 7h16"},
+        {"d": "M4 12h16"},
+        {"d": "M4 17h16"}
+      ]
+    },
+    "altro": {
+      "titolo": "Altre azioni",
+      "forme": [
+        {"cerchio": [12, 5.4, 1.4]},
+        {"cerchio": [12, 12, 1.4]},
+        {"cerchio": [12, 18.6, 1.4]}
+      ]
+    },
+    "documento": {
+      "titolo": "File",
+      "forme": [
+        {"d": "M13.8 3.5H7.5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2V8.2z"},
+        {"d": "M13.8 3.5v4.7h4.7"}
+      ]
+    },
+    "elenco": {
+      "titolo": "Elenco",
+      "forme": [
+        {"d": "M8.5 7h11.5"},
+        {"d": "M8.5 12h11.5"},
+        {"d": "M8.5 17h11.5"},
+        {"d": "M4 7h.01"},
+        {"d": "M4 12h.01"},
+        {"d": "M4 17h.01"}
+      ]
+    },
+    "dado": {
+      "titolo": "Genera password",
+      "forme": [
+        {"rett": [3.5, 3.5, 17, 17, 3.5]},
+        {"cerchio": [8.6, 8.6, 1.3]},
+        {"cerchio": [12, 12, 1.3]},
+        {"cerchio": [15.4, 15.4, 1.3]}
+      ]
+    },
+    "qr": {
+      "titolo": "Inquadra il QR",
+      "forme": [
+        {"rett": [3.4, 3.4, 7, 7, 1.8]},
+        {"rett": [13.6, 3.4, 7, 7, 1.8]},
+        {"rett": [3.4, 13.6, 7, 7, 1.8]},
+        {"d": "M13.6 13.6h3.2v3.2h-3.2z"},
+        {"d": "M20.6 17.4v3.2h-3.2"}
+      ]
+    },
+    "esterno": {
+      "titolo": "Apri nel browser",
+      "forme": [
+        {"d": "M14.2 3.6h6.2v6.2"},
+        {"d": "M20.4 3.6 11.6 12.4"},
+        {"d": "M18.2 14v4.4a2 2 0 0 1-2 2H5.6a2 2 0 0 1-2-2V7.8a2 2 0 0 1 2-2H10"}
+      ]
+    },
+    "chevron-giu": {
+      "titolo": "Espandi",
+      "forme": [
+        {"d": "M6.4 9.4 12 15 17.6 9.4"}
+      ]
+    },
+    "chevron-destra": {
+      "titolo": "Apri",
+      "forme": [
+        {"d": "M9.4 6.4 15 12 9.4 17.6"}
+      ]
+    },
+    "su": {
+      "titolo": "Sposta su",
+      "forme": [
+        {"d": "M6.4 14.6 12 9 17.6 14.6"}
+      ]
+    },
+    "giu": {
+      "titolo": "Sposta giu",
+      "forme": [
+        {"d": "M6.4 9.4 12 15 17.6 9.4"}
+      ]
+    },
+    "indietro": {
+      "titolo": "Indietro",
+      "forme": [
+        {"d": "M20 12H4.6"},
+        {"d": "M10.6 5.8 4.4 12l6.2 6.2"}
+      ]
+    },
+    "avanti": {
+      "titolo": "Avanti",
+      "forme": [
+        {"d": "M4 12h15.4"},
+        {"d": "M13.4 5.8 19.6 12l-6.2 6.2"}
+      ]
+    },
+    "avviso": {
+      "titolo": "Attenzione",
+      "forme": [
+        {"d": "M10.7 4.3 2.7 18.1a1.5 1.5 0 0 0 1.3 2.3h16a1.5 1.5 0 0 0 1.3-2.3L13.3 4.3a1.5 1.5 0 0 0-2.6 0z"},
+        {"d": "M12 9.5v4"},
+        {"d": "M12 17h.01"}
+      ]
+    },
+    "info": {
+      "titolo": "Informazione",
+      "forme": [
+        {"cerchio": [12, 12, 8.5]},
+        {"d": "M12 11.2v5"},
+        {"d": "M12 7.9h.01"}
+      ]
+    },
+    "scintilla": {
+      "titolo": "Assistente locale",
+      "forme": [
+        {"d": "M11 3.4 12.9 8.3 17.8 10.2 12.9 12.1 11 17 9.1 12.1 4.2 10.2 9.1 8.3z"},
+        {"d": "M17.9 15.1l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z"}
+      ]
+    },
+    "banca": {
+      "titolo": "Conto bancario",
+      "forme": [
+        {"d": "M3.4 9.4 12 4.2l8.6 5.2"},
+        {"d": "M5.8 9.8v8.4"},
+        {"d": "M9.9 9.8v8.4"},
+        {"d": "M14.1 9.8v8.4"},
+        {"d": "M18.2 9.8v8.4"},
+        {"d": "M3.2 20.6h17.6"}
+      ]
+    },
+    "identita": {
+      "titolo": "Documento d'identita",
+      "forme": [
+        {"rett": [2.6, 4.8, 18.8, 14.4, 2.5]},
+        {"cerchio": [8.6, 11, 2.1]},
+        {"d": "M5.4 16.6a3.6 3.6 0 0 1 6.4 0"},
+        {"d": "M14.6 10h4.2"},
+        {"d": "M14.6 13.6h4.2"}
+      ]
+    },
+    "estensione": {
+      "titolo": "Estensione del browser",
+      "forme": [
+        {"rett": [3, 4.6, 18, 14.8, 2.5]},
+        {"d": "M3 9.4h18"},
+        {"cerchio": [6.2, 7, 0.75]},
+        {"cerchio": [8.9, 7, 0.75]}
+      ]
+    },
+    "dispositivo": {
+      "titolo": "Dispositivo abbinato",
+      "forme": [
+        {"rett": [7, 2.6, 10, 18.8, 2.5]},
+        {"d": "M10.6 5.6h2.8"},
+        {"d": "M12 18.2h.01"}
+      ]
+    },
+    "dispositivi": {
+      "titolo": "Dispositivi",
+      "forme": [
+        {"rett": [2.6, 5, 12.4, 9.4, 2]},
+        {"d": "M6 18h5.6"},
+        {"d": "M8.8 14.4V18"},
+        {"rett": [16.6, 9.6, 4.8, 10.4, 1.6]}
+      ]
+    },
+    "rete": {
+      "titolo": "Rete locale",
+      "forme": [
+        {"d": "M4.6 8.6a10.5 10.5 0 0 1 14.8 0"},
+        {"d": "M7.6 11.9a6.2 6.2 0 0 1 8.8 0"},
+        {"d": "M10.4 15.2a2.3 2.3 0 0 1 3.2 0"},
+        {"d": "M12 18.6h.01"}
+      ]
+    },
+    "impronta": {
+      "titolo": "Impronta digitale",
+      "forme": [
+        {"d": "M3.2 8.7A10.4 10.4 0 0 1 12 3.6a10.4 10.4 0 0 1 8.8 5.1"},
+        {"d": "M5.8 11.2a6.4 6.4 0 0 1 12.4 0v2.4a13 13 0 0 1-.9 4.7"},
+        {"d": "M9.2 11.2a2.9 2.9 0 0 1 5.8 0v3.2a9.6 9.6 0 0 1-1.1 4.4"},
+        {"d": "M12 11.6v3.4a6 6 0 0 1-.9 3.2"}
+      ]
+    },
+    "fissa": {
+      "titolo": "Voce fissata",
+      "forme": [
+        {"d": "M14.8 3.4 20.6 9.2l-3.1 3.1-.9 5.5-8.4-8.4 5.5-.9z"},
+        {"d": "M8.2 15.8 3.4 20.6"}
+      ]
+    },
+    "stella": {
+      "titolo": "Preferita",
+      "forme": [
+        {"d": "M12 3.4l2.7 5.4 6 .9-4.3 4.2 1 6-5.4-2.8-5.4 2.8 1-6L3.3 9.7l6-.9z"}
+      ]
+    },
+    "utente": {
+      "titolo": "Account",
+      "forme": [
+        {"cerchio": [12, 8.2, 3.9]},
+        {"d": "M4.6 20.4a7.6 7.6 0 0 1 14.8 0"}
+      ]
+    },
+    "globo": {
+      "titolo": "Indirizzo web",
+      "forme": [
+        {"cerchio": [12, 12, 8.5]},
+        {"d": "M3.5 12h17"},
+        {"d": "M12 3.5a13 13 0 0 1 0 17 13 13 0 0 1 0-17z"}
+      ]
+    }
+  }
+}

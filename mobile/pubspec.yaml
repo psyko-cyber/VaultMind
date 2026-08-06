@@ -58,9 +58,48 @@ flutter:
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.
+  # Resta true: le icone dell'app sono le nostre (`IconaVM`), ma i widget di
+  # Material ne usano di proprie che non passano da noi -- la freccia
+  # «indietro» dell'AppBar, la spunta della casella, la freccetta del menu a
+  # tendina. Con false sparirebbero quelle, non le nostre.
   uses-material-design: true
   assets:
     - assets/logo.png
+    # Le licenze viaggiano dentro l'APK insieme ai font: la SIL OFL lo
+    # pretende, e un file di testo da 4 KB non e' un prezzo.
+    - assets/fonts/
+
+  # I FONT, gli stessi del PC e dell'estensione.
+  #
+  # Sono istanze STATICHE, una per peso, non il file variabile: in Flutter
+  # l'aggancio fra `FontWeight` e l'asse `wght` di un font variabile non e'
+  # garantito, e quando non aggancia tutto il testo esce col peso di
+  # riferimento senza che nulla si lamenti. Si vede solo guardando il
+  # telefono, cioe' tardi.
+  #
+  # Li prepara `design/prepara_font.py`, che spiega anche perche' sono
+  # ritagliati sul solo alfabeto latino (493 KB invece di 4 MB).
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-400.ttf
+          weight: 400
+        - asset: assets/fonts/Inter-500.ttf
+          weight: 500
+        - asset: assets/fonts/Inter-600.ttf
+          weight: 600
+        - asset: assets/fonts/Inter-700.ttf
+          weight: 700
+    - family: Space Grotesk
+      fonts:
+        - asset: assets/fonts/SpaceGrotesk-600.ttf
+          weight: 600
+    - family: JetBrains Mono
+      fonts:
+        - asset: assets/fonts/JetBrainsMono-400.ttf
+          weight: 400
+        - asset: assets/fonts/JetBrainsMono-700.ttf
+          weight: 700
 
   # To add assets to your application, add an assets section, like this:
   # assets:
