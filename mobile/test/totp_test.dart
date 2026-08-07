@@ -118,6 +118,150 @@ void main() {
     });
   });
 
+  // ------------------------------------------------- otpauth-migration
+  //
+  // Il QR di «Trasferisci account» di Google Authenticator. Google lo usa
+  // ANCHE per esportare un conto solo, quindi è la prima cosa in cui inciampa
+  // chi arriva da lì: trovato provando l'app sul telefono il 07/08/2026, dove
+  // l'app leggeva il QR e poi diceva che non era una 2FA.
+  //
+  // Il payload lo costruiscono i test byte per byte, come lo scrive Google:
+  // un vettore registrato da un QR vero conterrebbe un secret vero.
+  group('leggiMigrazione', () {
+    /// Un campo protobuf con lunghezza (wire type 2).
+    List<int> blocco(int campo, List<int> dati) =>
+        [(campo << 3) | 2, dati.length, ...dati];
+
+    /// Un campo protobuf numerico (wire type 0). Valori piccoli: un byte.
+    List<int> numero(int campo, int valore) => [(campo << 3) | 0, valore];
+
+    /// Un `OtpParameters`, cioè un conto.
+    List<int> conto({
+      required List<int> secret,
+      String nome = '',
+      String issuer = '',
+      int algoritmo = 1,   // 1 = SHA1
+      int cifre = 1,       // 1 = sei cifre, 2 = otto
+      int tipo = 2,        // 1 = HOTP, 2 = TOTP
+    }) =>
+        blocco(1, [
+          ...blocco(1, secret),
+          ...blocco(2, utf8.encode(nome)),
+          ...blocco(3, utf8.encode(issuer)),
+          ...numero(4, algoritmo),
+          ...numero(5, cifre),
+          ...numero(6, tipo),
+        ]);
+
+    String uri(List<int> corpo) =>
+        'otpauth-migration://offline?data='
+        '${Uri.encodeComponent(base64.encode([...corpo, ...numero(2, 1)]))}';
+
+    // 'JBSWY3DPEHPK3PXP' in base32 sono questi dieci byte.
+    const dieciByte = [0x48, 0x65, 0x6c, 0x6c, 0x6f, 0x21, 0xde, 0xad, 0xbe, 0xef];
+
+    test('un conto solo: il caso vero di chi esporta Epic Games', () {
+      final l = leggiMigrazione(uri(conto(
+        secret: dieciByte,
+        nome: 'luca@esempio.it',
+        issuer: 'Epic Games',
+      )));
+      expect(l.length, 1);
+      expect(l.first.issuer, 'Epic Games');
+      expect(l.first.nome, 'luca@esempio.it');
+      expect(l.first.standard, isTrue);
+      // Il secret esce in base32, perché è quello che finisce nel vault e che
+      // `totp.py` sa rileggere: nel protobuf sta in byte grezzi.
+      expect(l.first.secret, 'JBSWY3DPEHPK3PXP');
+      // La prova che chiude il giro: da quel secret si calcola un codice.
+      expect(generaOtp(l.first.secret).code.length, 6);
+    });
+
+    test('più conti, nell\'ordine in cui stanno dentro', () {
+      final l = leggiMigrazione(uri([
+        ...conto(secret: dieciByte, nome: 'a@x.it', issuer: 'Amazon'),
+        ...conto(secret: dieciByte, nome: 'b@x.it', issuer: 'Poste'),
+        ...conto(secret: dieciByte, nome: 'c@x.it', issuer: 'GitHub'),
+      ]));
+      expect(l.map((d) => d.issuer).toList(), ['Amazon', 'Poste', 'GitHub']);
+    });
+
+    test('l\'etichetta "Issuer:account" si spezza anche qui', () {
+      final l = leggiMigrazione(
+          uri(conto(secret: dieciByte, nome: 'Google:luca@esempio.it')));
+      expect(l.first.issuer, 'Google');
+      expect(l.first.nome, 'luca@esempio.it');
+    });
+
+    test('gli HOTP si saltano invece di importarli rotti', () {
+      // Sono a contatore: importarli darebbe codici sempre sbagliati.
+      final l = leggiMigrazione(uri([
+        ...conto(secret: dieciByte, issuer: 'ContoNormale'),
+        ...conto(secret: dieciByte, issuer: 'AContatore', tipo: 1),
+      ]));
+      expect(l.map((d) => d.issuer).toList(), ['ContoNormale']);
+    });
+
+    test('otto cifre o SHA256 si vedono, non passano di nascosto', () {
+      final otto = leggiMigrazione(
+          uri(conto(secret: dieciByte, issuer: 'X', cifre: 2)));
+      expect(otto.first.cifre, 8);
+      expect(otto.first.standard, isFalse);
+
+      final sha = leggiMigrazione(
+          uri(conto(secret: dieciByte, issuer: 'X', algoritmo: 2)));
+      expect(sha.first.algoritmo, 'SHA256');
+      expect(sha.first.standard, isFalse);
+    });
+
+    test('un payload troncato salva quello che era già leggibile', () {
+      // Meglio due conti su tre che un errore e zero: chi ha inquadrato non
+      // può fare niente per migliorare un QR mezzo letto.
+      final intero = [
+        ...conto(secret: dieciByte, issuer: 'Primo'),
+        ...conto(secret: dieciByte, issuer: 'Secondo'),
+        ...conto(secret: dieciByte, issuer: 'Terzo'),
+      ];
+      final mozzato = intero.sublist(0, intero.length - 12);
+      final l = leggiMigrazione('otpauth-migration://offline?data='
+          '${Uri.encodeComponent(base64.encode(mozzato))}');
+      expect(l.length, greaterThanOrEqualTo(2));
+      expect(l.first.issuer, 'Primo');
+    });
+
+    test('quel che non è un\'esportazione dà una lista vuota', () {
+      expect(leggiMigrazione('otpauth://totp/X?secret=JBSWY3DPEHPK3PXP'), isEmpty);
+      expect(leggiMigrazione('otpauth-migration://offline'), isEmpty);
+      expect(leggiMigrazione('otpauth-migration://offline?data=###'), isEmpty);
+      expect(leggiMigrazione('https://esempio.it'), isEmpty);
+      expect(leggiMigrazione(''), isEmpty);
+    });
+
+    test('il riempimento base64 mancante non fa fallire tutto', () {
+      // Google a volte omette gli "=" finali, e `base64.decode` è severo.
+      final corpo = base64.encode(conto(secret: dieciByte, issuer: 'Senza'));
+      final senzaUguali = corpo.replaceAll('=', '');
+      expect(
+        leggiMigrazione('otpauth-migration://offline?data=$senzaUguali')
+            .first.issuer,
+        'Senza',
+      );
+    });
+  });
+
+  group('descriviQr', () {
+    // Il messaggio d'errore deve dire cosa hai inquadrato, non cosa ci si
+    // aspettava: è la lezione che qui è già costata tre volte.
+    test('riconosce i casi che una persona incontra davvero', () {
+      expect(descriviQr('otpauth-migration://offline?data=AAA'), 'esportazione');
+      expect(descriviQr('otpauth://hotp/X?secret=A&counter=1'), 'hotp');
+      expect(descriviQr('otpauth://totp/X'), 'otpauth-rotto');
+      expect(descriviQr('https://esempio.it'), 'indirizzo');
+      expect(descriviQr('   '), 'vuoto');
+      expect(descriviQr('BEGIN:VCARD'), 'altro');
+    });
+  });
+
   group('interpretaSecret', () {
     test('accetta il secret nudo, comunque lo si incolli', () {
       expect(interpretaSecret('JBSWY3DPEHPK3PXP')!.secret, 'JBSWY3DPEHPK3PXP');

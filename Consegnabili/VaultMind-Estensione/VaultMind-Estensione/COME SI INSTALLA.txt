@@ -1,0 +1,22 @@
+Estensione VaultMind per Chrome / Edge / Brave
+==============================================
+
+NOTA: se hai installato VaultMind con VaultMind-Setup.exe, questo zip
+NON TI SERVE - l'estensione e' gia' sul tuo computer, installata
+insieme all'app. Il percorso da usare lo trovi nell'app:
+Impostazioni > Estensione browser, con il pulsante per copiarlo.
+
+Questo zip serve solo a chi vuole tenere l'estensione altrove, o a chi
+usa VaultMind dal sorgente (run.bat).
+
+1. Estrai questa cartella dove vuoi tenerla (non cancellarla dopo:
+   il browser la carica da li' ogni volta).
+2. Nel browser apri  chrome://extensions  e attiva "Modalita' sviluppatore".
+3. "Carica estensione non pacchettizzata" -> scegli questa cartella.
+4. Apri VaultMind e sblocca il vault.
+5. Menu -> Impostazioni -> Estensione browser -> Associa...
+6. Clicca l'icona VaultMind nella barra del browser e scrivi il codice.
+
+L'estensione legge dal vault SOLO quando l'app e' aperta e sbloccata.
+Non salva nessuna credenziale nel browser ed e' in sola lettura.
+Versione app richiesta: v6.8 o successiva (build 06/08/2026).

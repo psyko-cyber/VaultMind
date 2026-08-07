@@ -172,7 +172,9 @@ class _ModuloVoceState extends State<ModuloVoce> {
   }
 
   Future<void> _aggiungi2FA() async {
-    final dati = await mostraFoglio2FA(context);
+    // La sessione serve solo se il QR è un'esportazione con più conti dentro:
+    // quelli che non finiscono in questa voce devono poter diventare voci loro.
+    final dati = await mostraFoglio2FA(context, sessione: widget.sessione);
     if (dati == null || !mounted) return;
 
     // Se un campo OTP c'è già lo si riempie, invece di aggiungerne un secondo:

@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="it">
+<head>
+<meta charset="utf-8">
+<style>
+  /* I TRE TEMI DELL'APP, non tre colori somiglianti.
+     I valori sono copiati uno per uno da index.html (PC), che a sua volta li
+     condivide con tema.dart (Android): un accento leggermente diverso fra le
+     tre finestre si nota subito e fa sembrare l'estensione un pezzo di
+     qualcun altro. Se un giorno cambia la palette dell'app, cambia anche qui.
+
+     I nomi (dark / light / night) sono gli stessi dell'app di proposito: cosi'
+     confrontarli e' leggere due file, non tradurre.
+
+     I font sono gli stessi dell'app e stanno DENTRO l'estensione (fonts/):
+     un popup che scarica un webfont direbbe a Google, a ogni apertura, che
+     stai guardando le tue credenziali -- ed e' esattamente cio' che l'app ha
+     appena smesso di fare. */
+  :root, body[data-tema="dark"]{
+    --bg:#080B14; --card:#121A2B; --line:#1F2A40;
+    --txt:#E8ECF6; --dim:#8FA0C0; --accent:#38BDF8; --err:#FCA5A5; --ok:#34D399;
+  }
+  body[data-tema="light"]{
+    --bg:#F4F7FC; --card:#FFFFFF; --line:#D9E2F0;
+    --txt:#0F1729; --dim:#4F5D75; --accent:#0369A1; --err:#B91C1C; --ok:#047857;
+  }
+  body[data-tema="night"]{
+    --bg:#050912; --card:#0E1730; --line:#1E2C4C;
+    --txt:#E8ECF6; --dim:#8FA0C0; --accent:#E3B341; --err:#FCA5A5; --ok:#4ADE80;
+  }
+  /* `--dim` era #5A6884 (scuro), #6B7C99 (chiaro), #6A789A (notte): tutti e
+     tre sotto il minimo AA di 4,5:1, ed e' il colore delle etichette dei
+     campi e di ogni spiegazione. Vedi design/anteprima.html, che il rapporto
+     lo calcola a schermo. */
+  @font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(fonts/Inter-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+  @font-face{font-family:'Inter';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(fonts/Inter-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(fonts/SpaceGrotesk-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+  @font-face{font-family:'Space Grotesk';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(fonts/SpaceGrotesk-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(fonts/JetBrainsMono-latin.woff2) format('woff2');
+    unicode-range:U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD}
+  @font-face{font-family:'JetBrains Mono';font-style:normal;font-weight:400 700;font-display:block;
+    src:url(fonts/JetBrainsMono-latin-ext.woff2) format('woff2');
+    unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
+  *{box-sizing:border-box;margin:0;padding:0}
+  /* Le icone arrivano dallo stesso design/icone.json dell'app e del telefono:
+     lo sprite qui sotto lo scrive `py -3 design/genera_icone.py`. */
+  .ic{display:inline-block;width:16px;height:16px;flex:0 0 auto;vertical-align:-3px;
+      fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}
+  .ic-32{width:34px;height:34px;stroke-width:1.3}
+  :where(button,input,[tabindex]):focus-visible{outline:none;
+      box-shadow:0 0 0 2px var(--bg),0 0 0 4px var(--accent)}
+  body{width:360px;max-height:560px;overflow-y:auto;background:var(--bg);color:var(--txt);
+       font:14px/1.45 'Inter',system-ui,'Segoe UI',sans-serif}
+  ::-webkit-scrollbar{width:8px} ::-webkit-scrollbar-thumb{background:var(--line);border-radius:4px}
+  header{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);
+         position:sticky;top:0;background:var(--bg);z-index:2}
+  header img{width:20px;height:20px}
+  header b{font-size:15px;letter-spacing:.3px}
+  #stato{margin-left:auto;font-size:11px;color:var(--dim)}
+  .view{padding:14px}
+  .hidden{display:none}
+  .center{text-align:center;padding:26px 18px}
+  .big{color:var(--dim);margin-bottom:10px;line-height:0}
+  .dim{color:var(--dim);font-size:12.5px}
+  p{margin:6px 0}
+  ol{margin:10px 0 12px 18px;color:var(--dim);font-size:12.5px}
+  ol li{margin:4px 0}
+  input{width:100%;padding:9px 11px;border:1px solid var(--line);border-radius:9px;
+        background:var(--card);color:var(--txt);font:inherit;outline:none}
+  input:focus{border-color:var(--accent)}
+  #pairCode{text-align:center;font-size:20px;letter-spacing:8px;font-family:'JetBrains Mono',ui-monospace,Consolas,monospace}
+  /* Il testo del pulsante prende lo SFONDO del tema, come nell'app: scuro
+     sopra il ciano e sopra l'oro, bianco sopra il blu del tema chiaro. Un
+     #141414 fisso spariva sul chiaro. */
+  button{width:100%;margin-top:10px;padding:9px;border:0;border-radius:9px;background:var(--accent);
+         color:var(--bg);font:600 14px/1 inherit;cursor:pointer}
+  button:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent;border:1px solid var(--line);color:var(--txt);font-weight:500}
+  .err{color:var(--err);font-size:12.5px;min-height:16px;margin-top:8px}
+  .sez{margin:14px 0 6px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim)}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:11px;padding:10px 12px;margin:8px 0}
+  .tit{display:flex;align-items:center;gap:6px;font-weight:600;font-size:13.5px}
+  .tit .star{color:var(--accent)}
+  .frow{display:flex;align-items:center;gap:8px;margin-top:7px;font-size:12.5px}
+  .frow .lab{color:var(--dim);min-width:78px;max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .frow .val{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+             font-family:'JetBrains Mono',ui-monospace,Consolas,monospace;font-size:12px}
+  .frow .cp{width:auto;margin:0;padding:4px 9px;font-size:11.5px;background:transparent;
+            border:1px solid var(--line);color:var(--txt);border-radius:7px;font-weight:500}
+  .frow .cp:hover{border-color:var(--accent);color:var(--accent)}
+  /* Icone al posto della parola "Copia" ripetuta su ogni riga: le stesse
+     dell'app, cosi' il gesto e' lo stesso ovunque. */
+  .frow .ico{display:inline-flex;align-items:center;justify-content:center;
+             width:auto;flex:0 0 auto;margin:0;padding:5px 7px;
+             background:transparent;border:1px solid var(--line);color:var(--dim);
+             border-radius:7px;font-weight:500}
+  .frow .ico:hover{border-color:var(--accent);color:var(--accent);filter:none}
+  .frow .val.visibile{color:var(--txt)}
+  .reply{color:var(--dim);font-size:12.5px;font-style:italic;margin:8px 2px}
+  footer{padding:9px 14px;border-top:1px solid var(--line);color:var(--dim);font-size:11px;text-align:center}
+  #toast{position:fixed;left:50%;bottom:44px;transform:translateX(-50%);background:var(--accent);
+         color:var(--bg);font-weight:600;font-size:12.5px;padding:7px 14px;border-radius:9px;z-index:9}
+  /* impostazioni */
+  header .icona{display:inline-flex;align-items:center;justify-content:center;
+                width:auto;margin:0 0 0 8px;padding:5px 8px;background:transparent;
+                border:1px solid var(--line);color:var(--dim);font-weight:500;
+                border-radius:8px}
+  header .icona:hover{border-color:var(--accent);color:var(--accent);filter:none}
+  .tema{display:flex;align-items:center;gap:10px;width:100%;margin-top:8px;padding:9px 11px;
+        background:var(--card);border:1px solid var(--line);border-radius:11px;color:var(--txt);
+        font:500 13.5px/1.3 inherit;text-align:left}
+  .tema:hover{border-color:var(--accent);filter:none}
+  .tema.sel{border-color:var(--accent)}
+  .tema .pall{display:inline-flex;gap:3px}
+  .tema .pall i{width:11px;height:11px;border-radius:50%;border:1px solid rgba(127,127,127,.35)}
+  .tema .segno{margin-left:auto;color:var(--accent);font-weight:700}
+</style>
+</head>
+<!-- Il tema di partenza sta qui e non nel JS: impostarlo dopo il primo
+     disegno farebbe lampeggiare il popup a ogni apertura. Il valore salvato
+     lo sovrascrive subito dopo, se e' diverso. -->
+<body data-tema="night">
+<!-- ICONE:INIZIO -->
+<svg width="0" height="0" aria-hidden="true" style="position:absolute">
+<symbol id="i-copia" viewBox="0 0 24 24"><rect x="9" y="9" width="11.5" height="11.5" rx="2.5"/><path d="M6 15h-.5A2.5 2.5 0 0 1 3 12.5v-7A2.5 2.5 0 0 1 5.5 3h7A2.5 2.5 0 0 1 15 5.5V6"/></symbol>
+<symbol id="i-estensione" viewBox="0 0 24 24"><rect x="3" y="4.6" width="18" height="14.8" rx="2.5"/><path d="M3 9.4h18"/><circle cx="6.2" cy="7" r="0.75"/><circle cx="8.9" cy="7" r="0.75"/></symbol>
+<symbol id="i-impostazioni" viewBox="0 0 24 24"><path d="M3.5 7.5h8"/><path d="M16.5 7.5h4"/><path d="M3.5 16.5h4"/><path d="M12.5 16.5h8"/><circle cx="14" cy="7.5" r="2.5"/><circle cx="10" cy="16.5" r="2.5"/></symbol>
+<symbol id="i-lucchetto" viewBox="0 0 24 24"><rect x="4" y="10.5" width="16" height="10.5" rx="2.5"/><path d="M7.75 10.5V7a4.25 4.25 0 0 1 8.5 0v3.5"/><path d="M12 14.75v2.5"/></symbol>
+<symbol id="i-occhio" viewBox="0 0 24 24"><path d="M2.6 12S6.1 5.6 12 5.6 21.4 12 21.4 12 17.9 18.4 12 18.4 2.6 12 2.6 12z"/><circle cx="12" cy="12" r="3"/></symbol>
+<symbol id="i-scudo-ok" viewBox="0 0 24 24"><path d="M12 3.2 4.6 6.1v6.2c0 4.4 3.1 7.6 7.4 9.1 4.3-1.5 7.4-4.7 7.4-9.1V6.1z"/><path d="M9 11.9 11.3 14.2 15.4 10.1"/></symbol>
+<symbol id="i-spunta" viewBox="0 0 24 24"><path d="M4.5 12.6 9.6 17.7 19.5 6.6"/></symbol>
+</svg>
+<!-- ICONE:FINE -->
+  <header>
+    <img src="icons/icon32.png" alt=""><b>VaultMind</b><span id="stato"></span>
+    <button class="icona" id="impBtn" title="Impostazioni" aria-label="Impostazioni"><svg class="ic" aria-hidden="true"><use href="#i-impostazioni"/></svg></button>
+  </header>
+
+  <section id="viewOff" class="view center hidden">
+    <div class="big"><svg class="ic ic-32" aria-hidden="true"><use href="#i-estensione"/></svg></div>
+    <p><b>VaultMind non è in esecuzione.</b></p>
+    <p class="dim">Apri l'app sul computer, poi riprova. L'estensione è solo una finestra sul vault locale: se l'app è chiusa, qui non c'è niente.</p>
+    <button class="ghost" id="retryOff">Riprova</button>
+  </section>
+
+  <section id="viewLocked" class="view center hidden">
+    <div class="big"><svg class="ic ic-32" aria-hidden="true"><use href="#i-lucchetto"/></svg></div>
+    <p><b>Il vault è bloccato.</b></p>
+    <p class="dim">Sbloccalo nell'app. L'estensione non chiede mai la master password.</p>
+    <button class="ghost" id="retryLocked">Riprova</button>
+  </section>
+
+  <section id="viewPair" class="view hidden">
+    <p><b>Associa l'estensione a VaultMind</b></p>
+    <ol>
+      <li>Apri VaultMind e sblocca il vault</li>
+      <li>Menu → Impostazioni → <b>Estensione browser</b> → <b>Associa…</b></li>
+      <li>Scrivi qui il codice che compare nell'app</li>
+    </ol>
+    <input id="pairCode" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="······">
+    <button id="pairBtn">Associa</button>
+    <div id="pairMsg" class="err"></div>
+  </section>
+
+  <section id="viewMain" class="view hidden">
+    <input id="q" autocomplete="off" placeholder="Cerca… (Invio: ricerca intelligente)">
+    <div id="site"></div>
+    <div id="results"></div>
+  </section>
+
+  <section id="viewImpostazioni" class="view hidden">
+    <div class="sez">Tema</div>
+    <div id="temi"></div>
+    <p class="dim" style="margin-top:10px">Gli stessi tre dell'app e del telefono. La scelta vale solo per questa
+       estensione: resta nel browser, non tocca il vault.</p>
+
+    <div class="sez" style="margin-top:18px">Privacy</div>
+    <div id="privacy"></div>
+    <p class="dim" style="margin-top:10px">Coperti, i valori si vedono uno alla volta con l'occhio e si richiudono da soli
+       dopo 15 secondi. Questo popup si apre sopra la pagina che stai guardando: il momento in cui compare è proprio
+       quello in cui potresti non essere solo davanti allo schermo.</p>
+
+    <button class="ghost" id="impChiudi">Indietro</button>
+  </section>
+
+  <footer>Sola lettura · nessuna credenziale salvata nel browser</footer>
+  <div id="toast" class="hidden"></div>
+  <script src="popup.js"></script>
+</body>
+</html>
