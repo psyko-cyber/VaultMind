@@ -190,6 +190,15 @@
   label.lbl{font-family:var(--disp);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
   .field{width:100%;margin-top:6px;border-radius:12px;padding:12px 14px;background:var(--s1);
     border:1px solid var(--brd);color:var(--t1);outline:none;font-family:var(--mono)}
+  /* WebView2 dipinge i campi auto-compilati con un fondo chiaro suo (il giallo
+     dell'autofill): nel tema scuro il campo sembrava di un altro tema, ed e'
+     pure assurdo che un gestore di password si auto-compili da solo. `background`
+     non vince sull'autofill, serve il `box-shadow` inset. */
+  input:-webkit-autofill,input:-webkit-autofill:hover,input:-webkit-autofill:focus,
+  input:-webkit-autofill:active{
+    -webkit-text-fill-color:var(--t1);caret-color:var(--t1);
+    -webkit-box-shadow:0 0 0 100px var(--s1) inset;
+    transition:background-color 9999s ease-in-out 0s}
   .btn{width:100%;margin-top:12px;border-radius:12px;padding:12px;font-weight:700;background:var(--acc);color:var(--acc-su)}
   .btn:disabled{opacity:.4;cursor:default}
   /* Le varianti del pulsante. Erano `style="..."` ripetuti nel markup: lo
@@ -782,7 +791,7 @@
     <div class="db-head">
       <div style="flex:1"></div>
       <div style="display:flex;gap:8px">
-        <button id="catNewBtn" class="iconbtn" title="Crea una categoria">＋ Nuova categoria</button>
+        <button id="catNewBtn" class="iconbtn" title="Crea una categoria"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cartella-piu"/></svg>Nuova categoria</button>
         <button id="catRefreshBtn" class="iconbtn" title="Aggiorna" aria-label="Aggiorna"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
       </div>
     </div>
@@ -792,7 +801,7 @@
 
   <div class="composer">
     <div class="inner">
-      <button class="iconbtn" id="addBtn" title="Aggiungi credenziale" style="border-color:var(--acc);color:var(--acc)">＋</button>
+      <button class="iconbtn" id="addBtn" title="Aggiungi credenziale" aria-label="Aggiungi credenziale" style="border-color:var(--acc);color:var(--acc)"><svg class="ic" aria-hidden="true"><use href="#i-piu"/></svg></button>
       <button class="iconbtn" id="importBtn" title="Import intelligente (incolla testo)" aria-label="Import intelligente"><svg class="ic" aria-hidden="true"><use href="#i-importa"/></svg></button>
       <div class="searchbox">
         <span class="lente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg></span>
@@ -1712,7 +1721,7 @@ function onbFieldRow(label, value){
   return row;
 }
 $("#closeOnboard").onclick=$("#onboardSkip").onclick=()=>{ $("#onboardModal").classList.add("hidden");
-  addAI("Saltato. Puoi aggiungere le voci quando vuoi col pulsante ＋. Scrivimi pure cosa ti serve."); };
+  addAI("Saltato. Puoi aggiungere le voci quando vuoi col pulsante +. Scrivimi pure cosa ti serve."); };
 $("#onboardSave").onclick=async()=>{
   $("#onboardSave").disabled=true; $("#onboardSave").textContent="Salvo…";
   let saved=0;
@@ -1739,7 +1748,7 @@ $("#onboardSave").onclick=async()=>{
   $("#onboardSave").disabled=false; $("#onboardSave").textContent="Salva e inizia";
   $("#onboardModal").classList.add("hidden");
   addAI(saved ? `Salvate ${saved} voci. Ora puoi chiederle: prova "pin della cie" o "home banking".`
-              : "Niente da salvare (nessun campo compilato). Puoi aggiungere le voci col pulsante ＋ quando vuoi.");
+              : "Niente da salvare (nessun campo compilato). Puoi aggiungere le voci col pulsante + quando vuoi.");
 };
 
 /* ---- IMPORT 2FA DA QR (decodifica 100% locale nel browser) ---- */
@@ -2571,7 +2580,7 @@ function catRow(nome, vera){
   head.append(freccia, nm, cnt, sp);
 
   if(vera){
-    head.appendChild(catBtn("＋ Voci", "Scegli quali voci mettere qui", (e)=>{
+    head.appendChild(catBtn("piu", "Scegli quali voci mettere qui", (e)=>{
       e.stopPropagation(); openPick(nome);
     }));
     head.appendChild(catBtn("matita", "Rinomina", (e)=>{ e.stopPropagation(); rinominaCat(row, nome); }));
@@ -2803,7 +2812,7 @@ function promptClearAll(){
     yes.disabled=true; no.disabled=true; yes.textContent="Svuoto…";
     const {ok,j}=await api("/api/clear");
     if(ok){ scriviConteggio(j.count);
-      addAI(`Database svuotato: rimosse ${j.removed} voci. Puoi aggiungerne di nuove col pulsante ＋ o con l'import.`);
+      addAI(`Database svuotato: rimosse ${j.removed} voci. Puoi aggiungerne di nuove col pulsante + o con l'import.`);
       if(!$("#dbPanel").classList.contains("hidden")) loadDb();
     } else addAI(j.detail||"Errore durante lo svuotamento.");
   };
