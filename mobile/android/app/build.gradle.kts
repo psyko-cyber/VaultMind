@@ -89,6 +89,23 @@ dependencies {
     // un pacchetto Flutter: la chiave del vault va protetta dal Keystore con
     // l'autenticazione obbligatoria, e quel controllo si fa solo di qui.
     implementation("androidx.biometric:biometric:1.1.0")
+
+    // Lettura dei QR della 2FA. Stessa regola dell'impronta: librerie Android,
+    // non pacchetti Flutter.
+    //
+    // ZXing core e' Java puro e sta tutto dentro l'APK: nessuna rete, nessun
+    // Google Play Services, nessun modello da scaricare al primo uso. ML Kit
+    // avrebbe fatto lo stesso lavoro meglio, ma e' un componente Google e
+    // nella variante leggera il modello se lo scarica -- in un prodotto che
+    // promette di non parlare con nessuno, non e' un dettaglio.
+    implementation("com.google.zxing:core:3.5.3")
+
+    // CameraX per l'anteprima dal vivo. camera2 nudo sarebbe cinque volte il
+    // codice e una manciata di telefoni su cui non funziona.
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.camera:camera-view:1.4.2")
 }
 
 flutter {

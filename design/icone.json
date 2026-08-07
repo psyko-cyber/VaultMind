@@ -343,13 +343,29 @@
       ]
     },
     "qr": {
-      "titolo": "Inquadra il QR",
+      "titolo": "Codice QR",
       "forme": [
         {"rett": [3.4, 3.4, 7, 7, 1.8]},
         {"rett": [13.6, 3.4, 7, 7, 1.8]},
         {"rett": [3.4, 13.6, 7, 7, 1.8]},
         {"d": "M13.6 13.6h3.2v3.2h-3.2z"},
         {"d": "M20.6 17.4v3.2h-3.2"}
+      ]
+    },
+    "fotocamera": {
+      "titolo": "Inquadra col telefono",
+      "forme": [
+        {"rett": [2.9, 6.6, 18.2, 13.5, 3]},
+        {"d": "M8.8 6.6 10.2 4.1h3.6l1.4 2.5"},
+        {"cerchio": [12, 13.4, 3.7]}
+      ]
+    },
+    "immagine": {
+      "titolo": "Da un'immagine gia' salvata",
+      "forme": [
+        {"rett": [3.3, 4.3, 17.4, 15.4, 3]},
+        {"cerchio": [8.6, 9.4, 1.6]},
+        {"d": "M3.9 17.4 8.9 12.4l3.4 3.4 3.1-3.1 4.8 4.8"}
       ]
     },
     "esterno": {

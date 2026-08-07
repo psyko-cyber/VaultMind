@@ -82,3 +82,133 @@ int _potenza(int base, int esponente) {
   }
   return r;
 }
+
+// ------------------------------------------------------------------ otpauth
+
+/// Quel che si ricava da un QR di attivazione della 2FA.
+///
+/// Nel vault finisce **solo il `secret`**, in base32 nudo: è ciò che il PC si
+/// aspetta di trovare in un campo `OTP (2FA)` (`totp.py`, `_b32decode`), e il
+/// formato del vault è un contratto fra tre piattaforme, non un posto dove
+/// inventare un campo nuovo. `issuer` e `nome` servono a proporre un titolo
+/// alla voce; [standard] serve ad avvisare quando quel che resta fuori
+/// cambierebbe il risultato.
+class DatiOtp {
+  /// Chi rilascia il secondo fattore: "GitHub", "Amazon".
+  final String issuer;
+
+  /// L'account dentro quel servizio, di solito l'email.
+  final String nome;
+
+  /// La chiave, in base32.
+  final String secret;
+
+  /// Cifre e periodo dichiarati dal QR. Quasi sempre 6 e 30.
+  final int cifre;
+  final int periodo;
+
+  /// L'algoritmo dichiarato, in maiuscolo. Quasi sempre `SHA1`.
+  final String algoritmo;
+
+  const DatiOtp({
+    required this.secret,
+    this.issuer = '',
+    this.nome = '',
+    this.cifre = 6,
+    this.periodo = 30,
+    this.algoritmo = 'SHA1',
+  });
+
+  /// Il QR chiede esattamente ciò che VaultMind sa calcolare?
+  ///
+  /// Esiste perché il caso contrario è il peggiore possibile: se il servizio
+  /// vuole 8 cifre ogni 60 secondi e noi ne mostriamo 6 ogni 30, il codice non
+  /// è "rotto" — è **plausibile e sempre sbagliato**, e chi lo usa dà la colpa
+  /// al sito. Meglio dirlo prima di salvare.
+  bool get standard => cifre == 6 && periodo == 30 && algoritmo == 'SHA1';
+
+  /// Il titolo da proporre per la voce nuova.
+  String get titoloProposto {
+    if (issuer.isNotEmpty && nome.isNotEmpty && issuer != nome) {
+      return '$issuer ($nome)';
+    }
+    return issuer.isNotEmpty ? issuer : nome;
+  }
+}
+
+/// Legge un URI `otpauth://totp/...`, quello che c'è dentro i QR di
+/// attivazione. `null` se non è un otpauth valido o se manca il secret.
+///
+/// `hotp` viene **rifiutato di proposito**: è basato su un contatore che
+/// avanza a ogni codice, non sull'orologio, e VaultMind non tiene contatori.
+/// Accettarlo vorrebbe dire mostrare codici sempre sbagliati.
+DatiOtp? leggiOtpauth(String testo) {
+  final t = testo.trim();
+  Uri u;
+  try {
+    u = Uri.parse(t);
+  } catch (_) {
+    return null;
+  }
+  if (u.scheme.toLowerCase() != 'otpauth') return null;
+  if (u.host.toLowerCase() != 'totp') return null;
+
+  final p = u.queryParameters;
+  final secret = _normalizza(p['secret'] ?? '');
+  if (!_plausibile(secret)) return null;
+
+  // L'etichetta è `Issuer:account` oppure il solo account. Il parametro
+  // `issuer=` quando c'è vince, perché l'etichetta a volte è troncata.
+  final etichetta = u.pathSegments.isEmpty ? '' : u.pathSegments.join('/');
+  final duePunti = etichetta.indexOf(':');
+  final daEtichetta = duePunti >= 0 ? etichetta.substring(0, duePunti) : '';
+  final nome =
+      duePunti >= 0 ? etichetta.substring(duePunti + 1) : etichetta;
+
+  return DatiOtp(
+    secret: secret,
+    issuer: (p['issuer'] ?? daEtichetta).trim(),
+    nome: nome.trim(),
+    cifre: int.tryParse(p['digits'] ?? '') ?? 6,
+    periodo: int.tryParse(p['period'] ?? '') ?? 30,
+    algoritmo: (p['algorithm'] ?? 'SHA1').toUpperCase(),
+  );
+}
+
+/// Interpreta quello che l'utente ha in mano: l'URI intero del QR, **oppure**
+/// il solo secret copiato dalla pagina "inserimento manuale" del sito.
+///
+/// I siti mostrano il secret a gruppi di quattro (`abcd efgh ijkl`) e chi lo
+/// incolla porta dentro gli spazi: si tolgono qui, non si chiede all'utente di
+/// pulirlo. `null` se non è né l'uno né l'altro.
+DatiOtp? interpretaSecret(String testo) {
+  final t = testo.trim();
+  if (t.isEmpty) return null;
+  if (t.toLowerCase().startsWith('otpauth')) return leggiOtpauth(t);
+
+  final s = _normalizza(t);
+  return _plausibile(s) ? DatiOtp(secret: s) : null;
+}
+
+/// Come lo scrivono i siti: a gruppi di quattro, a volte in minuscolo, a volte
+/// con i trattini. Base32 è insensibile alle maiuscole e il maiuscolo è la
+/// forma canonica — è quella che finisce nel vault, dove la legge anche il PC.
+String _normalizza(String s) =>
+    s.toUpperCase().replaceAll(RegExp(r'[\s=-]'), '');
+
+/// Il secret regge un conto vero?
+///
+/// La soglia di otto caratteri esiste perché senza di lei `A` sarebbe un
+/// secret valido: `_base32` accetta cinque bit, l'HMAC li digerisce, e ne
+/// uscirebbero sei cifre credibili e sempre rifiutate. Un secret vero non
+/// scende sotto i sedici caratteri; otto è largo apposta, per non rifiutare un
+/// servizio che si comporti in modo strano.
+bool _plausibile(String normalizzato) {
+  if (normalizzato.length < 8) return false;
+  try {
+    generaOtp(normalizzato);
+    return true;
+  } catch (_) {
+    return false;
+  }
+}

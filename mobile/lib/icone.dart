@@ -57,6 +57,8 @@ class Icone {
   static const String elenco = 'elenco';
   static const String dado = 'dado';
   static const String qr = 'qr';
+  static const String fotocamera = 'fotocamera';
+  static const String immagine = 'immagine';
   static const String esterno = 'esterno';
   static const String chevronGiu = 'chevron-giu';
   static const String chevronDestra = 'chevron-destra';
@@ -178,6 +180,8 @@ const Map<String, Path Function()> _tracciati = {
   'elenco': _elenco,
   'dado': _dado,
   'qr': _qr,
+  'fotocamera': _fotocamera,
+  'immagine': _immagine,
   'esterno': _esterno,
   'chevron-giu': _chevronGiu,
   'chevron-destra': _chevronDestra,
@@ -705,6 +709,27 @@ Path _qr() {
   p.moveTo(20.6, 17.4);
   p.lineTo(20.6, 20.6);
   p.lineTo(17.4, 20.6);
+  return p;
+}
+Path _fotocamera() {
+  final p = Path();
+  p.addRRect(RRect.fromLTRBR(2.9, 6.6, 21.099999999999998, 20.1, const Radius.circular(3)));
+  p.moveTo(8.8, 6.6);
+  p.lineTo(10.2, 4.1);
+  p.lineTo(13.8, 4.1);
+  p.lineTo(15.2, 6.6);
+  p.addOval(Rect.fromCircle(center: const Offset(12, 13.4), radius: 3.7));
+  return p;
+}
+Path _immagine() {
+  final p = Path();
+  p.addRRect(RRect.fromLTRBR(3.3, 4.3, 20.7, 19.7, const Radius.circular(3)));
+  p.addOval(Rect.fromCircle(center: const Offset(8.6, 9.4), radius: 1.6));
+  p.moveTo(3.9, 17.4);
+  p.lineTo(8.9, 12.4);
+  p.lineTo(12.3, 15.8);
+  p.lineTo(15.4, 12.7);
+  p.lineTo(20.2, 17.5);
   return p;
 }
 Path _esterno() {

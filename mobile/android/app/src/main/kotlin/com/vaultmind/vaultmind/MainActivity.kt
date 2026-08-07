@@ -35,6 +35,8 @@ class MainActivity : FlutterFragmentActivity() {
     companion object {
         private const val CODICE_SCEGLI = 4711
         private const val CODICE_SALVA = 4712
+        private const val CODICE_QR_FOTOCAMERA = 4713
+        private const val CODICE_QR_IMMAGINE = 4714
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -114,6 +116,34 @@ class MainActivity : FlutterFragmentActivity() {
                     }
                 }
 
+                // ---- lettura di un QR ----
+                // Due strade, e servono tutte e due. La fotocamera e' quella
+                // ovvia, ma non copre il caso piu' frequente di tutti: la 2FA
+                // attivata sul browser DI QUESTO telefono, dove il QR sta
+                // sullo schermo che dovrebbe fotografare. Li' l'unica strada
+                // e' lo screenshot.
+                "qrDaFotocamera" -> {
+                    richiestaInCorso = esito
+                    val a = chiamata.arguments as? Map<*, *>
+                    val i = Intent(this, ScansionaQr::class.java).apply {
+                        (a?.get("colore") as? Int)?.let {
+                            putExtra(ScansionaQr.EXTRA_COLORE, it)
+                        }
+                        (a?.get("titolo") as? String)?.let {
+                            putExtra(ScansionaQr.EXTRA_TITOLO, it)
+                        }
+                    }
+                    startActivityForResult(i, CODICE_QR_FOTOCAMERA)
+                }
+                "qrDaImmagine" -> {
+                    richiestaInCorso = esito
+                    val i = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+                        addCategory(Intent.CATEGORY_OPENABLE)
+                        type = "image/*"
+                    }
+                    startActivityForResult(i, CODICE_QR_IMMAGINE)
+                }
+
                 // ---- impronta ----
                 "bioDisponibile" -> esito.success(Biometria.disponibile(this))
                 "bioAttiva" -> esito.success(Biometria.attiva(this))
@@ -180,9 +210,45 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         @Suppress("DEPRECATION")
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode != CODICE_SCEGLI && requestCode != CODICE_SALVA) return
+        if (requestCode != CODICE_SCEGLI && requestCode != CODICE_SALVA &&
+            requestCode != CODICE_QR_FOTOCAMERA && requestCode != CODICE_QR_IMMAGINE
+        ) return
         val esito = richiestaInCorso ?: return
         richiestaInCorso = null
+
+        if (requestCode == CODICE_QR_FOTOCAMERA) {
+            val testo = data?.getStringExtra(ScansionaQr.EXTRA_TESTO)
+            if (testo != null) {
+                esito.success(testo)
+            } else {
+                // Annullare non e' un errore; negare il permesso si', ed e'
+                // l'unico caso in cui Dart ha qualcosa da spiegare.
+                when (val errore = data?.getStringExtra(ScansionaQr.EXTRA_ERRORE)) {
+                    null -> esito.success(null)
+                    else -> esito.error(errore, null, null)
+                }
+            }
+            return
+        }
+
+        if (requestCode == CODICE_QR_IMMAGINE) {
+            if (resultCode != Activity.RESULT_OK || data?.data == null) {
+                esito.success(null)   // annullato
+                return
+            }
+            try {
+                val testo = contentResolver.openInputStream(data.data!!)
+                    ?.use { LettoreQr.daFlusso(it) }
+                // "Nessun QR nell'immagine" e "immagine illeggibile" chiedono
+                // due cose diverse a chi la usa: riprova a inquadrare, oppure
+                // scegli un altro file. Restano distinti fino a Dart.
+                if (testo != null) esito.success(testo)
+                else esito.error("nessun_qr", null, null)
+            } catch (e: Exception) {
+                esito.error("immagine", null, null)
+            }
+            return
+        }
 
         if (requestCode == CODICE_SALVA) {
             val testo = backupDaScrivere

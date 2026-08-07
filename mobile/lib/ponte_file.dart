@@ -1,5 +1,11 @@
 /// Il lato Dart del ponte verso Android (`MainActivity.kt`).
 ///
+/// Il nome dice "file" perché di file si trattava all'inizio; oggi passano di
+/// qui anche l'apertura di un indirizzo, l'impronta e la lettura dei QR. Resta
+/// **un canale solo** di proposito: dall'altra parte c'è una `MainActivity`
+/// sola, e spezzare il ponte in quattro vorrebbe dire quattro `MethodChannel`
+/// da tenere allineati per non guadagnare niente.
+///
 /// Due modi di ricevere un backup, in ordine di comodità per chi lo usa:
 ///  1. tocca l'allegato in chat e sceglie VaultMind — zero navigazione;
 ///  2. preme "Scegli il file" e usa il selettore di sistema.
@@ -63,6 +69,81 @@ Future<bool> apriNelBrowser(String url) async {
     return await _canale.invokeMethod<bool>('apriUrl', url) ?? false;
   } on PlatformException {
     return false;
+  }
+}
+
+// --------------------------------------------------------------------- QR
+
+/// Com'è andata la lettura di un QR.
+///
+/// Sono sei esiti e non "una stringa o niente" perché chiedono cinque cose
+/// diverse a chi sta usando l'app: riprova, scegli un altro file, dai il
+/// permesso, usa un altro telefono, oppure niente — hai annullato tu.
+enum EsitoQr {
+  letto,
+
+  /// L'utente è tornato indietro. Non è un errore e non si dice niente.
+  annullato,
+
+  /// Permesso della fotocamera negato.
+  permessoNegato,
+
+  /// Fotocamera assente, occupata, o vietata dalle policy del telefono.
+  fotocameraNonDisponibile,
+
+  /// L'immagine si è aperta ma dentro non c'era nessun QR.
+  nessunQr,
+
+  /// Il file scelto non è un'immagine leggibile.
+  immagineIllegibile,
+}
+
+class RisultatoQr {
+  final EsitoQr esito;
+
+  /// Il contenuto del QR. Valorizzato solo con [EsitoQr.letto].
+  final String? testo;
+
+  const RisultatoQr(this.esito, [this.testo]);
+}
+
+const _erroriQr = {
+  'permesso': EsitoQr.permessoNegato,
+  'fotocamera': EsitoQr.fotocameraNonDisponibile,
+  'nessun_qr': EsitoQr.nessunQr,
+  'immagine': EsitoQr.immagineIllegibile,
+};
+
+/// Apre la fotocamera e restituisce il contenuto del primo QR inquadrato.
+///
+/// [coloreAccento] è il colore del tema in corso: la schermata è nativa, non
+/// legge il tema di Flutter, e senza questo il mirino sarebbe viola anche
+/// nell'app in oro.
+Future<RisultatoQr> qrDaFotocamera({
+  required int coloreAccento,
+  String titolo = 'Inquadra il QR',
+}) =>
+    _leggiQr('qrDaFotocamera', {'colore': coloreAccento, 'titolo': titolo});
+
+/// Sceglie un'immagine col selettore di sistema e ci cerca dentro un QR.
+///
+/// È la strada che la fotocamera non può coprire: quando la 2FA si attiva sul
+/// browser **di questo stesso telefono**, il QR sta sullo schermo che
+/// dovrebbe fotografare. Lì l'unico modo è lo screenshot.
+Future<RisultatoQr> qrDaImmagine() => _leggiQr('qrDaImmagine', null);
+
+Future<RisultatoQr> _leggiQr(String metodo, Map<String, Object?>? argomenti) async {
+  try {
+    final testo = await _canale.invokeMethod<String>(metodo, argomenti);
+    return testo == null
+        ? const RisultatoQr(EsitoQr.annullato)
+        : RisultatoQr(EsitoQr.letto, testo);
+  } on PlatformException catch (e) {
+    return RisultatoQr(_erroriQr[e.code] ?? EsitoQr.annullato);
+  } on MissingPluginException {
+    // Succede solo fuori da Android (i test girano sul PC): meglio "annullato"
+    // che un'eccezione che nessuno cattura.
+    return const RisultatoQr(EsitoQr.annullato);
   }
 }
 

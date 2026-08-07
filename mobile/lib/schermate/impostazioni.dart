@@ -1,10 +1,12 @@
 /// Impostazioni dell'app.
 ///
-/// Ci sono solo le cose che sul telefono hanno senso. Cambio master password,
-/// generatore e import CSV restano sul PC.
+/// Ci sono solo le cose che sul telefono hanno senso. Cambio master password e
+/// import CSV restano sul PC: il primo perché rifà tutto il vault, il secondo
+/// perché un file CSV su un telefono non ce l'ha nessuno.
 library;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../archivio.dart';
 import '../impostazioni.dart';
@@ -13,6 +15,9 @@ import '../sessione.dart';
 import '../sync_gestore.dart';
 import '../tema.dart';
 import 'dialoghi.dart';
+import 'foglio_generatore.dart';
+import 'modulo_voce.dart';
+import 'scheda_voce.dart' show svuotaDopo;
 import 'sincronizza.dart';
 import '../icone.dart';
 import '../interruttore.dart';
@@ -122,6 +127,21 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                   : null,
             ),
 
+          _Sezione('Strumenti'),
+          // Qui e non nella barra in alto: la barra ha già tre icone, e
+          // generare una password è una cosa che si fa qualche volta a
+          // settimana, non ogni volta che si apre l'app. Dentro il modulo di
+          // una voce c'è comunque il suo pulsante, che è dove serve più
+          // spesso.
+          ListTile(
+            leading: IconaVM(Icone.dado, color: context.cTenue),
+            title: const Text('Genera una password'),
+            subtitle: Text(
+                'Da copiare in un modulo di registrazione, o da salvare subito in una voce.',
+                style: TextStyle(fontSize: 12, color: context.cTenue)),
+            onTap: _generatore,
+          ),
+
           _Sezione('Dispositivi'),
           // Qui e non nella barra: abbinare si fa una volta sola, mentre
           // sincronizzare si fa spesso — e infatti il tasto in alto ora
@@ -199,6 +219,40 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
         ],
       ),
     );
+  }
+
+  /// Il generatore aperto da solo, senza una voce da compilare.
+  ///
+  /// Le due uscite non sono equivalenti e non si fa finta che lo siano: copiare
+  /// serve a incollare *adesso* in un modulo di registrazione aperto nel
+  /// browser, ma una password copiata e mai salvata è una password persa. Per
+  /// questo la seconda strada porta dritta al modulo della voce, con la
+  /// password già dentro.
+  Future<void> _generatore() async {
+    final scelta = await mostraGeneratore(
+      context,
+      etichettaAzione: 'Copia negli appunti',
+      mostraCreaVoce: true,
+    );
+    if (scelta == null || !mounted) return;
+
+    if (scelta.creaVoce) {
+      await Navigator.of(context).push(MaterialPageRoute(
+        builder: (_) => ModuloVoce(
+          sessione: widget.sessione,
+          passwordIniziale: scelta.password,
+        ),
+      ));
+      return;
+    }
+
+    await Clipboard.setData(ClipboardData(text: scelta.password));
+    svuotaDopo(scelta.password);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+      content: Text('Password copiata — gli appunti si svuotano fra 45 secondi'),
+      duration: Duration(seconds: 3),
+    ));
   }
 
   /// Il backup parte dal vault **in memoria**, non dal file: se l'utente ha

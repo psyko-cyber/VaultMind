@@ -32,6 +32,15 @@ class Impostazioni {
   /// Un pin che punta a una voce cancellata altrove si ignora in silenzio.
   List<int> pinnate;
 
+  /// Lunghezza e simboli dell'ultima password generata.
+  ///
+  /// Si ricordano solo questi due, come sul PC (`gen_length`, `gen_symbols`):
+  /// sono le due scelte che una persona fa una volta e poi tiene. Maiuscole,
+  /// minuscole e cifre no — si spengono per un sito che non le accetta, e
+  /// quella è una deroga, non una preferenza.
+  int genLunghezza;
+  bool genSimboli;
+
   // ---- sincronizzazione ----
   // Qui dentro **non finisce nessun segreto**, nemmeno adesso: le chiavi verso
   // ogni dispositivo si ricavano dalla chiave del vault (`chiaveVerso`), non si
@@ -77,6 +86,8 @@ class Impostazioni {
     this.tema = TemaId.notteOro,
     this.autoBlocco = 5,
     List<int>? pinnate,
+    this.genLunghezza = 20,
+    this.genSimboli = true,
     this.idDispositivo = '',
     this.nomeDispositivo = '',
     this.syncAcceso = true,
@@ -92,6 +103,8 @@ class Impostazioni {
         'tema': tema.name,
         'autoBlocco': autoBlocco,
         'pinnate': pinnate,
+        'genLunghezza': genLunghezza,
+        'genSimboli': genSimboli,
         'idDispositivo': idDispositivo,
         'nomeDispositivo': nomeDispositivo,
         'syncAcceso': syncAcceso,
@@ -109,6 +122,8 @@ class Impostazioni {
         pinnate: ((j['pinnate'] ?? const []) as List)
             .map((x) => (x as num).toInt())
             .toList(),
+        genLunghezza: (j['genLunghezza'] as num?)?.toInt() ?? 20,
+        genSimboli: j['genSimboli'] != false,
         idDispositivo: '${j['idDispositivo'] ?? ''}',
         nomeDispositivo: '${j['nomeDispositivo'] ?? ''}',
         syncAcceso: j['syncAcceso'] != false,
@@ -133,6 +148,8 @@ class Impostazioni {
     TemaId? tema,
     int? autoBlocco,
     List<int>? pinnate,
+    int? genLunghezza,
+    bool? genSimboli,
     String? idDispositivo,
     String? nomeDispositivo,
     bool? syncAcceso,
@@ -144,6 +161,8 @@ class Impostazioni {
         tema: tema ?? this.tema,
         autoBlocco: autoBlocco ?? this.autoBlocco,
         pinnate: pinnate ?? this.pinnate,
+        genLunghezza: genLunghezza ?? this.genLunghezza,
+        genSimboli: genSimboli ?? this.genSimboli,
         idDispositivo: idDispositivo ?? this.idDispositivo,
         nomeDispositivo: nomeDispositivo ?? this.nomeDispositivo,
         syncAcceso: syncAcceso ?? this.syncAcceso,

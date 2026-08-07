@@ -15,6 +15,18 @@
          (Nel testo di questo commento niente doppi trattini: l'XML li vieta,
          e il manifest smette di essere leggibile. Gia' pagata.) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Serve a inquadrare il QR di attivazione della 2FA, e a nient'altro.
+
+         Android lo chiede all'utente al primo uso, non all'installazione: chi
+         non usa mai quella schermata non vede mai la domanda.
+
+         `required="false"`: un telefono senza fotocamera posteriore deve poter
+         installare l'app lo stesso. Il QR si legge anche da uno screenshot, e
+         quella strada non passa di qui. -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+    <uses-feature android:name="android.hardware.camera" android:required="false"/>
+
     <application
         android:label="VaultMind"
         android:name="${applicationName}"
@@ -62,6 +74,25 @@
                 <data android:mimeType="application/json"/>
             </intent-filter>
         </activity>
+
+        <!-- Il lettore di QR.
+
+             `exported="false"`: la lancia solo VaultMind. Un'altra app non
+             deve poter aprire la nostra fotocamera, e nemmeno farsi leggere un
+             QR da noi.
+
+             Bloccata in verticale di proposito: si inquadra un QR in due
+             secondi, e permettere la rotazione vuol dire ricostruire
+             l'anteprima nel mezzo del gesto per guadagnare niente.
+
+             Stesso tema di avvio della schermata principale, cosi' il passaggio
+             non lampeggia di bianco. -->
+        <activity
+            android:name=".ScansionaQr"
+            android:exported="false"
+            android:screenOrientation="portrait"
+            android:theme="@style/NormalTheme"/>
+
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
