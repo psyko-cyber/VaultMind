@@ -92,6 +92,32 @@ String uidNuovo() {
   return List.generate(32, (_) => cifre[_casuale.nextInt(16)]).join();
 }
 
+/// Il salt di un vault NUOVO: 16 byte, come `os.urandom(16)` in
+/// `crypto_store.create()`. Chi apre non ne controlla la lunghezza (usa quello
+/// che trova nel file), ma i vault nati sul telefono devono essere
+/// indistinguibili da quelli nati sul PC.
+const int kLunghezzaSalt = 16;
+
+/// Il minimo per una master password NUOVA, lo stesso di `/api/unlock` sul PC.
+/// Contato in caratteri veri (`runes`), come `len()` in Python: con
+/// `String.length` un'emoji varrebbe due.
+const int kMasterMinima = 8;
+
+/// Un vault nuovo e vuoto, con la sua chiave. **Non scrive niente**: salvarlo
+/// è compito di chi chiama (`creaVault` in `archivio.dart`), e solo quando
+/// tutto il resto è andato bene.
+///
+/// Esiste dal 16/09/2026: fino ad allora un vault nasceva solo sul PC, e chi
+/// aveva soltanto il telefono restava fermo alla prima schermata.
+Future<({Vault vault, Uint8List chiave})> nuovoVault(String master) async {
+  if (master.runes.length < kMasterMinima) {
+    throw ArgumentError('La master password deve avere almeno $kMasterMinima caratteri.');
+  }
+  final salt = Uint8List.fromList(
+      List.generate(kLunghezzaSalt, (_) => _casuale.nextInt(256)));
+  return (vault: Vault(const [], salt: salt), chiave: await derivaChiave(master, salt));
+}
+
 /// La lapide di una voce cancellata: senza, l'altro dispositivo — che la voce
 /// ce l'ha ancora — la rimanderebbe indietro e la voce resusciterebbe.
 class Lapide {

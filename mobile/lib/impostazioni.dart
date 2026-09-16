@@ -1,23 +1,34 @@
 /// Le preferenze dell'app: tema e auto-blocco.
 ///
-/// Stanno in un file JSON accanto al vault, non in un pacchetto di
-/// impostazioni: sono due valori, e una dipendenza in più è una dipendenza
-/// che può rompersi al prossimo aggiornamento di Android.
+/// Stanno in un file JSON accanto al vault (`deposito.dart`), non in un
+/// pacchetto di impostazioni: sono due valori, e una dipendenza in più è una
+/// dipendenza che può rompersi al prossimo aggiornamento di Android.
 ///
 /// Qui dentro **non finisce niente di segreto**: né password, né chiavi.
 library;
 
 import 'dart:convert';
-import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 
+import 'deposito.dart';
 import 'sync_protocollo.dart';
 import 'tema.dart';
 
 class Impostazioni {
+  /// Il predefinito è **Scuro**, blu con l'accento azzurro: lo stesso del PC.
+  /// Fino al 16/09/2026 sul telefono era «Notte e oro», e le due app
+  /// sembravano due prodotti.
   TemaId tema;
+
+  /// L'utente ha scelto il tema dalle Impostazioni?
+  ///
+  /// Serve perché fino al 16/09/2026 il tema si salvava **sempre**, anche
+  /// quando nessuno l'aveva toccato: «Notte e oro» nel file non distingue chi
+  /// l'ha voluto da chi l'ha solo ricevuto come predefinito. Senza questa
+  /// voce, il nuovo predefinito non sarebbe mai arrivato a chi aveva già
+  /// aperto l'app una volta.
+  bool temaScelto;
 
   /// Minuti di inattività dopo i quali il vault si richiude. 0 = mai.
   int autoBlocco;
@@ -83,7 +94,8 @@ class Impostazioni {
   Map<String, String> indirizzi;
 
   Impostazioni({
-    this.tema = TemaId.notteOro,
+    this.tema = TemaId.scuro,
+    this.temaScelto = false,
     this.autoBlocco = 5,
     List<int>? pinnate,
     this.genLunghezza = 20,
@@ -101,6 +113,7 @@ class Impostazioni {
 
   Map<String, dynamic> toJson() => {
         'tema': tema.name,
+        if (temaScelto) 'temaScelto': true,
         'autoBlocco': autoBlocco,
         'pinnate': pinnate,
         'genLunghezza': genLunghezza,
@@ -113,11 +126,17 @@ class Impostazioni {
         'indirizzi': indirizzi,
       };
 
-  static Impostazioni fromJson(Map<String, dynamic> j) => Impostazioni(
-        tema: TemaId.values.firstWhere(
-          (t) => t.name == j['tema'],
-          orElse: () => TemaId.notteOro,
-        ),
+  static Impostazioni fromJson(Map<String, dynamic> j) {
+    final scelto = j['temaScelto'] == true;
+    final letto = TemaId.values.firstWhere(
+      (t) => t.name == j['tema'],
+      orElse: () => TemaId.scuro,
+    );
+    return Impostazioni(
+        // «Notte e oro» mai scelto era il vecchio predefinito: passa al nuovo.
+        // Il chiaro invece non era predefinito, quindi qualcuno l'ha voluto.
+        tema: !scelto && letto == TemaId.notteOro ? TemaId.scuro : letto,
+        temaScelto: scelto,
         autoBlocco: (j['autoBlocco'] as num?)?.toInt() ?? 5,
         pinnate: ((j['pinnate'] ?? const []) as List)
             .map((x) => (x as num).toInt())
@@ -143,9 +162,11 @@ class Impostazioni {
             '${e.key}': '${e.value}'
         },
       );
+  }
 
   Impostazioni copia({
     TemaId? tema,
+    bool? temaScelto,
     int? autoBlocco,
     List<int>? pinnate,
     int? genLunghezza,
@@ -159,6 +180,7 @@ class Impostazioni {
   }) =>
       Impostazioni(
         tema: tema ?? this.tema,
+        temaScelto: temaScelto ?? this.temaScelto,
         autoBlocco: autoBlocco ?? this.autoBlocco,
         pinnate: pinnate ?? this.pinnate,
         genLunghezza: genLunghezza ?? this.genLunghezza,
@@ -176,17 +198,14 @@ class Impostazioni {
 /// interfaccia si ridipinge da sola.
 final impostazioni = ValueNotifier<Impostazioni>(Impostazioni());
 
-Future<File> _file() async {
-  final dir = await getApplicationDocumentsDirectory();
-  return File('${dir.path}/impostazioni.json');
-}
+const _nome = 'impostazioni.json';
 
 Future<void> caricaImpostazioni() async {
   try {
-    final f = await _file();
-    if (await f.exists()) {
-      impostazioni.value = Impostazioni.fromJson(
-          jsonDecode(await f.readAsString()) as Map<String, dynamic>);
+    final testo = await leggiDeposito(_nome);
+    if (testo != null) {
+      impostazioni.value =
+          Impostazioni.fromJson(jsonDecode(testo) as Map<String, dynamic>);
     }
   } catch (_) {
     // Un file di preferenze illeggibile non deve impedire di aprire il vault:
@@ -217,7 +236,7 @@ Future<void> cambiaFissata(int id) async {
 Future<void> salvaImpostazioni(Impostazioni nuove) async {
   impostazioni.value = nuove;
   try {
-    (await _file()).writeAsString(jsonEncode(nuove.toJson()), flush: true);
+    await scriviDeposito(_nome, jsonEncode(nuove.toJson()));
   } catch (_) {
     // Se non si salva, la scelta vale per questa sessione: fastidioso, non grave.
   }

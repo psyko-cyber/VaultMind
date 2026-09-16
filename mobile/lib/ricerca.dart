@@ -115,11 +115,14 @@ Float32List _vettore(String testo) {
       // Il PC prende l'intero MD5 come numero e ne fa il modulo. Gli ultimi
       // byte del digest bastano: il modulo di una potenza di due dipende solo
       // da quelli, e 1024 lo è.
-      var h = 0;
-      for (var k = digest.length - 8; k < digest.length; k++) {
-        h = ((h << 8) | digest[k]) & 0x7FFFFFFFFFFFFFF;
-      }
-      v[h % _dimensioni] += 1.0;
+      //
+      // Due byte e non otto: in JavaScript (la versione per iPhone) gli
+      // interi sono double, e oltre 2^53 i bit bassi si perdono — il modulo
+      // uscirebbe diverso da quello del PC, in silenzio, e la ricerca
+      // troverebbe voci sbagliate solo sull'iPhone. Sedici bit bastano finché
+      // _dimensioni è una potenza di due fino a 65536.
+      final h = (digest[digest.length - 2] << 8) | digest[digest.length - 1];
+      v[h & (_dimensioni - 1)] += 1.0;
     }
   }
   var norma = 0.0;

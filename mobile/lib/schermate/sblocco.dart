@@ -1,8 +1,10 @@
-/// Sblocco del vault, e import del backup quando non c'è ancora.
+/// Sblocco del vault e, quando non c'è ancora, le tre strade per averne uno:
+/// crearlo, riceverlo dal PC, importare un backup.
 library;
 
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -13,6 +15,7 @@ import '../ponte_file.dart';
 import '../vault.dart';
 import 'casa.dart';
 import 'dialoghi.dart';
+import 'nuovo_vault.dart';
 import 'travaso.dart';
 import '../icone.dart';
 
@@ -95,48 +98,6 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     );
   }
 
-  /// Dopo uno sblocco riuscito propone l'impronta, una volta sola: è il solo
-  /// momento in cui la chiave è disponibile per essere messa al sicuro.
-  ///
-  /// Riceve la chiave già derivata. Prima se la ri-derivava da sé, e questa
-  /// schermata faceva Argon2 **due volte** a ogni sblocco: coi parametri veri
-  /// (64 MB, time cost 3) è quasi un secondo di attesa regalato.
-  Future<void> _proponiImpronta(Uint8List chiave) async {
-    if (!await impresaDisponibile() || await improntaAttiva()) return;
-    if (!mounted) return;
-    final vuole = await showDialog<bool>(
-      context: context,
-      builder: (c) => AlertDialog(
-        backgroundColor: context.cPannello,
-        title: const Text('Sbloccare con l\'impronta?'),
-        content: const Text(
-          'La prossima volta ti basterà il dito, senza riscrivere la master password.\n\n'
-          'La password non viene salvata: viene messa al sicuro la chiave del vault, '
-          'e il telefono la restituisce solo dopo aver riconosciuto la tua impronta.',
-          style: TextStyle(fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(c, false),
-            child: Text('No, grazie', style: TextStyle(color: context.cTenue)),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(c, true),
-            style: FilledButton.styleFrom(
-                backgroundColor: context.cAccento, foregroundColor: context.cSuAccento),
-            child: const Text('Attiva'),
-          ),
-        ],
-      ),
-    );
-    if (vuole != true) return;
-    try {
-      await improntaAttivaConChiave(base64.encode(chiave));
-    } catch (e) {
-      // Se non riesce non è grave: si continua con la master password.
-    }
-  }
-
   Future<void> _sblocca() async {
     if (_password.text.isEmpty) return;
     setState(() {
@@ -151,7 +112,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
       final chiave = await chiaveDelVault(contenuto, master);
       final vault = await apriVaultConChiave(contenuto, chiave);
       if (!mounted) return;
-      await _proponiImpronta(chiave);
+      await proponiImpronta(context, chiave);
       if (!mounted) return;
       // La password esce dalla memoria appena non serve più. Resta comunque
       // in RAM finché il campo di testo vive, ma non la si tiene un istante
@@ -197,7 +158,8 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         _errore = null;
       });
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Backup importato. Sbloccalo con la master password del PC.'),
+        content: Text('Backup importato. Sbloccalo con la master password del '
+            'dispositivo da cui arriva.'),
       ));
     } on FormatException catch (e) {
       setState(() => _errore = e.message);
@@ -301,8 +263,8 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         ],
         const SizedBox(height: 14),
         Text(
-          'La master password è la stessa del PC: da lei si deriva la chiave, '
-          'e non viene salvata da nessuna parte.',
+          'Da lei si deriva la chiave del vault, e non viene salvata da nessuna '
+          'parte. Se il vault arriva da un PC, è la stessa del PC.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.5),
         ),
@@ -320,32 +282,33 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         ),
       ];
 
-  /// Il travaso via rete è il primo pulsante e il file è il secondo, non per
-  /// gusto: passare da WhatsApp funziona ma è un passaggio da spiegare, e
-  /// ogni passaggio da spiegare è qualcuno che si ferma. Il file resta perché
-  /// fuori casa è l'unica strada: il salt arriva dalla scoperta, che è in
-  /// broadcast e in una VPN non passa.
+  /// Tre strade, e l'ordine conta.
+  ///
+  /// **Creare** viene prima dal 16/09/2026: il telefono deve bastare da solo.
+  /// Prima c'erano solo le due strade dal PC, e chi aveva ricevuto l'APK senza
+  /// avere un PC si fermava qui.
+  ///
+  /// Le due strade dal PC stanno sotto una domanda che le separa, perché
+  /// premere «Crea» avendo già un PC fa nascere un secondo vault che col primo
+  /// non si sincronizza. Fra le due il travaso viene prima del file, non per
+  /// gusto: passare da WhatsApp funziona ma è un passaggio da spiegare, e ogni
+  /// passaggio da spiegare è qualcuno che si ferma. Il file resta perché fuori
+  /// casa è l'unica strada: il salt arriva dalla scoperta, che è in broadcast e
+  /// in una VPN non passa.
   List<Widget> _invitoImport() => [
         const Text(
           'Su questo telefono non c\'è ancora nessun vault.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 14),
         ),
-        const SizedBox(height: 10),
-        Text(
-          'Se il PC è acceso sulla stessa WiFi, il vault arriva da lì: '
-          'niente file da mandarsi.',
-          textAlign: TextAlign.center,
-          style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.55),
-        ),
-        const SizedBox(height: 26),
+        const SizedBox(height: 22),
         SizedBox(
           width: double.infinity,
           child: FilledButton.icon(
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const SchermataTravaso())),
-            icon: const IconaVM(Icone.rete),
-            label: const Text('Ricevi il vault dal PC',
+                builder: (_) => const SchermataNuovoVault())),
+            icon: const IconaVM(Icone.piu),
+            label: const Text('Crea un vault nuovo',
                 style: TextStyle(fontWeight: FontWeight.w600)),
             style: FilledButton.styleFrom(
               backgroundColor: context.cAccento,
@@ -354,7 +317,39 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 30),
+        const Text(
+          'Hai già VaultMind su un PC?',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          // Nel browser il travaso via rete non c'è (`sync_rete_web.dart`):
+          // resta il file, e il testo dice dove prenderlo sul PC.
+          kIsWeb
+              ? 'Sul PC apri il menu › «Backup del vault», manda il file a '
+                  'questo telefono e sceglilo qui sotto.'
+              : 'Se il PC è acceso sulla stessa WiFi, il vault arriva da lì: '
+                  'niente file da mandarsi.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.55),
+        ),
+        const SizedBox(height: 14),
+        if (!kIsWeb) ...[
+          OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => const SchermataTravaso())),
+            icon: IconaVM(Icone.rete, color: context.cAccento),
+            label: Text('Ricevi il vault dal PC',
+                style: TextStyle(color: context.cAccento)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: context.cBordo),
+              padding: const EdgeInsets.symmetric(vertical: 13),
+            ),
+          ),
+          const SizedBox(height: 12),
+        ],
         OutlinedButton.icon(
           onPressed: _importa,
           icon: IconaVM(Icone.documentoSu, color: context.cAccento),

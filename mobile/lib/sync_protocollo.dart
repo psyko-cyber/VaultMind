@@ -79,7 +79,9 @@ List<int> _hkdf(List<int> ikm, List<int> salt, List<int> info, [int lunghezza = 
 String _cifre(List<int> dato, int quante) {
   var n = 0;
   for (var i = 0; i < 6 && i < dato.length; i++) {
-    n = (n << 8) | dato[i];
+    // `* 256 +` e non `<< 8 |`: stesso numero, ma vale anche nel browser, dove
+    // gli shift si fermano a 32 bit e sei byte ne sono 48.
+    n = n * 256 + dato[i];
   }
   var limite = 1;
   for (var i = 0; i < quante; i++) {

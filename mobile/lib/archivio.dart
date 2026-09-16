@@ -1,25 +1,27 @@
-/// Dove sta il vault sul telefono, e come ci arriva.
+/// Dove sta il vault sul dispositivo, e come ci arriva.
 ///
-/// Il file resta nella cartella privata dell'app: nessun'altra app può
-/// leggerlo, e `allowBackup="false"` più le regole in `res/xml/nessun_backup`
-/// impediscono ad Android di copiarlo sul Google Drive dell'utente.
-/// Il vault è comunque cifrato: quel file, da solo, non serve a nulla.
+/// Sul telefono è un file nella cartella privata dell'app; nel browser è la
+/// memoria del sito. Il *dove* lo decide `deposito.dart`; qui restano le
+/// regole, uguali ovunque. Il vault è comunque cifrato: quel testo, da solo,
+/// non serve a nulla.
 library;
 
 import 'dart:convert';
-import 'dart:io';
 
-import 'package:path_provider/path_provider.dart';
+import 'deposito.dart';
 
 /// Il vault sul dispositivo. Nome fisso: ce n'è uno solo.
-Future<File> fileVault() async {
-  final dir = await getApplicationDocumentsDirectory();
-  return File('${dir.path}/vault.json');
+const _vault = 'vault.json';
+
+Future<bool> esisteVault() => esisteDeposito(_vault);
+
+Future<String> leggiVault() async {
+  final c = await leggiDeposito(_vault);
+  // Chi chiama ha già controllato che ci sia: se manca, per l'utente è un
+  // vault che non si legge, e VaultCorrupted dice la cosa giusta da fare.
+  if (c == null) throw const FormatException('Il vault non c\'è più.');
+  return c;
 }
-
-Future<bool> esisteVault() async => (await fileVault()).exists();
-
-Future<String> leggiVault() async => (await fileVault()).readAsString();
 
 /// Segnalibro che ricorda se il vault è stato modificato QUI dopo l'ultimo
 /// import. Un file che c'è o non c'è, invece di confrontare le date: gli
@@ -28,17 +30,13 @@ Future<String> leggiVault() async => (await fileVault()).readAsString();
 /// Serve perché da quando il telefono scrive, reimportare un backup dal PC
 /// può cancellare del lavoro fatto qui — ed è l'unico modo di perdere dati
 /// prima che esista il sync (TODO §2).
-Future<File> _segnalibro() async {
-  final dir = await getApplicationDocumentsDirectory();
-  return File('${dir.path}/modificato-in-locale');
-}
+const _segnalibro = 'modificato-in-locale';
 
-Future<bool> modificatoInLocale() async => (await _segnalibro()).exists();
+Future<bool> modificatoInLocale() => esisteDeposito(_segnalibro);
 
-/// Salva il vault cifrato **in modo atomico**: prima un file temporaneo, poi
-/// il rename, che sullo stesso volume è indivisibile. Se il telefono muore a
-/// metà scrittura resta il vault vecchio, intero — mai mezzo vault, che non si
-/// aprirebbe più e sarebbe l'unica copia.
+/// Salva il vault cifrato **in modo atomico** (vedi `scriviDeposito`): se il
+/// telefono muore a metà scrittura resta il vault vecchio, intero — mai mezzo
+/// vault, che non si aprirebbe più e sarebbe l'unica copia.
 Future<void> salvaVaultCifrato(String contenuto) async {
   if (!sembraUnVault(contenuto)) {
     // Difesa dell'ultimo istante: qui passa solo roba prodotta da cifraVault(),
@@ -46,11 +44,28 @@ Future<void> salvaVaultCifrato(String contenuto) async {
     // cui non si torna indietro.
     throw const FormatException('Rifiuto di salvare: non ha la forma di un vault.');
   }
-  final f = await fileVault();
-  final tmp = File('${f.path}.tmp');
-  await tmp.writeAsString(contenuto, flush: true);
-  await tmp.rename(f.path);
-  await (await _segnalibro()).writeAsString('', flush: true);
+  await scriviDeposito(_vault, contenuto);
+  await scriviDeposito(_segnalibro, '');
+}
+
+/// Scrive il vault di un dispositivo che non ne aveva: la strada di chi usa
+/// VaultMind **senza un PC**.
+///
+/// Si rifiuta se un vault c'è già. La schermata lo ha controllato prima, ma
+/// nel frattempo può arrivare un backup da «Apri con», e un vault vuoto scritto
+/// sopra uno pieno è la perdita da cui non si torna.
+///
+/// Niente segnalibro [modificatoInLocale]: un vault vuoto non ha lavoro da
+/// proteggere, e importare un backup subito dopo non deve chiedere conferma.
+/// Lo mette la prima voce salvata.
+Future<void> creaVault(String contenuto) async {
+  if (!sembraUnVault(contenuto)) {
+    throw const FormatException('Rifiuto di salvare: non ha la forma di un vault.');
+  }
+  if (await esisteVault()) {
+    throw const FormatException('Su questo dispositivo c\'è già un vault.');
+  }
+  await scriviDeposito(_vault, contenuto);
 }
 
 /// Verifica che il testo sia davvero un vault prima di salvarlo.
@@ -78,40 +93,37 @@ Future<void> importaVault(String contenuto) async {
   if (!sembraUnVault(contenuto)) {
     throw const FormatException('Il file scelto non è un backup di VaultMind.');
   }
-  final f = await fileVault();
-  if (await f.exists()) {
+  final attuale = await leggiDeposito(_vault);
+  if (attuale != null) {
     final quando = DateTime.now();
     final marca = '${quando.year}'
         '${quando.month.toString().padLeft(2, '0')}'
         '${quando.day.toString().padLeft(2, '0')}-'
         '${quando.hour.toString().padLeft(2, '0')}'
         '${quando.minute.toString().padLeft(2, '0')}';
-    await f.copy('${f.parent.path}/vault-precedente-$marca.json');
+    await scriviDeposito('vault-precedente-$marca.json', attuale);
   }
-  await f.writeAsString(contenuto, flush: true);
+  await scriviDeposito(_vault, contenuto);
   // Il vault arriva da fuori: quello che c'era di modificato qui è stato
   // sostituito, e il segnalibro riparte da zero.
-  final s = await _segnalibro();
-  if (await s.exists()) await s.delete();
+  await eliminaDeposito(_segnalibro);
 }
 
-/// Toglie il vault da questo telefono, comprese le copie di sicurezza degli
+/// Toglie il vault da questo dispositivo, comprese le copie di sicurezza degli
 /// import precedenti: lasciarne una in giro vanificherebbe la scelta.
-/// Sul PC resta tutto: qui c'è solo una copia.
+/// Se il vault è nato qui e non esiste un backup, è la fine delle password:
+/// lo deve dire la schermata, non questa funzione.
 Future<void> eliminaVault() async {
-  final f = await fileVault();
-  final dir = f.parent;
-  for (final e in dir.listSync()) {
-    if (e is File && e.path.split(RegExp(r'[\\/]')).last.startsWith('vault')) {
+  for (final nome in await nomiDeposito()) {
+    if (nome.startsWith('vault')) {
       try {
-        await e.delete();
+        await eliminaDeposito(nome);
       } catch (_) {}
     }
   }
   // Senza vault il segnalibro non significa più niente, e lasciarlo farebbe
   // avvisare di modifiche locali al primo import del prossimo backup.
   try {
-    final s = await _segnalibro();
-    if (await s.exists()) await s.delete();
+    await eliminaDeposito(_segnalibro);
   } catch (_) {}
 }

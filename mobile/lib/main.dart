@@ -1,4 +1,5 @@
-/// VaultMind per Android.
+/// VaultMind per Android e, dal 16/09/2026, per il browser: è la versione per
+/// iPhone, installata dalla schermata Home (vedi `schermate/installa.dart`).
 ///
 /// Dal 04/08/2026 il telefono **scrive** nel vault: voci, categorie, tutto.
 /// Fino a quel giorno era in sola lettura, per non creare due versioni
@@ -15,6 +16,8 @@ import 'package:flutter/services.dart';
 
 import 'archivio.dart';
 import 'impostazioni.dart';
+import 'ponte_file.dart';
+import 'schermate/installa.dart';
 import 'schermate/sblocco.dart';
 import 'tema.dart';
 
@@ -69,9 +72,14 @@ class _Avvio extends StatefulWidget {
 class _AvvioState extends State<_Avvio> {
   bool? _esiste;
 
+  /// In Safari senza icona sulla Home si chiede prima di installare. Si può
+  /// proseguire lo stesso, ma dev'essere una scelta: vedi `installa.dart`.
+  bool _restaNelBrowser = false;
+
   @override
   void initState() {
     super.initState();
+    chiediMemoriaPersistente();
     esisteVault().then((v) {
       if (mounted) setState(() => _esiste = v);
     });
@@ -83,6 +91,10 @@ class _AvvioState extends State<_Avvio> {
       return Scaffold(
         body: Center(child: CircularProgressIndicator(color: context.cAccento)),
       );
+    }
+    if (browserIos() && !installataSullaHome() && !_restaNelBrowser) {
+      return SchermataInstalla(
+          onProsegui: () => setState(() => _restaNelBrowser = true));
     }
     return SchermataSblocco(vaultPresente: _esiste!);
   }

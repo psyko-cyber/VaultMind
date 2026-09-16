@@ -160,12 +160,18 @@ ThemeData _costruisci({
         backgroundColor: accento,
         foregroundColor: suAccento,
         padding: const EdgeInsets.symmetric(vertical: 15),
-        textStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+        // fontFamily ripetuto di proposito: uno stile di componente SOSTITUISCE
+        // quello del tema invece di fondersi, e senza famiglia il testo
+        // tornava a Roboto. Su Android era solo il font sbagliato; nel browser
+        // Roboto non c'è (non si scarica niente da Google) e il testo del
+        // pulsante spariva del tutto.
+        textStyle: const TextStyle(
+            fontFamily: 'Inter', fontWeight: FontWeight.w600, fontSize: 15),
       ),
     ),
     snackBarTheme: SnackBarThemeData(
       backgroundColor: pannello,
-      contentTextStyle: TextStyle(color: testo),
+      contentTextStyle: TextStyle(fontFamily: 'Inter', color: testo),
       behavior: SnackBarBehavior.floating,
     ),
   );

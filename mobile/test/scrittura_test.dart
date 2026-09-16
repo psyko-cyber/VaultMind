@@ -158,6 +158,34 @@ void main() {
     expect(voce.title, 'Voce dal futuro');
   });
 
+  group('vault nato sul telefono', () {
+    test('password troppo corta: rifiutata prima di Argon2', () {
+      expect(() => nuovoVault('1234567'), throwsArgumentError);
+      // Si contano i caratteri come fa Python: sette emoji sono sette, non
+      // quattordici unità UTF-16 che passerebbero la soglia.
+      expect(() => nuovoVault('🔑' * 7), throwsArgumentError);
+    });
+
+    test('salt nuovo da 16 byte, e si riapre con la sola password', () async {
+      final a = await nuovoVault(master);
+      final b = await nuovoVault(master);
+      expect(a.vault.salt.length, 16);
+      expect(a.vault.salt, isNot(equals(b.vault.salt)),
+          reason: 'due vault con lo stesso salt avrebbero la stessa chiave');
+
+      final testo = await cifraVault(a.vault, a.chiave);
+      final riletto = await apriVault(testo, master);
+      expect(riletto.credenziali, isEmpty);
+      expect(riletto.salt, a.vault.salt);
+
+      // Lo lascia a Python: è il PC che arriva dopo, con «Ripristina da
+      // backup». Stessa master password del vettore, che Python conosce.
+      final dir = Directory('${Directory.current.path}/build')
+        ..createSync(recursive: true);
+      File('${dir.path}/vault-nato-su-dart.json').writeAsStringSync(testo);
+    });
+  });
+
   test('lascia in build/ un vault scritto da Dart, per la suite Python', () async {
     // Ci si mette dentro tutto quello che il PC deve saper rileggere: voci
     // spostate di categoria (quindi con `rev` avanzato), una categoria vuota,

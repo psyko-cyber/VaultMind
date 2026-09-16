@@ -63,7 +63,14 @@ CodiceOtp generaOtp(String secret, {int? t, int periodo = 30, int cifre = 6}) {
 
   // Il contatore va impacchettato su 8 byte big-endian: sbagliare l'ordine dà
   // codici plausibili e sempre errati, il modo peggiore di fallire.
-  final blocco = ByteData(8)..setUint64(0, contatore, Endian.big);
+  //
+  // Due metà da 32 bit e non `setUint64`: nel browser (la versione per
+  // iPhone) `setUint64` non esiste e solleva un'eccezione. Il risultato è
+  // identico finché il contatore sta sotto 2^53, cioè per i prossimi
+  // duecento milioni di anni.
+  final blocco = ByteData(8)
+    ..setUint32(0, contatore ~/ 0x100000000, Endian.big)
+    ..setUint32(4, contatore % 0x100000000, Endian.big);
   final h = Hmac(sha1, chiave).convert(blocco.buffer.asUint8List()).bytes;
 
   final offset = h[h.length - 1] & 0x0F;
@@ -185,12 +192,14 @@ DatiOtp? leggiOtpauth(String testo) {
 
 /// Un intero varint, il mattone di ogni protobuf. [p] avanza.
 int _varint(Uint8List b, _Cursore p) {
-  var spostamento = 0, valore = 0, byte = 0;
+  // Moltiplicazioni e non `<<`: nel browser gli shift lavorano a 32 bit, e un
+  // varint da cinque byte uscirebbe sbagliato senza nessun errore.
+  var peso = 1, valore = 0, byte = 0;
   do {
     if (p.i >= b.length) throw const FormatException('varint troncato');
     byte = b[p.i++];
-    valore |= (byte & 0x7F) << spostamento;
-    spostamento += 7;
+    valore += (byte & 0x7F) * peso;
+    peso *= 128;
   } while (byte & 0x80 != 0);
   return valore;
 }

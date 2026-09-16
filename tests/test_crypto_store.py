@@ -900,6 +900,28 @@ class TestScrittoDaDart(unittest.TestCase):
         self.assertEqual(12, len(_b64d(blob["nonce"])), "nonce da 12 byte")
         self.assertEqual(16, len(_b64d(blob["kdf"]["salt"])), "salt da 16 byte")
 
+    def test_il_pc_apre_un_vault_nato_sul_telefono(self):
+        """Dal 16/09/2026 il vault può nascere sul telefono, senza PC. Il giorno
+        che il PC arriva, ci entra con «Ripristina da backup»: deve aprirsi, ed
+        essere un vault in cui si scrive come in uno nato qui."""
+        nato = os.path.join(os.path.dirname(self.file), "vault-nato-su-dart.json")
+        if not os.path.exists(nato):
+            self.skipTest("nessun vault nato su Dart: esegui prima "
+                          "mobile\\costruisci.ps1 -Test")
+        cartella = tempfile.mkdtemp()
+        try:
+            copia = os.path.join(cartella, "vault.json")
+            shutil.copy(nato, copia)
+            s = VaultStore(copia)
+            s.unlock(self.atteso["master_password"])
+            self.assertEqual([], s.entries)
+            s.add("Prima voce dal PC", [{"label": "utente", "value": "mario"}], [])
+            riaperto = VaultStore(copia)
+            riaperto.unlock(self.atteso["master_password"])
+            self.assertEqual(["Prima voce dal PC"], [c.title for c in riaperto.entries])
+        finally:
+            shutil.rmtree(cartella, ignore_errors=True)
+
 
 # ===========================================================================
 class TestFondamentaSync(BaseVault):

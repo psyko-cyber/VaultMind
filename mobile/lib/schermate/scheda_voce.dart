@@ -7,6 +7,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
@@ -26,7 +27,13 @@ final _url = RegExp(r'^(url|sito|link|indirizzo|website|web)$', caseSensitive: f
 
 /// Su Android gli appunti sono leggibili da altre app: un segreto non ci resta
 /// a tempo indefinito.
+///
+/// Nel browser non si può. Safari scrive negli appunti solo in risposta a un
+/// tocco, e per rileggerli mostra la bolla «Incolla»: comparirebbe da sola,
+/// 45 secondi dopo, senza che nessuno capisca perché. Meglio non promettere
+/// (vedi [avvisoAppunti]) che promettere e non mantenere.
 void svuotaDopo(String testo) {
+  if (kIsWeb) return;
   Future.delayed(const Duration(seconds: 45), () async {
     final attuale = await Clipboard.getData(Clipboard.kTextPlain);
     if (attuale?.text == testo) {
@@ -34,6 +41,29 @@ void svuotaDopo(String testo) {
     }
   });
 }
+
+/// Copia negli appunti; `false` se il sistema rifiuta.
+///
+/// Su Android non succede. Nel browser sì: Safari scrive negli appunti solo a
+/// ridosso di un tocco, e un'attesa in mezzo (un foglio che si chiude) basta a
+/// perdere il permesso. Prima l'errore non era gestito, e il tocco sembrava
+/// semplicemente non fare niente — trovato provando la versione web.
+Future<bool> copiaNegliAppunti(String testo) async {
+  try {
+    await Clipboard.setData(ClipboardData(text: testo));
+    return true;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Cosa dire quando [copiaNegliAppunti] non riesce: cosa è successo e cosa fare.
+const copiaRifiutata = 'Il browser non ha permesso di copiare: tocca di nuovo l\'icona.';
+
+/// La coda del messaggio dopo una copia, vera per dove gira l'app.
+const avvisoAppunti = kIsWeb
+    ? 'resta negli appunti finché non copi altro'
+    : 'gli appunti si svuotano fra 45 secondi';
 
 class SchedaVoce extends StatelessWidget {
   final Credenziale credenziale;
@@ -120,14 +150,15 @@ class SchedaVoce extends StatelessWidget {
               onLongPress: rapido == null
                   ? null
                   : () async {
-                      await Clipboard.setData(ClipboardData(text: rapido.value));
+                      final ok = await copiaNegliAppunti(rapido.value);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-                        content:
-                            Text('${rapido.label} di "${credenziale.title}" copiata'),
+                        content: Text(ok
+                            ? '${rapido.label} di "${credenziale.title}" copiata'
+                            : copiaRifiutata),
                         duration: const Duration(seconds: 2),
                       ));
-                      svuotaDopo(rapido.value);
+                      if (ok) svuotaDopo(rapido.value);
                     },
               child: Row(
                 children: [
@@ -317,13 +348,13 @@ class _RigaCampoState extends State<_RigaCampo> {
   }
 
   Future<void> _copia(String testo, String cosa) async {
-    await Clipboard.setData(ClipboardData(text: testo));
+    final ok = await copiaNegliAppunti(testo);
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('$cosa copiato — gli appunti si svuotano fra 45 secondi'),
+      content: Text(ok ? '$cosa copiato — $avvisoAppunti' : copiaRifiutata),
       duration: const Duration(seconds: 2),
     ));
-    svuotaDopo(testo);
+    if (ok) svuotaDopo(testo);
   }
 
   @override

@@ -10,6 +10,7 @@ library;
 
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../impostazioni.dart';
@@ -37,6 +38,12 @@ class _SchermataCasaState extends State<SchermataCasa>
     with WidgetsBindingObserver {
   int _sezione = 0;
   Timer? _inattivita;
+
+  /// L'ultimo tocco sullo schermo. Il timer da solo non basta: con l'app in
+  /// secondo piano un iPhone ferma i timer della versione browser (e Android
+  /// può sospendere l'app), quindi chi torna dopo un'ora troverebbe il vault
+  /// ancora aperto. Al rientro si guarda l'orologio, non il timer.
+  DateTime _ultimoTocco = DateTime.now();
   late final GestoreSync _sync;
 
   /// Un giro alla volta, e non due di fila: senza, tornare in primo piano due
@@ -76,6 +83,12 @@ class _SchermataCasaState extends State<SchermataCasa>
   @override
   void didChangeAppLifecycleState(AppLifecycleState stato) {
     if (stato != AppLifecycleState.resumed) return;
+    final minuti = impostazioni.value.autoBlocco;
+    if (minuti > 0 &&
+        DateTime.now().difference(_ultimoTocco) >= Duration(minutes: minuti)) {
+      _blocca();
+      return;
+    }
     if (DateTime.now().difference(_ultimoGiro) < const Duration(seconds: 20)) {
       return;   // rientri a raffica: uno vale per tutti
     }
@@ -145,6 +158,7 @@ class _SchermataCasaState extends State<SchermataCasa>
   /// Il vault si richiude da solo dopo un po' che non lo si tocca: un telefono
   /// si lascia sul tavolo molto più facilmente di un computer.
   void _riarmaBlocco() {
+    _ultimoTocco = DateTime.now();
     _inattivita?.cancel();
     final minuti = impostazioni.value.autoBlocco;
     if (minuti <= 0) return;
@@ -187,7 +201,9 @@ class _SchermataCasaState extends State<SchermataCasa>
               // spesso. L'abbinamento e i dispositivi fidati stanno nelle
               // impostazioni, dov'è giusto che stia una cosa da configurare
               // una volta sola.
-              IconButton(
+              // Nel browser niente sync (`sync_rete_web.dart`): un pulsante che
+              // non trova mai nessuno insegna solo a non fidarsi dei pulsanti.
+              if (!kIsWeb) IconButton(
                 icon: Badge(
                   isLabelVisible: _sync.conflitti.isNotEmpty,
                   label: Text('${_sync.conflitti.length}'),

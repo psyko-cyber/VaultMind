@@ -10,13 +10,12 @@
 library;
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../generatore.dart';
 import '../icone.dart';
 import '../impostazioni.dart';
 import '../tema.dart';
-import 'scheda_voce.dart' show svuotaDopo;
+import 'scheda_voce.dart' show copiaNegliAppunti, svuotaDopo;
 
 /// Cosa ha deciso chi ha aperto il foglio.
 class SceltaGeneratore {
@@ -121,8 +120,9 @@ class _FoglioGeneratoreState extends State<_FoglioGeneratore> {
   }
 
   Future<void> _copia() async {
-    await Clipboard.setData(ClipboardData(text: _password));
-    svuotaDopo(_password);
+    // Se il browser rifiuta, la password torna comunque a chi ha aperto il
+    // foglio: lì si riprova a copiare e, se serve, lo si dice.
+    if (await copiaNegliAppunti(_password)) svuotaDopo(_password);
     if (!mounted) return;
     Navigator.of(context).pop(SceltaGeneratore(_password));
   }

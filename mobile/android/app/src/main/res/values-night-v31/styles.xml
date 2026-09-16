@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Lo splash di Android 12 e successivi, che NON usa windowBackground: disegna
+     da se' l'icona dell'app dentro un cerchio. Senza queste voci prendeva
+     l'icona adattiva intera e ne ritagliava il quadrato.
+
+     Il file e' doppio (values-v31 e values-night-v31) perche' fra i
+     qualificatori "night" vince su "v31": col solo values-v31, un telefono
+     in tema scuro userebbe values-night e lo splash tornerebbe quello di
+     sistema. Cambia solo il tema padre, come nei file senza v31. -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+        <item name="android:windowSplashScreenBackground">@color/sfondo_icona</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@mipmap/ic_launcher_foreground</item>
+        <!-- Il cerchio dietro l'icona, dello stesso colore del fondo: non si
+             vede, e il medaglione resta sospeso. -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@color/sfondo_icona</item>
+    </style>
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

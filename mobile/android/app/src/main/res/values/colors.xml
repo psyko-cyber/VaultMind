@@ -1,7 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Blu notte del tema "Notte e oro": lo sfondo dell'icona adattiva deve
-         essere in tinta col medaglione, altrimenti il ritaglio del sistema
-         lascia un alone di colore diverso attorno. -->
-    <color name="sfondo_icona">#070C1A</color>
+    <!-- Il fondo del tema predefinito "Scuro" (tema.dart, blu e azzurro come
+         il PC), e lo stesso
+         colore su cui design/genera_logo.py posa il medaglione.
+
+         Serve in tre posti che devono combaciare: lo sfondo dell'icona
+         adattiva, lo splash di Android 12 e il cerchio dietro l'icona dello
+         splash. Se uno dei tre si stacca riappare il bordo del quadrato: era
+         il "logo spezzato" dello splash, fino al 16/09/2026. -->
+    <color name="sfondo_icona">#080B14</color>
 </resources>

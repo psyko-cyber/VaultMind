@@ -185,7 +185,7 @@ class _SchermataTravasoState extends State<SchermataTravaso> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               Text(
-                'Sul PC: menu → Sincronizza → «Abbina un dispositivo». '
+                'Sul PC: menu › Sincronizza › «Abbina un dispositivo». '
                 'Compare un codice di 6 cifre che vale 120 secondi.',
                 style: TextStyle(
                     fontSize: 13, color: context.cTenue, height: 1.55),

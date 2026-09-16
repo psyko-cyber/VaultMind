@@ -5,8 +5,8 @@
 /// perché un file CSV su un telefono non ce l'ha nessuno.
 library;
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import '../archivio.dart';
 import '../impostazioni.dart';
@@ -17,7 +17,8 @@ import '../tema.dart';
 import 'dialoghi.dart';
 import 'foglio_generatore.dart';
 import 'modulo_voce.dart';
-import 'scheda_voce.dart' show svuotaDopo;
+import 'scheda_voce.dart'
+    show avvisoAppunti, copiaNegliAppunti, copiaRifiutata, svuotaDopo;
 import 'sincronizza.dart';
 import '../icone.dart';
 import '../interruttore.dart';
@@ -71,7 +72,8 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             // copia() e non un Impostazioni nuovo: costruirlo da zero
             // dimenticherebbe le voci fissate, che sono l'unico dato vero
             // conservato qui dentro.
-            onChanged: (v) => salvaImpostazioni(imp.copia(tema: v ?? imp.tema)),
+            onChanged: (v) => salvaImpostazioni(
+                imp.copia(tema: v ?? imp.tema, temaScelto: true)),
             child: Column(
               children: [
                 for (final t in TemaId.values)
@@ -142,11 +144,13 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             onTap: _generatore,
           ),
 
-          _Sezione('Dispositivi'),
+          // Nel browser il sync non c'è (`sync_rete_web.dart`): la sezione
+          // porterebbe a una ricerca che non trova mai nessuno.
+          if (!kIsWeb) _Sezione('Dispositivi'),
           // Qui e non nella barra: abbinare si fa una volta sola, mentre
           // sincronizzare si fa spesso — e infatti il tasto in alto ora
           // sincronizza invece di aprire questa schermata.
-          ListTile(
+          if (!kIsWeb) ListTile(
             leading: IconaVM(Icone.dispositivi, color: context.cTenue),
             title: const Text('Sincronizza con altri dispositivi'),
             subtitle: Text(
@@ -170,6 +174,19 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                 'Una copia completa e cifrata, che funziona anche senza rete.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
           ),
+          // Nel browser il vault vive nella memoria dell'icona sulla Home, che
+          // se ne va con lei. È il rischio che l'app Android non ha, e va
+          // detto dove si decide di fare il backup, non in un foglio d'aiuto.
+          if (kIsWeb)
+            ListTile(
+              leading: IconaVM(Icone.avviso, color: context.cErrore),
+              title: const Text('Il vault vive dentro questa app'),
+              subtitle: Text(
+                  'Se togli VaultMind dalla schermata Home, il vault se ne va '
+                  'con lei. Salva un backup ogni volta che aggiungi qualcosa '
+                  'di importante.',
+                  style: TextStyle(fontSize: 12, color: context.cTenue)),
+            ),
           if (imp.pinnate.isNotEmpty)
             ListTile(
               leading: IconaVM(Icone.fissa, color: context.cTenue),
@@ -205,7 +222,9 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             leading: IconaVM(Icone.cestino, color: context.cErrore),
             title: Text('Elimina il vault da questo telefono',
                 style: TextStyle(color: context.cErrore)),
-            subtitle: Text('Sul PC resta tutto: qui c\'è solo una copia.',
+            // Non più «sul PC resta tutto»: da quando il vault può nascere sul
+            // telefono, per qualcuno questa è l'unica copia.
+            subtitle: Text('Senza un PC o un backup, le password sono perse.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
             onTap: _elimina,
           ),
@@ -246,12 +265,12 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
       return;
     }
 
-    await Clipboard.setData(ClipboardData(text: scelta.password));
-    svuotaDopo(scelta.password);
+    final ok = await copiaNegliAppunti(scelta.password);
+    if (ok) svuotaDopo(scelta.password);
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-      content: Text('Password copiata — gli appunti si svuotano fra 45 secondi'),
-      duration: Duration(seconds: 3),
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(ok ? 'Password copiata — $avvisoAppunti' : copiaRifiutata),
+      duration: const Duration(seconds: 3),
     ));
   }
 
@@ -310,8 +329,10 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
       builder: (c) => AlertDialog(
         title: const Text('Eliminare il vault?'),
         content: const Text(
-          'Viene tolto solo da questo telefono. Sul PC resta tutto, e potrai '
-          'reimportarlo quando vuoi con un nuovo backup.',
+          'Viene tolto da questo telefono, insieme alle copie di sicurezza.\n\n'
+          'Se usi VaultMind anche su un PC, là resta tutto e potrai riaverlo. '
+          'Se invece il vault esiste solo qui e non hai un backup, le password '
+          'sono perse per sempre: prima salvane uno.',
           style: TextStyle(height: 1.5),
         ),
         actions: [

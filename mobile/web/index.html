@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <!-- Sostituito da `flutter build web --base-href`: su GitHub Pages l'app
+       vive in /vaultmind-web/, non nella radice. -->
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <!-- La regola che tiene VaultMind offline anche nel browser: nessun
+       collegamento verso altri siti. I font e il motore grafico sono dentro
+       l'app (flutter build web no-web-resources-cdn), e se qualcosa provasse
+       a chiamare fuori, il browser lo blocca prima.
+       wasm-unsafe-eval serve a CanvasKit, il motore grafico in WebAssembly;
+       unsafe-inline negli stili a Flutter, che inserisce i suoi. -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; media-src 'self' blob:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'none'">
+  <meta name="description" content="VaultMind: password manager locale. Il vault resta sul dispositivo, cifrato.">
+  <meta name="theme-color" content="#080B14">
+  <meta name="format-detection" content="telephone=no">
+
+  <!-- iPhone: app a tutto schermo dalla schermata Home -->
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="VaultMind">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+
+  <link rel="icon" type="image/png" href="favicon.png">
+  <title>VaultMind</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    html, body { margin: 0; height: 100%; background: #080B14; }
+    #carica {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; gap: 18px;
+      font-family: -apple-system, system-ui, sans-serif; color: #8FA0C0;
+      font-size: 13px; letter-spacing: .02em;
+    }
+    #carica img { width: 112px; height: 112px; border-radius: 26px; }
+  </style>
+</head>
+<body>
+  <!-- Resta finche' Flutter non disegna: la prima volta l'app pesa qualche
+       megabyte, e uno schermo vuoto sembra un'app rotta. -->
+  <div id="carica">
+    <img src="icons/Icon-192.png" alt="">
+    <div>VaultMind si sta aprendo</div>
+  </div>
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
