@@ -178,6 +178,29 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
+                // Solo nel browser, e solo quando serve: una versione nuova è
+                // già attiva ma questa pagina è la vecchia. Qui e non dentro
+                // il vault aperto, perché ricaricare chiude la sessione — e
+                // mai da solo, perché qualcuno potrebbe star scrivendo.
+                ValueListenableBuilder<bool>(
+                  valueListenable: aggiornamentoWeb,
+                  builder: (context, pronto, _) => !pronto
+                      ? const SizedBox.shrink()
+                      : Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: OutlinedButton.icon(
+                            onPressed: ricaricaApp,
+                            icon: IconaVM(Icone.aggiorna,
+                                size: 18, color: context.cAccento),
+                            label: Text(
+                                'È pronta una versione nuova: tocca per aggiornare',
+                                style: TextStyle(
+                                    color: context.cAccento, fontSize: 13)),
+                            style: OutlinedButton.styleFrom(
+                                side: BorderSide(color: context.cAccento)),
+                          ),
+                        ),
+                ),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(24),
                   child: Image.asset('assets/logo.png', width: 96, height: 96,

@@ -25,6 +25,7 @@ import 'dart:js_interop';
 import 'dart:js_interop_unsafe';
 import 'dart:typed_data';
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
 import 'package:web/web.dart' as web;
 
 import 'lettore_qr.dart';
@@ -136,6 +137,26 @@ bool installataSullaHome() {
     return false;
   }
 }
+
+final _aggiornamento = ValueNotifier<bool>(false);
+var _aggiornamentoInAscolto = false;
+
+/// Vero quando il service worker ha attivato una versione nuova mentre questa
+/// pagina girava ancora con la vecchia. Lo segnala `flutter_bootstrap.js`,
+/// sia con una proprietà (se è successo prima che Dart partisse) sia con un
+/// evento (se succede dopo).
+ValueListenable<bool> aggiornamentoPronto() {
+  if (!_aggiornamentoInAscolto) {
+    _aggiornamentoInAscolto = true;
+    final gia = web.window.getProperty<JSAny?>('vaultmindAggiornamentoPronto'.toJS);
+    _aggiornamento.value = gia.isA<JSBoolean>() && (gia as JSBoolean).toDart;
+    web.window.addEventListener('vaultmind-aggiornamento',
+        ((web.Event _) => _aggiornamento.value = true).toJS);
+  }
+  return _aggiornamento;
+}
+
+void ricaricaApp() => web.window.location.reload();
 
 /// Chiede al browser di non liberare la memoria del sito quando serve spazio.
 /// Non tutti rispondono di sì, e nessuno lo garantisce: è una richiesta, il

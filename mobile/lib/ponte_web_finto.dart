@@ -5,6 +5,8 @@
 /// programmazione, non un caso da gestire.
 library;
 
+import 'package:flutter/foundation.dart' show ValueListenable, ValueNotifier;
+
 import 'ponte_file.dart' show RisultatoQr;
 
 Never _mai() => throw UnsupportedError('ponte_web chiamato fuori dal browser');
@@ -17,3 +19,5 @@ bool installataSullaHome() => false;
 Future<void> chiediMemoriaPersistente() async {}
 Future<RisultatoQr> qrDaImmagine() => _mai();
 Future<RisultatoQr> qrDaFotocamera({required int coloreAccento, String titolo = ''}) => _mai();
+ValueListenable<bool> aggiornamentoPronto() => ValueNotifier(false);
+void ricaricaApp() {}

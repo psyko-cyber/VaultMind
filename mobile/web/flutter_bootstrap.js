@@ -21,6 +21,19 @@ _flutter.loader.load({
 
 // Il service worker tiene l'app in memoria: dalla seconda apertura funziona
 // senza rete. Vedi sw.js.
+//
+// Quando una versione nuova prende il posto di quella che gira, questa pagina
+// resta la vecchia: non la si ricarica da sola, perche' qualcuno potrebbe star
+// scrivendo una password. Si alza una bandiera che l'app legge
+// (ponte_web.dart) per offrire "aggiorna" sulla schermata di sblocco.
+// Alla primissima installazione non c'e' niente da annunciare: la pagina era
+// gia' l'ultima versione.
 if ('serviceWorker' in navigator) {
+  var eraControllata = !!navigator.serviceWorker.controller;
+  navigator.serviceWorker.addEventListener('controllerchange', function () {
+    if (!eraControllata) return;
+    window.vaultmindAggiornamentoPronto = true;
+    window.dispatchEvent(new Event('vaultmind-aggiornamento'));
+  });
   navigator.serviceWorker.register('sw.js').catch(function () {});
 }

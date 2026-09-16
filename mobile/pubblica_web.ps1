@@ -9,10 +9,12 @@
 # repo pubblico.
 #
 # PERCHE' UN SERVICE WORKER SCRITTO QUI: web\sw.js ha due segnaposto, la
-# versione e l'elenco dei file, che si conoscono solo a build finita. Senza
-# elenco l'app non si apre offline; con un elenco sbagliato (un file che non
-# esiste) il service worker non si installa affatto, in silenzio. Per questo
-# l'elenco si ricava dalla cartella vera, non si scrive a mano.
+# versione e le impronte dei file (percorso -> SHA-256), che si conoscono solo
+# a build finita. Senza elenco l'app non si apre offline; con un elenco
+# sbagliato (un file che non esiste) il service worker non si installa affatto,
+# in silenzio. Per questo l'elenco si ricava dalla cartella vera. Le impronte
+# servono a sw.js per rifiutare un file che la CDN di GitHub serve ancora
+# della versione precedente: vedi il commento in cima a sw.js.
 #
 # COSA NON SI PUBBLICA: i simboli di debug (*.symbols), le varianti skwasm
 # (solo build wasm, che su iPhone non gira) e quelle sperimentali (wimp,
@@ -74,12 +76,19 @@ $file = Get-ChildItem $uscita -Recurse -File |
   ForEach-Object { $_.FullName.Substring($uscita.Length + 1).Replace('\', '/') } |
   Where-Object { $_ -ne "sw.js" -and $_ -notlike "canvaskit/chromium/*" -and $_ -ne "assets/NOTICES" } |
   Sort-Object
-$elenco = "[" + ((@("./") + $file | ForEach-Object { '"' + $_ + '"' }) -join ",") + "]"
+# "./" e' la pagina chiesta aprendo l'icona: stesso contenuto di index.html.
+$impronte = @()
+foreach ($f in $file) {
+  $h = (Get-FileHash -Algorithm SHA256 -LiteralPath (Join-Path $uscita $f)).Hash.ToLower()
+  $impronte += '"' + $f + '":"' + $h + '"'
+  if ($f -eq "index.html") { $impronte += '"./":"' + $h + '"' }
+}
+$elenco = "{" + ($impronte -join ",") + "}"
 
 $hash = (& git rev-parse --short HEAD).Trim()
 $versione = (Get-Date -Format "yyyyMMdd-HHmmss") + "-" + $hash
 $sw = Join-Path $uscita "sw.js"
-$testo = [IO.File]::ReadAllText($sw).Replace("__VERSIONE__", $versione).Replace("__FILE__", $elenco)
+$testo = [IO.File]::ReadAllText($sw).Replace("__VERSIONE__", $versione).Replace("__IMPRONTE__", $elenco)
 [IO.File]::WriteAllText($sw, $testo, (New-Object Text.UTF8Encoding $false))
 $mb = [math]::Round(((Get-ChildItem $uscita -Recurse -File | Measure-Object Length -Sum).Sum) / 1MB, 1)
 $mbCache = [math]::Round((($file | ForEach-Object { (Get-Item -LiteralPath (Join-Path $uscita $_)).Length } | Measure-Object -Sum).Sum) / 1MB, 1)

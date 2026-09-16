@@ -205,3 +205,13 @@ bool installataSullaHome() => !kIsWeb || web.installataSullaHome();
 Future<void> chiediMemoriaPersistente() async {
   if (kIsWeb) await web.chiediMemoriaPersistente();
 }
+
+/// Una versione nuova dell'app web è attiva ma questa pagina è ancora la
+/// vecchia. Sempre falso fuori dal browser: l'APK si aggiorna reinstallandolo.
+/// Non si ricarica mai da solo: vedi `web/sw.js`.
+final ValueListenable<bool> aggiornamentoWeb =
+    kIsWeb ? web.aggiornamentoPronto() : ValueNotifier(false);
+
+void ricaricaApp() {
+  if (kIsWeb) web.ricaricaApp();
+}
