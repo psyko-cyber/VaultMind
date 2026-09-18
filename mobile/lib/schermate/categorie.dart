@@ -23,7 +23,13 @@ import '../icone.dart';
 
 class SezioneCategorie extends StatefulWidget {
   final Sessione sessione;
-  const SezioneCategorie({super.key, required this.sessione});
+
+  /// Quello della casa, condiviso con chat e database: serve alla scelta
+  /// multipla di [_SceltaVoci], che prima se ne costruiva un terzo tutto suo.
+  final IndiceRicerca indice;
+
+  const SezioneCategorie(
+      {super.key, required this.sessione, required this.indice});
 
   @override
   State<SezioneCategorie> createState() => _SezioneCategorieState();
@@ -80,6 +86,7 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
         builder: (_) => _SceltaVoci(
           sessione: widget.sessione,
           categoria: categoria,
+          indice: widget.indice,
         ),
       ),
     );
@@ -104,7 +111,22 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
     return ValueListenableBuilder<Vault>(
       valueListenable: widget.sessione,
       builder: (context, vault, _) {
-        final senza = vault.credenziali.where((c) => c.categoria.isEmpty).toList();
+        // Un giro solo sulle voci, non uno per categoria: prima ogni gruppo
+        // rifiltrava le 800 voci da capo, e con quindici categorie erano
+        // dodicimila confronti a ogni ridisegno.
+        final perCategoria = <String, List<Credenziale>>{
+          for (final cat in vault.categorie) cat: <Credenziale>[],
+        };
+        final senza = <Credenziale>[];
+        for (final c in vault.credenziali) {
+          if (c.categoria.isEmpty) {
+            senza.add(c);
+          } else {
+            // Una categoria cancellata altrove lascia voci che la indicano
+            // ancora: restano fuori dai gruppi, come prima.
+            perCategoria[c.categoria]?.add(c);
+          }
+        }
 
         return Scaffold(
           backgroundColor: Colors.transparent,
@@ -131,9 +153,7 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
                     for (final cat in vault.categorie)
                       _Gruppo(
                         titolo: cat,
-                        voci: vault.credenziali
-                            .where((c) => c.categoria == cat)
-                            .toList(),
+                        voci: perCategoria[cat]!,
                         sessione: widget.sessione,
                         onAggiungi: () => _aggiungiVoci(cat),
                         onRinomina: () => _rinomina(cat),
@@ -276,7 +296,9 @@ class _Gruppo extends StatelessWidget {
 class _SceltaVoci extends StatefulWidget {
   final Sessione sessione;
   final String categoria;
-  const _SceltaVoci({required this.sessione, required this.categoria});
+  final IndiceRicerca indice;
+  const _SceltaVoci(
+      {required this.sessione, required this.categoria, required this.indice});
 
   @override
   State<_SceltaVoci> createState() => _SceltaVociState();
@@ -285,20 +307,18 @@ class _SceltaVoci extends StatefulWidget {
 class _SceltaVociState extends State<_SceltaVoci> {
   final _ricerca = TextEditingController();
   final _scelte = <int>{};
-  late final IndiceRicerca _indice;
   late List<Credenziale> _mostrate;
 
   @override
   void initState() {
     super.initState();
-    _indice = IndiceRicerca(widget.sessione.vault.credenziali);
     _mostrate = widget.sessione.vault.credenziali;
     _ricerca.addListener(() {
       final q = _ricerca.text.trim();
       setState(() {
         _mostrate = q.isEmpty
             ? widget.sessione.vault.credenziali
-            : _indice.cerca(q).map((r) => r.voce).toList();
+            : widget.indice.cerca(q).map((r) => r.voce).toList();
       });
     });
   }

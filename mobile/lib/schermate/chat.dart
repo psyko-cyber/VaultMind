@@ -27,7 +27,12 @@ import '../icone.dart';
 
 class SezioneChat extends StatefulWidget {
   final Sessione sessione;
-  const SezioneChat({super.key, required this.sessione});
+
+  /// Costruito e tenuto aggiornato dalla casa: qui si usa e basta. Farsene uno
+  /// proprio voleva dire ricalcolare 800 voci in parallelo al database.
+  final IndiceRicerca indice;
+
+  const SezioneChat({super.key, required this.sessione, required this.indice});
 
   @override
   State<SezioneChat> createState() => _SezioneChatState();
@@ -54,13 +59,10 @@ class _SezioneChatState extends State<SezioneChat> {
   final _domanda = TextEditingController();
   final _scorrimento = ScrollController();
   final _battute = <_Battuta>[];
-  late IndiceRicerca _indice;
 
   @override
   void initState() {
     super.initState();
-    _ricostruisciIndice();
-    widget.sessione.addListener(_ricostruisciIndice);
     _battute.add(const _Battuta(false,
         'Chiedimi una credenziale: "la password di Amazon", "il conto in banca". '
         'Cerco fra le voci del vault — non invento niente.'));
@@ -68,14 +70,9 @@ class _SezioneChatState extends State<SezioneChat> {
 
   @override
   void dispose() {
-    widget.sessione.removeListener(_ricostruisciIndice);
     _domanda.dispose();
     _scorrimento.dispose();
     super.dispose();
-  }
-
-  void _ricostruisciIndice() {
-    _indice = IndiceRicerca(widget.sessione.vault.credenziali);
   }
 
   void _inFondo() {
@@ -96,7 +93,7 @@ class _SezioneChatState extends State<SezioneChat> {
     if (testo.isEmpty) return;
     _domanda.clear();
 
-    final risposta = interpreta(_indice.cerca(testo, quanti: 8));
+    final risposta = interpreta(widget.indice.cerca(testo, quanti: 8));
     setState(() {
       _battute.add(_Battuta(true, testo));
       _battute.add(_rispondi(testo, risposta));

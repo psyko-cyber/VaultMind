@@ -14,6 +14,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
 import '../impostazioni.dart';
+import '../ricerca.dart';
 import '../sessione.dart';
 import '../sync_gestore.dart';
 import '../tema.dart';
@@ -50,6 +51,40 @@ class _SchermataCasaState extends State<SchermataCasa>
   /// volte in dieci secondi vorrebbe dire scambiare il vault due volte.
   bool _syncInCorso = false;
   DateTime _ultimoGiro = DateTime.fromMillisecondsSinceEpoch(0);
+
+  IndiceRicerca? _indice;
+  List<Credenziale>? _indicizzate;
+
+  /// Le sezioni già aperte almeno una volta. La chat nasce dentro: è la home.
+  ///
+  /// [IndexedStack] tiene vive tutte le sezioni — ed è quello che vogliamo, per
+  /// non perdere ricerca, scorrimento e conversazione — ma le **costruisce
+  /// tutte a ogni ridisegno**, anche quelle che non si stanno guardando. Le
+  /// Categorie sono le più care (un gruppo per categoria, e dentro una scheda
+  /// per voce), e le si pagava a ogni cambio di scheda e a ogni giro di sync
+  /// pur senza averle mai aperte. Dopo la prima visita la sezione resta, quindi
+  /// non si perde niente: si rimanda soltanto un lavoro che non serviva ancora.
+  final _visitate = <int>{0};
+
+  /// L'indice è **uno solo per tutta la casa**, e si rifà solo quando le voci
+  /// cambiano davvero.
+  ///
+  /// Prima lo costruivano per conto loro sia la chat sia il database, e ognuna
+  /// lo rifaceva a ogni notifica della sessione: due costruzioni complete a
+  /// ogni voce salvata e a ogni giro di sync, anche quando a cambiare era solo
+  /// una categoria. Su 800 voci, nel browser dell'iPhone, era l'attesa a schermo
+  /// fermo che si vedeva dopo ogni modifica.
+  ///
+  /// `identical` e non `==`: [Vault.con] tiene la stessa lista quando le voci
+  /// non sono state toccate, quindi il confronto per riferimento basta e non
+  /// costa niente.
+  IndiceRicerca _indicePer(List<Credenziale> voci) {
+    if (!identical(voci, _indicizzate)) {
+      _indicizzate = voci;
+      _indice = IndiceRicerca(voci);
+    }
+    return _indice!;
+  }
 
   @override
   void initState() {
@@ -245,14 +280,32 @@ class _SchermataCasaState extends State<SchermataCasa>
           body: IndexedStack(
             index: _sezione,
             children: [
-              SezioneChat(sessione: widget.sessione),
-              SezioneDatabase(sessione: widget.sessione),
-              SezioneCategorie(sessione: widget.sessione),
+              if (_visitate.contains(0))
+                SezioneChat(
+                    sessione: widget.sessione,
+                    indice: _indicePer(vault.credenziali))
+              else
+                const SizedBox.shrink(),
+              if (_visitate.contains(1))
+                SezioneDatabase(
+                    sessione: widget.sessione,
+                    indice: _indicePer(vault.credenziali))
+              else
+                const SizedBox.shrink(),
+              if (_visitate.contains(2))
+                SezioneCategorie(
+                    sessione: widget.sessione,
+                    indice: _indicePer(vault.credenziali))
+              else
+                const SizedBox.shrink(),
             ],
           ),
           bottomNavigationBar: NavigationBar(
             selectedIndex: _sezione,
-            onDestinationSelected: (i) => setState(() => _sezione = i),
+            onDestinationSelected: (i) => setState(() {
+              _sezione = i;
+              _visitate.add(i);
+            }),
             destinations: const [
               NavigationDestination(
                   icon: IconaVM(Icone.chat),

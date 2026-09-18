@@ -57,16 +57,44 @@ const _indiziSegreto = [
   'token', 'chiave', 'key', 'codice', 'code',
 ];
 
+// Via gli accenti: "società" e "societa" devono combaciare.
+const _conAccento = 'àáâãäåèéêëìíîïòóôõöùúûüçñ';
+const _senzaAccento = 'aaaaaaeeeeiiiiooooouuuucn';
+final Map<int, int> _accenti = {
+  for (var i = 0; i < _conAccento.length; i++)
+    _conAccento.codeUnitAt(i): _senzaAccento.codeUnitAt(i),
+};
+
+/// Un solo passaggio sulla stringa, non ventisette.
+///
+/// Faceva 25 `replaceAll` per gli accenti più due espressioni regolari, ognuna
+/// una scansione completa: su 800 voci `_normalizza` viene chiamata migliaia di
+/// volte e nel browser (dove l'iPhone gira) quelle scansioni si sentono. Il
+/// risultato è lo stesso carattere per carattere: quello che non è `[a-z0-9@.]`
+/// dopo lo spoglio degli accenti separava già le parole, e gli spazi
+/// consecutivi venivano comunque compattati in uno solo.
 String _normalizza(String s) {
-  var t = s.toLowerCase();
-  // Via gli accenti: "società" e "societa" devono combaciare.
-  const con = 'àáâãäåèéêëìíîïòóôõöùúûüçñ';
-  const senza = 'aaaaaaeeeeiiiiooooouuuucn';
-  for (var i = 0; i < con.length; i++) {
-    t = t.replaceAll(con[i], senza[i]);
+  final t = s.toLowerCase();
+  final b = StringBuffer();
+  var separatore = false;
+  var scritto = false;
+  for (var i = 0; i < t.length; i++) {
+    var c = t.codeUnitAt(i);
+    c = _accenti[c] ?? c;
+    final tenuto = (c >= 0x61 && c <= 0x7a) || // a-z
+        (c >= 0x30 && c <= 0x39) || // 0-9
+        c == 0x40 || // @
+        c == 0x2e; // .
+    if (!tenuto) {
+      separatore = true;
+      continue;
+    }
+    if (separatore && scritto) b.writeCharCode(0x20);
+    separatore = false;
+    scritto = true;
+    b.writeCharCode(c);
   }
-  t = t.replaceAll(RegExp(r'[^a-z0-9@.\s]'), ' ');
-  return t.replaceAll(RegExp(r'\s+'), ' ').trim();
+  return b.toString();
 }
 
 /// I titoli-dominio vanno spezzati: `amazon.it` indicizzato come token unico
@@ -105,24 +133,36 @@ bool _etichettaSegreta(String label) {
 /// Vettore char-n-gram con hashing, identico a `_HashingNgram` del PC:
 /// n-grammi da 3 e 4 caratteri, MD5 del gruppo, somma nella cella
 /// corrispondente, infine normalizzazione L2.
-Float32List _vettore(String testo) {
+///
+/// [cache] ricorda in quale cella finisce un gruppo di caratteri già visto. Su
+/// 800 voci i gruppi da 3 e 4 caratteri sono circa 240.000, ma quelli
+/// *diversi* una frazione: "com", "ail", "ban" tornano in decine di voci.
+/// L'MD5 è il costo dominante della costruzione dell'indice, e nel browser
+/// pesa il quadruplo che sul telefono nativo. La cella calcolata è la stessa,
+/// quindi i punteggi non cambiano di un bit.
+Float32List _vettore(String testo, Map<String, int> cache) {
   final t = '  ${testo.toLowerCase()}  ';
   final v = Float32List(_dimensioni);
   for (final n in [3, 4]) {
     for (var i = 0; i + n <= t.length; i++) {
       final gram = t.substring(i, i + n);
-      final digest = md5.convert(utf8.encode(gram)).bytes;
-      // Il PC prende l'intero MD5 come numero e ne fa il modulo. Gli ultimi
-      // byte del digest bastano: il modulo di una potenza di due dipende solo
-      // da quelli, e 1024 lo è.
-      //
-      // Due byte e non otto: in JavaScript (la versione per iPhone) gli
-      // interi sono double, e oltre 2^53 i bit bassi si perdono — il modulo
-      // uscirebbe diverso da quello del PC, in silenzio, e la ricerca
-      // troverebbe voci sbagliate solo sull'iPhone. Sedici bit bastano finché
-      // _dimensioni è una potenza di due fino a 65536.
-      final h = (digest[digest.length - 2] << 8) | digest[digest.length - 1];
-      v[h & (_dimensioni - 1)] += 1.0;
+      var cella = cache[gram];
+      if (cella == null) {
+        final digest = md5.convert(utf8.encode(gram)).bytes;
+        // Il PC prende l'intero MD5 come numero e ne fa il modulo. Gli ultimi
+        // byte del digest bastano: il modulo di una potenza di due dipende solo
+        // da quelli, e 1024 lo è.
+        //
+        // Due byte e non otto: in JavaScript (la versione per iPhone) gli
+        // interi sono double, e oltre 2^53 i bit bassi si perdono — il modulo
+        // uscirebbe diverso da quello del PC, in silenzio, e la ricerca
+        // troverebbe voci sbagliate solo sull'iPhone. Sedici bit bastano finché
+        // _dimensioni è una potenza di due fino a 65536.
+        final h = (digest[digest.length - 2] << 8) | digest[digest.length - 1];
+        cella = h & (_dimensioni - 1);
+        cache[gram] = cella;
+      }
+      v[cella] += 1.0;
     }
   }
   var norma = 0.0;
@@ -152,14 +192,6 @@ String _perVettore(String s) {
   return t.isEmpty ? _normalizza(s) : t.join(' ');
 }
 
-/// Token "forti" di una voce, per il punteggio lessicale: titolo, tag ed
-/// etichette. NON i valori, altrimenti ogni servizio registrato con una certa
-/// mail finirebbe raggruppato con quella mail.
-Set<String> _tokenForti(Credenziale c) => _conAlias([
-      ..._token(c.title),
-      ..._token(c.tags.join(' ')),
-      ..._token(c.fields.map((f) => f.label).join(' ')),
-    ]);
 
 class Risultato {
   final Credenziale voce;
@@ -240,13 +272,62 @@ RispostaRicerca interpreta(
 /// sarebbe lo spreco che sul PC costa mezzo secondo con 800 voci.
 class IndiceRicerca {
   final List<Credenziale> _voci;
-  final List<Float32List> _vettori;
+
+  /// I vettori tenuti **sparsi**: le celle non nulle e il loro peso, in ordine
+  /// di cella. Un documento riempie circa 200 delle 1024 celle, quindi il
+  /// coseno denso moltiplicava per zero l'80% delle volte. Sommando le stesse
+  /// celle nello stesso ordine il risultato è identico: i termini saltati
+  /// valevano zero.
+  final List<Int32List> _celle;
+  final List<Float32List> _pesi;
+
   final List<Set<String>> _forti;
+
+  /// I token del titolo, calcolati qui una volta sola. Prima `_bonus` li
+  /// ricavava da capo per ogni voce a ogni ricerca: 800 normalizzazioni per
+  /// tasto premuto, per un dato che non cambia mai fra una ricerca e l'altra.
+  final List<Set<String>> _titoli;
+
+  /// Vive quanto l'indice e muore con lui: al blocco del vault non resta in
+  /// memoria nessun frammento delle voci.
+  final Map<String, int> _cacheGram = {};
 
   IndiceRicerca(List<Credenziale> voci)
       : _voci = voci,
-        _vettori = voci.map((c) => _vettore(_perVettore(_documento(c)))).toList(),
-        _forti = voci.map(_tokenForti).toList();
+        _celle = [],
+        _pesi = [],
+        _forti = [],
+        _titoli = [] {
+    for (final c in voci) {
+      // `_token(c.title)` serve sia al titolo sia ai token forti: calcolarlo
+      // una volta sola e riusarlo dà esattamente gli stessi due insiemi.
+      final tokTitolo = _token(c.title);
+      _titoli.add(_conAlias(tokTitolo));
+      _forti.add(_conAlias([
+        ...tokTitolo,
+        ..._token(c.tags.join(' ')),
+        ..._token(c.fields.map((f) => f.label).join(' ')),
+      ]));
+
+      final v = _vettore(_perVettore(_documento(c)), _cacheGram);
+      var quante = 0;
+      for (var k = 0; k < _dimensioni; k++) {
+        if (v[k] != 0) quante++;
+      }
+      final celle = Int32List(quante);
+      final pesi = Float32List(quante);
+      var j = 0;
+      for (var k = 0; k < _dimensioni; k++) {
+        if (v[k] != 0) {
+          celle[j] = k;
+          pesi[j] = v[k];
+          j++;
+        }
+      }
+      _celle.add(celle);
+      _pesi.add(pesi);
+    }
+  }
 
   int get quante => _voci.length;
 
@@ -254,7 +335,7 @@ class IndiceRicerca {
   /// dello stesso termine trovato in un'etichetta.
   double _bonus(Set<String> query, int i) {
     if (query.isEmpty) return 0;
-    final titolo = _conAlias(_token(_voci[i].title));
+    final titolo = _titoli[i];
     final forti = _forti[i];
     var b = 0.0;
     for (final t in query) {
@@ -273,15 +354,17 @@ class IndiceRicerca {
     if (_voci.isEmpty || testo.trim().isEmpty) {
       return _voci.map((c) => Risultato(c, 0)).toList();
     }
-    final qv = _vettore(_perVettore(testo));
+    final qv = _vettore(_perVettore(testo), _cacheGram);
     final q = _conAlias(_token(testo));
 
     final esiti = <Risultato>[];
     for (var i = 0; i < _voci.length; i++) {
       var coseno = 0.0;
-      final v = _vettori[i];
-      for (var k = 0; k < _dimensioni; k++) {
-        coseno += v[k] * qv[k];
+      final celle = _celle[i];
+      final pesi = _pesi[i];
+      for (var j = 0; j < celle.length; j++) {
+        final peso = qv[celle[j]];
+        if (peso != 0) coseno += pesi[j] * peso;
       }
       esiti.add(Risultato(_voci[i], coseno + _bonus(q, i), q.intersection(_forti[i])));
     }

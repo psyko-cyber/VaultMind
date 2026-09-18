@@ -21,7 +21,13 @@ import '../icone.dart';
 
 class SezioneDatabase extends StatefulWidget {
   final Sessione sessione;
-  const SezioneDatabase({super.key, required this.sessione});
+
+  /// Costruito e tenuto aggiornato dalla casa. Quando le voci cambiano arriva
+  /// un indice diverso, ed è quello il segnale per rifare la ricerca.
+  final IndiceRicerca indice;
+
+  const SezioneDatabase(
+      {super.key, required this.sessione, required this.indice});
 
   @override
   State<SezioneDatabase> createState() => _SezioneDatabaseState();
@@ -29,31 +35,31 @@ class SezioneDatabase extends StatefulWidget {
 
 class _SezioneDatabaseState extends State<SezioneDatabase> {
   final _ricerca = TextEditingController();
-  late IndiceRicerca _indice;
   List<Credenziale> _trovate = const [];
   Timer? _attesa;
 
   @override
   void initState() {
     super.initState();
-    _ricostruisciIndice();
+    _aggiornaTrovate();
     _ricerca.addListener(_programmaRicerca);
-    // Aggiungere o modificare una voce cambia anche l'indice: senza questo,
-    // una voce appena creata non si troverebbe cercandola.
-    widget.sessione.addListener(_ricostruisciIndice);
+  }
+
+  /// Aggiungere o modificare una voce cambia anche l'indice: senza questo,
+  /// una voce appena creata non si troverebbe cercandola.
+  @override
+  void didUpdateWidget(SezioneDatabase vecchio) {
+    super.didUpdateWidget(vecchio);
+    // Siamo già dentro un ridisegno: aggiornare il campo basta, un setState
+    // qui ne chiederebbe un secondo per niente.
+    if (!identical(widget.indice, vecchio.indice)) _aggiornaTrovate();
   }
 
   @override
   void dispose() {
-    widget.sessione.removeListener(_ricostruisciIndice);
     _attesa?.cancel();
     _ricerca.dispose();
     super.dispose();
-  }
-
-  void _ricostruisciIndice() {
-    _indice = IndiceRicerca(widget.sessione.vault.credenziali);
-    _cerca();
   }
 
   /// Con 800 voci una ricerca costa qualche decina di millisecondi: farla a
@@ -64,14 +70,16 @@ class _SezioneDatabaseState extends State<SezioneDatabase> {
     _attesa = Timer(const Duration(milliseconds: 120), _cerca);
   }
 
-  void _cerca() {
+  void _aggiornaTrovate() {
     final q = _ricerca.text.trim();
+    _trovate = q.isEmpty
+        ? widget.sessione.vault.credenziali
+        : widget.indice.cerca(q).map((r) => r.voce).toList();
+  }
+
+  void _cerca() {
     if (!mounted) return;
-    setState(() {
-      _trovate = q.isEmpty
-          ? widget.sessione.vault.credenziali
-          : _indice.cerca(q).map((r) => r.voce).toList();
-    });
+    setState(_aggiornaTrovate);
   }
 
   /// Le fissate salgono in cima, nell'ordine in cui sono state fissate — ma

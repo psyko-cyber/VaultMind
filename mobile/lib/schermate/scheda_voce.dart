@@ -25,6 +25,13 @@ final segreto = RegExp(r'pass|pin|secret|chiave|key|token|codice|puk|puc',
     caseSensitive: false);
 final _url = RegExp(r'^(url|sito|link|indirizzo|website|web)$', caseSensitive: false);
 
+/// Qui in cima come le due sopra, e non dentro il metodo che le usa: erano
+/// ricostruite a ogni disegno di ogni scheda — per ogni campo, in un ciclo —
+/// e scorrere l'elenco significava compilare decine di espressioni regolari
+/// per fotogramma. Nel browser dell'iPhone è scorrimento a scatti.
+final _iniziaPass = RegExp(r'^pass', caseSensitive: false);
+final _indirizzoApribile = RegExp(r'^https?://', caseSensitive: false);
+
 /// Su Android gli appunti sono leggibili da altre app: un segreto non ci resta
 /// a tempo indefinito.
 ///
@@ -89,7 +96,7 @@ class SchedaVoce extends StatelessWidget {
   Campo? get _daCopiare {
     for (final f in credenziale.fields) {
       if (f.value.trim().isEmpty) continue;
-      if (RegExp(r'^pass', caseSensitive: false).hasMatch(f.label)) return f;
+      if (_iniziaPass.hasMatch(f.label)) return f;
     }
     for (final f in credenziale.fields) {
       if (f.value.trim().isNotEmpty &&
@@ -309,7 +316,7 @@ class _RigaCampoState extends State<_RigaCampo> {
   /// che contiene "quello vecchio" non deve mostrare un pulsante che non
   /// porta da nessuna parte.
   bool get _sembraIndirizzo =>
-      RegExp(r'^https?://', caseSensitive: false).hasMatch(widget.campo.value.trim());
+      _indirizzoApribile.hasMatch(widget.campo.value.trim());
 
   @override
   void initState() {
