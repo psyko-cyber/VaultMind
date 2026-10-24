@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Le cartelle che il FileProvider del manifest puo' condividere.
+
+     Una sola, e dentro la cache dell'app: `vaultmind-aggiornamento/`, dove
+     `aggiornamenti_rete_io.dart` scarica l'APK. NON tutta la cache: li' ci
+     passano anche file temporanei dell'app, e un provider non deve poter
+     offrire piu' di quello che serve.
+
+     Il nome della cartella deve restare uguale a quello in
+     `aggiornamenti_rete_io.dart`: se cambia solo qui, l'installer riceve un
+     URI che il provider rifiuta ("Failed to find configured root"). -->
+<paths>
+    <cache-path name="aggiornamenti" path="vaultmind-aggiornamento/"/>
+</paths>

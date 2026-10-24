@@ -8,12 +8,15 @@ library;
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../aggiornamenti.dart';
 import '../archivio.dart';
 import '../impostazioni.dart';
 import '../ponte_file.dart';
 import '../sessione.dart';
 import '../sync_gestore.dart';
 import '../tema.dart';
+import '../versione.dart';
+import 'aggiornamento.dart';
 import 'dialoghi.dart';
 import 'foglio_generatore.dart';
 import 'modulo_voce.dart';
@@ -40,11 +43,37 @@ class SchermataImpostazioni extends StatefulWidget {
 class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
   bool _improntaDisponibile = false;
   bool _improntaAttiva = false;
+  bool _controlloInCorso = false;
+
+  /// La versione nuova già trovata, se c'è. Non si chiede a GitHub aprendo
+  /// questa schermata: lo ha già fatto la casa, e il risultato è lì.
+  Novita? get _novita => avvisoAggiornamento.value;
 
   @override
   void initState() {
     super.initState();
     _stato();
+  }
+
+  /// Il controllo chiesto a mano parla sempre, anche per dire che non c'era
+  /// niente: chi tocca un pulsante e non vede succedere nulla non sa se ha
+  /// funzionato. [silenzioso] serve a chi lo fa partire da un interruttore.
+  Future<void> _controllaOra({bool silenzioso = false}) async {
+    setState(() => _controlloInCorso = true);
+    final esito = await controlla(forza: true);
+    if (!mounted) return;
+    setState(() => _controlloInCorso = false);
+    if (esito.novita != null) {
+      await offriAggiornamento(context, esito.novita!);
+      if (mounted) setState(() {});
+      return;
+    }
+    if (silenzioso || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(esito.risposto
+          ? 'Hai già l\'ultima versione.'
+          : 'Nessuna risposta da GitHub: riprova quando hai connessione.'),
+    ));
   }
 
   Future<void> _stato() async {
@@ -229,9 +258,62 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
             onTap: _elimina,
           ),
 
+          // Nel browser non c'è niente da controllare: la pagina si aggiorna
+          // da sola col service worker, e la CSP non lascerebbe passare la
+          // richiesta a GitHub (`aggiornamenti_rete_web.dart`).
+          if (!kIsWeb) ...[
+            _Sezione('Aggiornamenti'),
+            RigaInterruttore(
+              acceso: imp.aggAttivi,
+              icona: const IconaVM(Icone.aggiorna, size: 22),
+              titolo: 'Controlla se c\'è una versione nuova',
+              descrizione: imp.aggAttivi
+                  ? 'Una richiesta a GitHub ogni 12 ore, senza nessun dato tuo: '
+                      'è l\'unica volta che VaultMind esce su Internet. Il vault non si muove da qui.'
+                  : 'Spento: l\'app non si collega a Internet per nessun motivo. '
+                      'Le versioni nuove restano su github.com/$repoGitHub/releases.',
+              onChanged: (v) async {
+                await salvaImpostazioni(imp.copia(aggAttivi: v));
+                // Appena acceso si guarda subito: chi ha alzato
+                // l'interruttore voleva sapere, non aspettare 12 ore.
+                if (v) await _controllaOra(silenzioso: true);
+              },
+            ),
+            ListTile(
+              leading: IconaVM(
+                  _novita == null ? Icone.info : Icone.avviso,
+                  color: _novita == null ? context.cTenue : context.cAccento),
+              title: Text(_novita == null
+                  ? 'Hai la versione $versioneApp'
+                  : 'C\'è la ${_novita!.versione}'),
+              subtitle: Text(
+                  _novita == null
+                      ? 'L\'APK viene da github.com/$repoGitHub, firmato con la stessa chiave: si installa sopra e i dati restano.'
+                      : 'Tocca qui per installarla: il vault, le impostazioni e i dispositivi abbinati restano dove sono.',
+                  style: TextStyle(fontSize: 12, color: context.cTenue)),
+              trailing: _controlloInCorso
+                  ? SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2, color: context.cTenue))
+                  : (imp.aggAttivi && _novita == null
+                      ? TextButton(
+                          onPressed: _controllaOra,
+                          child: Text('Controlla',
+                              style: TextStyle(
+                                  color: context.cAccento, fontSize: 12.5)))
+                      : null),
+              onTap: _novita == null
+                  ? null
+                  : () => offriAggiornamento(context, _novita!)
+                      .then((_) => mounted ? setState(() {}) : null),
+            ),
+          ],
+
           const SizedBox(height: 24),
           Center(
-            child: Text('VaultMind · vault locale, niente cloud',
+            child: Text('VaultMind $versioneApp · vault locale, niente cloud',
                 style: TextStyle(fontSize: 11, color: context.cTenue)),
           ),
           const SizedBox(height: 24),

@@ -85,6 +85,20 @@ Future<bool> apriNelBrowser(String url) async {
   }
 }
 
+/// Passa l'APK scaricato all'installer di Android (vedi `aggiornamenti.dart`).
+///
+/// Non installa niente da sé: apre la schermata di sistema, che chiede
+/// conferma e verifica la firma. Un APK firmato con una chiave diversa dalla
+/// nostra viene rifiutato da Android, e quella è la difesa vera.
+///
+/// Solleva [PlatformException] se l'installer non si apre (per esempio quando
+/// il permesso «installa app sconosciute» è negato): chi chiama lo dice, e
+/// offre la pagina delle release.
+Future<void> installaApk(String percorso) async {
+  if (kIsWeb) return;
+  await _canale.invokeMethod<void>('installaApk', percorso);
+}
+
 // --------------------------------------------------------------------- QR
 
 /// Com'è andata la lettura di un QR.
@@ -207,7 +221,8 @@ Future<void> chiediMemoriaPersistente() async {
 }
 
 /// Una versione nuova dell'app web è attiva ma questa pagina è ancora la
-/// vecchia. Sempre falso fuori dal browser: l'APK si aggiorna reinstallandolo.
+/// vecchia. Sempre falso fuori dal browser: lì l'aggiornamento è un APK nuovo
+/// installato sopra il vecchio (`aggiornamenti.dart`).
 /// Non si ricarica mai da solo: vedi `web/sw.js`.
 final ValueListenable<bool> aggiornamentoWeb =
     kIsWeb ? web.aggiornamentoPronto() : ValueNotifier(false);

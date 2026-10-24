@@ -19,7 +19,14 @@
 ; ==========================================================================
 
 #define MyAppName "VaultMind"
-#define MyAppVersion "6.8"
+; La versione NON si scrive qui: la passa rilascio.ps1 con /DMyAppVersion=...,
+; leggendola da app\__init__.py, che e' l'unico posto dove il numero esiste.
+; Scriverlo in due posti vuol dire, prima o poi, due numeri diversi - e da
+; quando l'app controlla gli aggiornamenti un numero sbagliato significa
+; un'app che non si aggiorna mai, o che riscarica la stessa versione.
+#ifndef MyAppVersion
+  #error Compila con installer\rilascio.ps1 (passa /DMyAppVersion=<versione>).
+#endif
 #define MyAppExeName "VaultMind.exe"
 ; Percorso dell'exe costruito da run.bat. Prima di compilare l'installer
 ; l'exe deve essere aggiornato: lo verifica rilascio.ps1.
@@ -81,6 +88,13 @@ Name: "{autodesktop}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; IconFilen
 
 [Run]
 Filename: "{app}\{#MyAppExeName}"; Description: "{cm:LaunchProgram,{#MyAppName}}"; Flags: nowait postinstall skipifsilent
+; Aggiornamento partito da dentro l'app (/SILENT /RELAUNCH=1): il setup ha
+; appena chiuso VaultMind, e riaprirlo e' l'unico modo di non lasciare chi ha
+; cliccato "Aggiorna" davanti a un desktop vuoto.
+; L'exe si lancia diretto: l'installazione e' per-utente, quindi qui non ci
+; sono privilegi da abbandonare (Tigert passa da explorer.exe perche' il suo
+; setup gira elevato e riaprirebbe l'app come amministratore).
+Filename: "{app}\{#MyAppExeName}"; Flags: nowait; Check: RilanciaDopoAggiornamento
 
 [Code]
 var
@@ -97,6 +111,14 @@ end;
 function OllamaPresent(): Boolean;
 begin
   Result := FileExists(OllamaExe());
+end;
+
+{ Vero solo durante un aggiornamento silenzioso avviato dall'app. Le due
+  condizioni servono entrambe: /RELAUNCH=1 da solo, su un'installazione fatta
+  a mano, riaprirebbe l'app anche a chi ha tolto la spunta "Avvia VaultMind". }
+function RilanciaDopoAggiornamento(): Boolean;
+begin
+  Result := WizardSilent() and (ExpandConstant('{param:RELAUNCH|0}') = '1');
 end;
 
 procedure InitializeWizard;

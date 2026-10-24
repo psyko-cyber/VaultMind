@@ -764,7 +764,48 @@
         </div>
       </div>
 
+      <!-- L'unica connessione in uscita dell'app: va detto qui, in chiaro, e
+           deve esserci l'interruttore. Chi compra VaultMind perché «non parla
+           con nessuno» ha il diritto di verificarlo in due secondi. -->
+      <div class="set-section">
+        <h4>Aggiornamenti</h4>
+        <div class="set-row">
+          <div><div class="lab">Controlla se c'è una versione nuova <span id="setVersione" class="set-status ok">—</span></div>
+            <div class="desc">Una richiesta a GitHub ogni 12 ore, senza nessun dato tuo: il vault non esce da questo computer. Spento, VaultMind non si collega a Internet per nessun motivo.</div></div>
+          <div id="swAgg" class="sw ctl" role="switch" tabindex="0" aria-checked="false" aria-label="Controllo degli aggiornamenti"></div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab" id="aggStato">—</div></div>
+          <button class="iconbtn ctl" id="aggControlla">Controlla ora</button>
+        </div>
+      </div>
+
       <div id="setMsg" class="set-msg"></div>
+    </div>
+  </div>
+
+  <!-- MODALE AGGIORNAMENTO
+       Compare dopo lo sblocco, non prima: la schermata del lucchetto deve
+       funzionare identica senza rete, e un avviso davanti al campo della
+       master password sarebbe la cosa più sospetta che un gestore di password
+       può fare. "Più tardi" lo rimanda di 20 ore. -->
+  <div id="aggModal" class="modal hidden">
+    <div class="card" style="max-width:520px;width:100%">
+      <div class="mhead"><span><svg class="ic ic-20" aria-hidden="true"><use href="#i-aggiorna"/></svg> <span id="aggTitolo">Aggiornamento</span></span>
+        <button class="iconbtn" id="aggChiudi" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
+      <div class="desc" id="aggTesto"></div>
+      <div id="aggNote" class="hidden" style="margin-top:12px;max-height:200px;overflow:auto;white-space:pre-wrap;
+           font-size:12.5px;line-height:1.5;color:var(--t2);border-top:1px solid var(--brd);padding-top:10px"></div>
+      <div id="aggBarra" class="hidden" style="margin-top:14px">
+        <div style="height:6px;border-radius:999px;background:var(--brd);overflow:hidden">
+          <div id="aggBarraPieno" style="height:100%;width:0%;background:var(--acc);transition:width .3s"></div>
+        </div>
+        <div id="aggBarraTesto" class="desc" style="margin-top:8px"></div>
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px">
+        <button class="iconbtn" id="aggDopo">Più tardi</button>
+        <button class="iconbtn" id="aggOra" style="background:var(--acc);color:var(--acc-su);border-color:transparent">Aggiorna</button>
+      </div>
     </div>
   </div>
 
@@ -1054,6 +1095,12 @@ async function doUnlock(){
   // Da qui la pagina tiene d'occhio quello che arriva dagli altri dispositivi.
   vigilaSync();
   aggiornaTastoSync();
+  // Niente await, e nessun errore mostrato: se la rete non c'è, la richiesta
+  // scade da sola e di questa riga non resta traccia. Chi apre VaultMind in
+  // aereo non deve accorgersene.
+  controllaAggiornamento();
+  clearInterval(AGG_ORARIO);
+  AGG_ORARIO = setInterval(controllaAggiornamento, 6 * 3600 * 1000);
   if(j.created){
     addAI("Vault creato. Configuriamo subito i tuoi dati principali.");
     openOnboarding();
@@ -1907,6 +1954,9 @@ async function openSettings(){
     setSw($("#swMic"), j.mic_enabled);
     $("#setGenLen").value=String(j.gen_length ?? 20);
     setSw($("#swGenSym"), j.gen_symbols);
+    setSw($("#swAgg"), j.aggiornamenti !== false);
+    mostraStatoAgg({attiva: j.aggiornamenti !== false, versione: j._versione,
+                    nuova: AGG && AGG.nuova});
     // stato reale componenti
     const os=$("#ollamaStatus"), ms=$("#micStatus");
     os.textContent=j._ollama_available?"attivo":"non rilevato"; os.className="set-status "+(j._ollama_available?"ok":"off");
@@ -1939,6 +1989,125 @@ $("#swOllama").addEventListener("click",()=>{ const on=!$("#swOllama").classList
 $("#swMic").addEventListener("click",()=>{ const on=!$("#swMic").classList.contains("on"); setSw($("#swMic"),on); saveSetting({mic_enabled:on}); applyMicSetting(on); });
 $("#swGenSym").addEventListener("click",()=>{ const on=!$("#swGenSym").classList.contains("on"); setSw($("#swGenSym"),on); saveSetting({gen_symbols:on}); });
 $("#setOpenImport").onclick=()=>{ $("#setModal").classList.add("hidden"); resetImport(); $("#importModal").classList.remove("hidden"); };
+$("#swAgg").addEventListener("click",()=>{
+  const on=!$("#swAgg").classList.contains("on");
+  setSw($("#swAgg"),on); saveSetting({aggiornamenti:on});
+  mostraStatoAgg({attiva:on, versione:$("#setVersione").textContent, nuova:(on&&AGG)?AGG.nuova:null});
+});
+$("#aggControlla").addEventListener("click", async ()=>{
+  const b=$("#aggControlla"); b.disabled=true; b.textContent="…";
+  const j=await chiediAggiornamento(true);
+  b.disabled=false; b.textContent="Controlla ora";
+  if(!j){ flashSet("Controllo non riuscito.","err"); return; }
+  mostraStatoAgg(j);
+  // Chi tocca un pulsante merita una risposta onesta: senza connessione
+  // "hai già l'ultima versione" sarebbe una bugia.
+  if(j.nuova) offriAggiornamento(j);
+  else if(!j.risposto) flashSet("Nessuna risposta da GitHub: riprova quando hai connessione.","err");
+  else flashSet("Hai già l'ultima versione.","ok");
+});
+
+/* ===== AGGIORNAMENTI =====
+   Il controllo vero sta in aggiornamenti.py; qui si decide solo QUANDO
+   chiedere e come dirlo. Due regole che non si vedono nel codice:
+   - la pagina non aspetta MAI questa risposta per mostrare qualcosa. Si chiede
+     e si va avanti: senza rete la fetch scade dopo 8 secondi e nessuno se ne
+     accorge.
+   - si chiede dopo lo sblocco, mai sulla schermata del lucchetto. */
+let AGG = null, AGG_VIGILE = null, AGG_ORARIO = null;
+
+async function chiediAggiornamento(forza){
+  try{
+    const r = await fetch("/api/aggiornamento" + (forza ? "?forza=true" : ""));
+    if(!r.ok) return null;
+    AGG = await r.json();
+    return AGG;
+  }catch(e){ return null; }
+}
+
+/* Allo sblocco e poi ogni sei ore: il tetto delle 12 ore lo tiene il server,
+   qui si guarda solo se è il caso di aprire la finestra. */
+async function controllaAggiornamento(){
+  const j = await chiediAggiornamento(false);
+  if(!j || !j.nuova || j.nuova.rinviata) return;
+  offriAggiornamento(j);
+}
+
+function mostraStatoAgg(j){
+  if(!j) return;
+  if(j.versione) $("#setVersione").textContent = j.versione;
+  const s = $("#aggStato");
+  if(!j.attiva) s.textContent = "Controllo spento: nessuna richiesta esce da qui.";
+  else if(j.nuova) s.textContent = `C'è la ${j.nuova.versione}.`;
+  // Senza risposta non si sa, e non si dice di sapere.
+  else if(j.risposto === false) s.textContent = "GitHub non ha risposto: non so se c'è una versione nuova.";
+  else s.textContent = "Nessuna versione più recente.";
+  $("#aggControlla").classList.toggle("hidden", !j.attiva);
+}
+
+function offriAggiornamento(j){
+  const n = j.nuova; if(!n) return;
+  // I pulsanti della finestra leggono AGG: se arrivasse una risposta diversa
+  // da quella mostrata, "Aggiorna" installerebbe un'altra versione.
+  AGG = j;
+  $("#aggTitolo").textContent = `VaultMind ${n.versione} disponibile`;
+  $("#aggTesto").textContent = `Hai la ${j.versione}. Si installa sopra quella attuale: il vault e le impostazioni restano dove sono.`
+    + (n.scaricabile ? " VaultMind si chiude e si riapre aggiornato." : "");
+  $("#aggNote").textContent = n.note || "";
+  $("#aggNote").classList.toggle("hidden", !n.note);
+  $("#aggOra").textContent = n.scaricabile ? "Aggiorna" : "Apri la pagina";
+  $("#aggBarra").classList.add("hidden");
+  $("#aggOra").disabled = false; $("#aggDopo").disabled = false;
+  $("#setModal").classList.add("hidden");
+  $("#aggModal").classList.remove("hidden");
+}
+
+/* Chiudere con la X = «non ora»: torna al prossimo sblocco. "Più tardi" è una
+   risposta diversa, e vale 20 ore: chi l'ha detto non vuole esser richiesto
+   dieci volte nello stesso pomeriggio. */
+$("#aggChiudi").onclick = ()=>{ clearInterval(AGG_VIGILE); $("#aggModal").classList.add("hidden"); };
+$("#aggDopo").onclick = async ()=>{
+  const n = AGG && AGG.nuova;
+  $("#aggModal").classList.add("hidden");
+  if(n) await api("/api/aggiornamento/rinvia", {versione:n.versione});
+};
+$("#aggOra").onclick = async ()=>{
+  const n = AGG && AGG.nuova; if(!n) return;
+  if(!n.scaricabile){ await api("/api/open_url", {url:n.pagina}); $("#aggModal").classList.add("hidden"); return; }
+  $("#aggOra").disabled = true; $("#aggDopo").disabled = true;
+  const {ok,j} = await api("/api/aggiornamento/installa", {});
+  if(!ok){
+    $("#aggOra").disabled = false; $("#aggDopo").disabled = false;
+    avviso(j.detail || "Aggiornamento non avviato.", true);
+    return;
+  }
+  barraAgg(0, "Avvio del download…");
+  clearInterval(AGG_VIGILE);
+  AGG_VIGILE = setInterval(vigilaAggiornamento, 1000);
+};
+
+function barraAgg(percento, testo){
+  $("#aggBarra").classList.remove("hidden");
+  $("#aggBarraPieno").style.width = Math.max(0, Math.min(100, percento)) + "%";
+  $("#aggBarraTesto").textContent = testo;
+}
+
+/* Durante l'installazione il server muore per mano del setup: una fetch che
+   non risponde è il comportamento previsto, non un errore da mostrare. */
+async function vigilaAggiornamento(){
+  const j = await chiediAggiornamento(false);
+  if(!j) return;
+  if(j.fase === "scarico") barraAgg(j.percento, `Scarico… ${j.percento}%`);
+  else if(j.fase === "installo") barraAgg(100, "Installo: VaultMind si chiude e si riapre aggiornato.");
+  else if(j.fase === "errore"){
+    clearInterval(AGG_VIGILE);
+    $("#aggBarra").classList.add("hidden");
+    $("#aggTesto").textContent = (j.errore || "Aggiornamento non riuscito.") + " Puoi scaricarlo a mano dalla pagina delle release.";
+    $("#aggOra").textContent = "Apri la pagina";
+    $("#aggOra").disabled = false; $("#aggDopo").disabled = false;
+    if(AGG && AGG.nuova) AGG.nuova.scaricabile = false;
+  }
+}
 
 /* ---- estensione browser: abbinamento e revoca ----
    Il codice si legge QUI, nell'app: chi controlla l'app autorizza. Il server

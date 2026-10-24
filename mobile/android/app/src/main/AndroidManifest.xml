@@ -9,12 +9,24 @@
          non trova niente): identico a un router che isola i dispositivi. Con
          l'APK di debug il sync funzionava, con quello vero no.
 
-         Niente permessi di rete oltre a questo: VaultMind non chiama Internet,
-         parla solo con l'altro dispositivo in casa.
+         Niente permessi di rete oltre a questo. Con la rete l'app fa due sole
+         cose: parla con l'altro dispositivo in casa, e (dal 25/10/2026) chiede
+         a GitHub se c'e' una versione nuova -- una GET anonima ogni 12 ore,
+         spegnibile da Impostazioni. Il vault non esce da qui in nessun caso.
 
          (Nel testo di questo commento niente doppi trattini: l'XML li vieta,
          e il manifest smette di essere leggibile. Gia' pagata.) -->
     <uses-permission android:name="android.permission.INTERNET"/>
+
+    <!-- Serve a installare l'APK dell'aggiornamento scaricato dall'app.
+         E' un permesso "normale": non compare in nessuna schermata di
+         richiesta, ma Android chiede comunque il consenso una volta
+         ("installa app sconosciute") la prima volta che si prova.
+         Senza di questo, l'installer di sistema non si apre affatto.
+
+         Ogni permesso nuovo si controlla DENTRO l'APK costruito:
+         `aapt dump permissions` sul file in Consegnabili. -->
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
 
     <!-- Serve a inquadrare il QR di attivazione della 2FA, e a nient'altro.
 
@@ -92,6 +104,29 @@
             android:exported="false"
             android:screenOrientation="portrait"
             android:theme="@style/NormalTheme"/>
+
+        <!-- L'APK dell'aggiornamento, dalla cache dell'app all'installer di
+             sistema. Da Android 7 un file:// passato a un'altra app solleva
+             FileUriExposedException: serve un content:// , e questo provider
+             lo fabbrica.
+
+             `exported="false"`: non e' una porta aperta. Il permesso di
+             lettura viaggia col singolo Intent (FLAG_GRANT_READ_URI_PERMISSION)
+             e vale solo per il file che ci mettiamo dentro; nessun'altra app
+             puo' chiedere niente a questo provider.
+
+             Le cartelle condivisibili sono dichiarate in res/xml: solo la
+             sottocartella degli aggiornamenti, non tutta la cache (dove
+             passano anche pezzi di vault decifrato). -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.aggiornamenti"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/aggiornamenti"/>
+        </provider>
 
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->

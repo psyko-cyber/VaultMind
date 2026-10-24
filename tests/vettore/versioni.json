@@ -1,0 +1,84 @@
+{
+  "_leggimi": "Confronto fra numeri di versione: dato 'a' (il tag dell'ultima release su GitHub) e 'b' (la versione installata), 'piuRecente' dice se c'e' un aggiornamento. Li eseguono ENTRAMBE le suite (Python: tests/test_aggiornamenti.py, Dart: mobile/test/aggiornamenti_test.dart), perche' due implementazioni dello stesso confronto sono un'app che si aggiorna sul PC e non sul telefono -- o, peggio, un telefono che propone all'infinito la versione che ha gia'. Regole: si butta via il 'v' del tag, si butta via tutto quello che segue un '+' o un '-' (il numero di build serve ad Android, non a dire chi e' piu' recente), i pezzi mancanti valgono 0, e qualunque cosa non sia un numero vale 0 -- cioe' una risposta illeggibile non diventa mai un aggiornamento.",
+
+  "casi": [
+    {
+      "nome": "la decina non e' alfabetica",
+      "perche": "Come stringhe '6.10' < '6.9'. E' il caso che rompe chi confronta i numeri di versione con <.",
+      "a": "6.10", "b": "6.9", "piuRecente": true
+    },
+    {
+      "nome": "versione maggiore nuova",
+      "a": "7.0", "b": "6.9", "piuRecente": true
+    },
+    {
+      "nome": "la stessa versione non e' un aggiornamento",
+      "a": "6.9", "b": "6.9", "piuRecente": false
+    },
+    {
+      "nome": "il tag ha la v davanti",
+      "perche": "Su GitHub il tag e' 'v6.9'; l'app sa di essere la '6.9'. Senza togliere la v, ogni avvio troverebbe un aggiornamento.",
+      "a": "v6.9", "b": "6.9", "piuRecente": false
+    },
+    {
+      "nome": "la v non confonde nemmeno al contrario",
+      "a": "6.9", "b": "v6.9", "piuRecente": false
+    },
+    {
+      "nome": "i pezzi mancanti valgono zero",
+      "perche": "pubspec.yaml scrive 6.9.0, app/__init__.py scrive 6.9: sono la stessa versione.",
+      "a": "6.9.0", "b": "6.9", "piuRecente": false
+    },
+    {
+      "nome": "e nell'altro verso",
+      "a": "6.9", "b": "6.9.0", "piuRecente": false
+    },
+    {
+      "nome": "il numero di build non e' una versione",
+      "perche": "Il telefono si descrive come 6.9.0+69 (69 e' il versionCode di Android). Senza buttare il +69, l'app si offrirebbe di aggiornarsi a cio' che ha installato -- a ogni avvio, per sempre.",
+      "a": "6.9.0+69", "b": "6.9", "piuRecente": false
+    },
+    {
+      "nome": "due build della stessa versione",
+      "a": "6.9.0+70", "b": "6.9.0+69", "piuRecente": false
+    },
+    {
+      "nome": "la correzione sulla stessa minore",
+      "a": "6.9.1", "b": "6.9", "piuRecente": true
+    },
+    {
+      "nome": "quattro pezzi, se un giorno servissero",
+      "a": "6.9.0.1", "b": "6.9.0", "piuRecente": true
+    },
+    {
+      "nome": "indietro non si va",
+      "perche": "Chi ha una build piu' nuova della release pubblicata (noi, sempre) non deve vedersi proporre di tornare indietro.",
+      "a": "6.8", "b": "6.9", "piuRecente": false
+    },
+    {
+      "nome": "avanti si va",
+      "a": "6.9", "b": "6.8", "piuRecente": true
+    },
+    {
+      "nome": "le decine dell'ultimo pezzo",
+      "a": "6.9.10", "b": "6.9.2", "piuRecente": true
+    },
+    {
+      "nome": "e al contrario",
+      "a": "6.9.2", "b": "6.9.10", "piuRecente": false
+    },
+    {
+      "nome": "la decina della maggiore",
+      "a": "10.0", "b": "9.9", "piuRecente": true
+    },
+    {
+      "nome": "niente non e' una versione",
+      "perche": "Una risposta vuota o illeggibile non deve mai diventare un aggiornamento da installare.",
+      "a": "", "b": "6.9", "piuRecente": false
+    },
+    {
+      "nome": "nemmeno una parola",
+      "a": "ciao", "b": "6.9", "piuRecente": false
+    }
+  ]
+}

@@ -100,6 +100,13 @@ dependencies {
     // promette di non parlare con nessuno, non e' un dettaglio.
     implementation("com.google.zxing:core:3.5.3")
 
+    // FileProvider, per passare l'APK dell'aggiornamento all'installer di
+    // sistema. Arriverebbe comunque di rimbalzo da biometric e camera, ma una
+    // dipendenza che si usa si dichiara: il giorno che una di quelle due
+    // cambia, l'aggiornamento dentro l'app non deve smettere di compilare per
+    // un motivo che non c'entra niente.
+    implementation("androidx.core:core:1.13.1")
+
     // CameraX per l'anteprima dal vivo. camera2 nudo sarebbe cinque volte il
     // codice e una manciata di telefoni su cui non funziona.
     implementation("androidx.camera:camera-core:1.4.2")

@@ -93,6 +93,32 @@ class Impostazioni {
   /// chi non è già dentro quella rete.
   Map<String, String> indirizzi;
 
+  // ---- aggiornamenti dell'app ----
+  // Il perché e i vincoli stanno in `aggiornamenti.dart`. Qui c'è solo quello
+  // che va ricordato fra un avvio e l'altro, e non è segreto: un interruttore,
+  // un orologio e il numero di versione visto su GitHub.
+
+  /// Controllo degli aggiornamenti acceso? È l'**unica** connessione in uscita
+  /// dell'app: da spento non parte nessuna richiesta verso Internet.
+  bool aggAttivi;
+
+  /// Quando si è chiesto l'ultima volta (ms). Serve a non chiedere più di una
+  /// volta ogni 12 ore, anche a chi apre l'app venti volte al giorno.
+  int aggControllo;
+
+  /// L'ultima release vista, come l'ha descritta GitHub (vedi `Novita`).
+  ///
+  /// Si conserva perché **senza rete resta vera**: chi ha visto l'avviso ieri
+  /// in casa lo rivede oggi in metropolitana, invece di vedere l'app
+  /// dimenticarsene. Vuota = niente di nuovo.
+  Map<String, dynamic> aggTrovata;
+
+  /// La versione su cui si è risposto «più tardi», e quando: non si ripropone
+  /// per 20 ore. Senza, chi dice «più tardi» se lo sente richiedere al
+  /// prossimo sblocco, cioè fra dieci minuti.
+  String aggRinviata;
+  int aggRinviataQuando;
+
   Impostazioni({
     this.tema = TemaId.scuro,
     this.temaScelto = false,
@@ -106,10 +132,16 @@ class Impostazioni {
     Map<String, String>? fidati,
     Map<String, Map<String, int>>? basi,
     Map<String, String>? indirizzi,
+    this.aggAttivi = true,
+    this.aggControllo = 0,
+    Map<String, dynamic>? aggTrovata,
+    this.aggRinviata = '',
+    this.aggRinviataQuando = 0,
   })  : pinnate = pinnate ?? [],
         fidati = fidati ?? {},
         basi = basi ?? {},
-        indirizzi = indirizzi ?? {};
+        indirizzi = indirizzi ?? {},
+        aggTrovata = aggTrovata ?? {};
 
   Map<String, dynamic> toJson() => {
         'tema': tema.name,
@@ -124,6 +156,13 @@ class Impostazioni {
         'fidati': fidati,
         'basi': basi,
         'indirizzi': indirizzi,
+        // Si scrivono solo se dicono qualcosa: un file di preferenze pieno di
+        // zeri non aiuta nessuno a capire cosa ci sta dentro.
+        if (!aggAttivi) 'aggAttivi': false,
+        if (aggControllo > 0) 'aggControllo': aggControllo,
+        if (aggTrovata.isNotEmpty) 'aggTrovata': aggTrovata,
+        if (aggRinviata.isNotEmpty) 'aggRinviata': aggRinviata,
+        if (aggRinviataQuando > 0) 'aggRinviataQuando': aggRinviataQuando,
       };
 
   static Impostazioni fromJson(Map<String, dynamic> j) {
@@ -161,6 +200,14 @@ class Impostazioni {
           for (final e in ((j['indirizzi'] ?? const {}) as Map).entries)
             '${e.key}': '${e.value}'
         },
+        aggAttivi: j['aggAttivi'] != false,
+        aggControllo: (j['aggControllo'] as num?)?.toInt() ?? 0,
+        aggTrovata: {
+          for (final e in ((j['aggTrovata'] ?? const {}) as Map).entries)
+            '${e.key}': e.value
+        },
+        aggRinviata: '${j['aggRinviata'] ?? ''}',
+        aggRinviataQuando: (j['aggRinviataQuando'] as num?)?.toInt() ?? 0,
       );
   }
 
@@ -177,6 +224,11 @@ class Impostazioni {
     Map<String, String>? fidati,
     Map<String, Map<String, int>>? basi,
     Map<String, String>? indirizzi,
+    bool? aggAttivi,
+    int? aggControllo,
+    Map<String, dynamic>? aggTrovata,
+    String? aggRinviata,
+    int? aggRinviataQuando,
   }) =>
       Impostazioni(
         tema: tema ?? this.tema,
@@ -191,6 +243,11 @@ class Impostazioni {
         fidati: fidati ?? this.fidati,
         basi: basi ?? this.basi,
         indirizzi: indirizzi ?? this.indirizzi,
+        aggAttivi: aggAttivi ?? this.aggAttivi,
+        aggControllo: aggControllo ?? this.aggControllo,
+        aggTrovata: aggTrovata ?? this.aggTrovata,
+        aggRinviata: aggRinviata ?? this.aggRinviata,
+        aggRinviataQuando: aggRinviataQuando ?? this.aggRinviataQuando,
       );
 }
 

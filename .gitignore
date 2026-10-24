@@ -33,6 +33,21 @@ mobile/android/key.properties
 *.jks
 *.keystore
 
+# Il nostro materiale di lavoro, fuori dal repo da quando e' pubblico
+# (25/10/2026). Stessa scelta di Tigert e Dollarz.
+#
+# Non sono segreti tecnici, sono cose NOSTRE: la configurazione della VPN di
+# casa, i percorsi del keystore, i blocchi alla vendita, prezzi e margini che
+# TODO.md stesso dichiara ipotesi da validare. Il codice e' pubblico, il piano
+# commerciale e la rete di casa no.
+#
+# ATTENZIONE: questi file ora vivono SOLO su disco e non hanno piu' il
+# backup di git. `git clean -xdf` li cancellerebbe. Tienine una copia fuori
+# dalla cartella del repo.
+CLAUDE.md
+TODO.md
+VaultMind_Presentazione.pptx
+
 # Sistema
 .DS_Store
 Thumbs.db

@@ -16,7 +16,15 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.0+1
+# Lo stesso numero di `VaultMind_Windows/app/__init__.py` e di
+# `lib/versione.dart`: PC e telefono escono dalla stessa release, quindi dallo
+# stesso numero (lo controlla `tests/test_versione.py`).
+# Dopo il `+` c'e' il versionCode di Android, che deve solo CRESCERE: era 1
+# fino alla 6.8, qui diventa 69 (6.9 -> 69) perche' un numero che si ricava
+# dalla versione non si sbaglia. Un APK con versionCode piu' basso di quello
+# installato Android lo rifiuta, e l'aggiornamento dentro l'app si fermerebbe
+# davanti a una schermata di errore.
+version: 6.9.0+69
 
 environment:
   sdk: ^3.12.2

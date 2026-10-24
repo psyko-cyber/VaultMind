@@ -11,6 +11,7 @@ import sys
 import json
 import secrets
 import hashlib
+import threading
 import time
 from pathlib import Path
 from typing import List, Optional, Any
@@ -28,6 +29,8 @@ from .import_csv import parse_csv
 from .sync_app import SyncApp
 from .sync_net import RifiutoSync
 from . import firewall, sync_net
+from . import __version__
+from . import aggiornamenti
 from . import llm
 from . import totp
 from . import transcribe
@@ -154,6 +157,9 @@ _DEFAULT_SETTINGS = {
     "gen_length": 20,            # default generatore password
     "gen_symbols": True,
     "theme": "dark",
+    # L'unica connessione in uscita dell'app. Acceso: una GET anonima a GitHub
+    # ogni 12 ore per sapere se c'è una versione nuova. Spento: nessuna.
+    "aggiornamenti": True,
 }
 
 def _load_settings() -> dict:
@@ -375,6 +381,7 @@ def get_settings():
     # arricchisce con lo stato reale dei componenti (sola lettura)
     s["_ollama_available"] = llm.available()
     s["_audio_available"] = transcribe.available()
+    s["_versione"] = __version__
     return s
 
 
@@ -385,6 +392,7 @@ class SettingsIn(BaseModel):
     gen_length: int | None = None
     gen_symbols: bool | None = None
     theme: str | None = None
+    aggiornamenti: bool | None = None
 
 @app.post("/api/settings")
 def set_settings(body: SettingsIn):
@@ -1061,6 +1069,146 @@ def open_url(body: OpenUrlIn):
     import webbrowser
     webbrowser.open(u)
     return {"ok": True}
+
+
+# ---------------- aggiornamenti dell'app ----------------
+# Il perché e i vincoli stanno in aggiornamenti.py. Qui c'è solo la colla:
+# quando si chiede a GitHub, cosa si ricorda, e chi lancia il setup.
+#
+# Lo stato del download vive in RAM e non su disco: riguarda questa sessione, e
+# appena il setup parte questo processo non esiste più.
+_AGG: dict = {"fase": "fermo", "percento": 0, "errore": None}
+
+
+def _agg_rinviata(s: dict, versione: str) -> bool:
+    """«Più tardi» su una versione precisa non si ripropone per RINVIO_ORE."""
+    return (s.get("agg_rinviata") == versione and
+            aggiornamenti.ora_ms() - int(s.get("agg_rinviata_quando") or 0)
+            < aggiornamenti.RINVIO_ORE * 3600_000)
+
+
+def _agg_controlla(forza: bool = False) -> tuple:
+    """`(novità, risposto)`: la novità da mostrare, dalla rete o da quello che
+    si sapeva già.
+
+    Non solleva mai. Quando la rete non risponde si tiene l'ultima risposta
+    buona, così chi ha visto l'avviso ieri lo rivede anche offline — è ancora
+    vero.
+
+    `risposto` False vuol dire «non lo so»: nessuna rete, o un proxy che ha
+    risposto qualcosa che non è una release. Serve a una cosa sola, e
+    importante: chi ha **premuto un pulsante** merita una risposta onesta, e
+    «hai già l'ultima versione» detto senza connessione è una bugia. Il
+    controllo automatico non lo guarda: lì il silenzio è giusto.
+    """
+    s = _load_settings()
+    if not s.get("aggiornamenti", True):
+        return None, True
+    risposto = True
+    vecchio = (aggiornamenti.ora_ms() - int(s.get("agg_controllo") or 0)
+               >= aggiornamenti.INTERVALLO_ORE * 3600_000)
+    if forza or vecchio:
+        info = aggiornamenti.cerca()
+        risposto = info is not None
+        # Rilettura: fra l'inizio della richiesta e adesso l'utente può aver
+        # salvato un'altra impostazione, e scrivere il dizionario vecchio la
+        # cancellerebbe.
+        s = _load_settings()
+        s["agg_controllo"] = aggiornamenti.ora_ms()
+        if info is not None:
+            s["agg_trovata"] = info if aggiornamenti.piu_recente(info["versione"], __version__) else None
+        _save_settings(s)
+    trovata = s.get("agg_trovata")
+    if not isinstance(trovata, dict):
+        return None, risposto
+    # Dopo un aggiornamento riuscito la nota resta nelle impostazioni: è questo
+    # confronto, non la cancellazione, a farla smettere di comparire.
+    if not aggiornamenti.piu_recente(str(trovata.get("versione") or ""), __version__):
+        return None, risposto
+    return trovata, risposto
+
+
+@app.get("/api/aggiornamento")
+def aggiornamento(forza: bool = False):
+    """Stato per la pagina. La chiama lo sblocco e poi ogni sei ore.
+
+    Il controllo di rete avviene QUI, ma nessuno aspetta questa risposta per
+    usare l'app: la pagina la chiede e se ne dimentica. Senza connessione la
+    richiesta finisce in timeout dopo 8 secondi e torna «niente di nuovo».
+    """
+    nuova, risposto = _agg_controlla(forza=forza)
+    s = _load_settings()
+    fuori = {
+        "versione": __version__,
+        "attiva": bool(s.get("aggiornamenti", True)),
+        "risposto": risposto,
+        "pagina": aggiornamenti.PAGINA_RELEASE,
+        "fase": _AGG["fase"],
+        "percento": _AGG["percento"],
+        "errore": _AGG["errore"],
+        "nuova": None,
+    }
+    if nuova:
+        fuori["nuova"] = {
+            "versione": nuova.get("versione"),
+            "note": aggiornamenti.note_pulite(str(nuova.get("note") or "")),
+            "pagina": nuova.get("pagina") or aggiornamenti.PAGINA_RELEASE,
+            "scaricabile": bool(nuova.get("download")),
+            "rinviata": _agg_rinviata(s, str(nuova.get("versione") or "")),
+        }
+    return fuori
+
+
+class RinviaIn(BaseModel):
+    versione: str
+
+@app.post("/api/aggiornamento/rinvia")
+def aggiornamento_rinvia(body: RinviaIn):
+    s = _load_settings()
+    s["agg_rinviata"] = body.versione
+    s["agg_rinviata_quando"] = aggiornamenti.ora_ms()
+    _save_settings(s)
+    return {"ok": True}
+
+
+def _agg_lavora(info: dict) -> None:
+    """Scarica, verifica, lancia. Gira in un thread: l'ultima riga chiude
+    l'app, e una richiesta HTTP in attesa morirebbe con lei."""
+    _AGG.update(fase="scarico", percento=0, errore=None)
+    try:
+        percorso = aggiornamenti.scarica(
+            info, su_progresso=lambda v: _AGG.update(percento=int(v * 100)))
+    except Exception as exc:
+        _AGG.update(fase="errore", errore=str(exc) or "Download non riuscito.")
+        return
+    _AGG.update(fase="installo", percento=100)
+    try:
+        if not aggiornamenti.installa(percorso):
+            _AGG.update(fase="errore",
+                        errore="Windows non ha avviato il programma di installazione.")
+    except Exception as exc:
+        _AGG.update(fase="errore", errore=str(exc))
+
+
+@app.post("/api/aggiornamento/installa")
+def aggiornamento_installa():
+    """Avvia l'aggiornamento e risponde subito.
+
+    Il setup silenzioso **chiude VaultMind** e lo riapre aggiornato: la
+    risposta deve essere già partita quando succede, quindi il lavoro vero sta
+    in un thread e la pagina guarda l'avanzamento con /api/aggiornamento.
+    """
+    _require_unlocked()
+    if _AGG["fase"] in ("scarico", "installo"):
+        return {"ok": True, "fase": _AGG["fase"]}
+    nuova, _ = _agg_controlla()
+    if not nuova:
+        raise HTTPException(status_code=400, detail="Non c'è nessuna versione più recente da installare.")
+    if not nuova.get("download"):
+        raise HTTPException(status_code=400,
+                            detail="Questa release non allega il setup di Windows: scaricalo dalla pagina.")
+    threading.Thread(target=_agg_lavora, args=(nuova,), daemon=True).start()
+    return {"ok": True, "fase": "scarico"}
 
 
 @app.post("/api/lock")

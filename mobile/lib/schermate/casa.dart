@@ -13,12 +13,14 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 
+import '../aggiornamenti.dart';
 import '../impostazioni.dart';
 import '../ricerca.dart';
 import '../sessione.dart';
 import '../sync_gestore.dart';
 import '../tema.dart';
 import '../vault.dart';
+import 'aggiornamento.dart';
 import 'categorie.dart';
 import 'chat.dart';
 import 'database.dart';
@@ -99,6 +101,11 @@ class _SchermataCasaState extends State<SchermataCasa>
     _sync.avvia().then((ok) {
       if (ok) _syncAutomatico();
     });
+    // Il controllo della versione si chiede da QUI, col vault già aperto, e
+    // non all'avvio dell'app: la schermata di sblocco deve comportarsi
+    // esattamente nello stesso modo senza rete. Niente await e niente errori
+    // mostrati: se la risposta non arriva, di questa riga non resta traccia.
+    _controllaAggiornamento();
   }
 
   @override
@@ -124,10 +131,26 @@ class _SchermataCasaState extends State<SchermataCasa>
       _blocca();
       return;
     }
+    // Chi non blocca mai il vault potrebbe non riavviare l'app per settimane:
+    // il tetto delle 12 ore sta in `controlla()`, qui si guarda solo al
+    // rientro. Prima del sync, che può metterci un po'.
+    _controllaAggiornamento();
     if (DateTime.now().difference(_ultimoGiro) < const Duration(seconds: 20)) {
       return;   // rientri a raffica: uno vale per tutti
     }
     _syncAutomatico();
+  }
+
+  /// La versione nuova si propone una volta, e solo se non è stata rimandata.
+  Future<void> _controllaAggiornamento() async {
+    try {
+      final novita = (await controlla()).novita;
+      if (novita == null || rinviata(novita) || !mounted) return;
+      await offriAggiornamento(context, novita);
+    } catch (_) {
+      // Non essere riusciti a sapere se c'è una versione nuova non è un
+      // problema di chi sta usando l'app.
+    }
   }
 
   void _aggiorna() {
