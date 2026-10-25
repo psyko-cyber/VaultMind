@@ -13,4 +13,4 @@ library;
 ///
 /// Non si legge da `pubspec.yaml`: per farlo servirebbe `package_info_plus`,
 /// cioè una dipendenza in più (e un plugin nativo) per leggere una stringa.
-const versioneApp = '7.1';
+const versioneApp = '7.2';

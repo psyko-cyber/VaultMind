@@ -9,4 +9,4 @@
 #: Era "0.1.0" mentre l'installer dichiarava 6.8: due numeri scollegati non
 #: servono a niente, e col controllo degli aggiornamenti un numero sbagliato
 #: qui significa non aggiornarsi mai (o riscaricare in continuazione).
-__version__ = "7.1"
+__version__ = "7.2"
