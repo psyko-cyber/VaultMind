@@ -13,6 +13,7 @@ import '../archivio.dart';
 import '../impostazioni.dart';
 import '../ponte_file.dart';
 import '../sessione.dart';
+import '../sfondo.dart';
 import '../sync_gestore.dart';
 import '../tema.dart';
 import '../versione.dart';
@@ -76,6 +77,13 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
     ));
   }
 
+  /// Il tema ridisegna questa schermata da solo (cambia il `Theme`), lo
+  /// sfondo no: senza il setState il segmento toccato resterebbe spento.
+  void _salvaSfondo(Impostazioni nuove) {
+    salvaImpostazioni(nuove);
+    setState(() {});
+  }
+
   Future<void> _stato() async {
     final d = await impresaDisponibile();
     final a = await improntaAttiva();
@@ -114,6 +122,26 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                   ),
               ],
             ),
+          ),
+          // Uno sfondo per ognuna delle tre sezioni, come sul PC: chi trova
+          // la costellazione bella nello sblocco può volerla ferma mentre
+          // legge l'elenco.
+          _SceltaSfondo(
+            titolo: 'Sfondo dello sblocco',
+            nota: 'Lo vedi quando il vault è chiuso.',
+            valore: imp.sfondoSblocco,
+            onScelto: (s) => _salvaSfondo(imp.copia(sfondoSblocco: s)),
+          ),
+          _SceltaSfondo(
+            titolo: 'Sfondo della chat',
+            valore: imp.sfondoChat,
+            onScelto: (s) => _salvaSfondo(imp.copia(sfondoChat: s)),
+          ),
+          _SceltaSfondo(
+            titolo: 'Sfondo del database',
+            nota: 'Vale anche per Categorie.',
+            valore: imp.sfondoDatabase,
+            onScelto: (s) => _salvaSfondo(imp.copia(sfondoDatabase: s)),
           ),
 
           _Sezione('Sicurezza'),
@@ -457,29 +485,78 @@ class _Sezione extends StatelessWidget {
       );
 }
 
-/// Anteprima del tema: si sceglie con l'occhio, non leggendo un nome.
+/// Anteprima del tema: si sceglie con l'occhio, non leggendo un nome. Il
+/// fondo del tema e, dentro, la sua coppia di neon: è quella che lo distingue.
 class _Pastiglia extends StatelessWidget {
   final TemaId tema;
   const _Pastiglia({required this.tema});
 
   @override
   Widget build(BuildContext context) {
-    final s = temaDati(tema).colorScheme;
+    final dati = temaDati(tema);
     return Container(
       width: 34,
       height: 34,
       decoration: BoxDecoration(
-        color: s.surface,
+        color: dati.colorScheme.surface,
         shape: BoxShape.circle,
         border: Border.all(color: context.cBordo),
       ),
       child: Center(
         child: Container(
-          width: 14,
-          height: 14,
-          decoration: BoxDecoration(color: s.primary, shape: BoxShape.circle),
+          width: 15,
+          height: 15,
+          decoration: BoxDecoration(
+              gradient: dati.extension<Cristallo>()!.sfumatura,
+              shape: BoxShape.circle),
         ),
       ),
     );
   }
+}
+
+/// I tre sfondi affiancati, uno per segmento: si vede subito quale è acceso,
+/// senza aprire un menu per scoprirlo.
+class _SceltaSfondo extends StatelessWidget {
+  final String titolo;
+  final String? nota;
+  final Sfondo valore;
+  final ValueChanged<Sfondo> onScelto;
+  const _SceltaSfondo(
+      {required this.titolo,
+      this.nota,
+      required this.valore,
+      required this.onScelto});
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Le misure di `RigaInterruttore`, la riga accanto.
+            Text(titolo, style: TextStyle(fontSize: 15, color: context.cTesto)),
+            if (nota != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(nota!,
+                    style: TextStyle(
+                        fontSize: 12.5, height: 1.35, color: context.cTenue)),
+              ),
+            const SizedBox(height: 9),
+            SizedBox(
+              width: double.infinity,
+              child: SegmentedButton<Sfondo>(
+                segments: [
+                  for (final s in Sfondo.values)
+                    ButtonSegment(value: s, label: Text(nomiSfondo[s]!)),
+                ],
+                selected: {valore},
+                showSelectedIcon: false,
+                onSelectionChanged: (scelti) => onScelto(scelti.first),
+              ),
+            ),
+          ],
+        ),
+      );
 }

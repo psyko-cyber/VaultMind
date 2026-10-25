@@ -36,7 +36,7 @@ void main() {
 
   /// La schermata come la costruisce la casa: l'indice viene da fuori.
   Widget schermata(Sessione s) => MaterialApp(
-        theme: temaDati(TemaId.scuro),
+        theme: temaDati(TemaId.prisma),
         home: SezioneDatabase(
             sessione: s, indice: IndiceRicerca(s.vault.credenziali)),
       );
@@ -85,7 +85,7 @@ void main() {
     final indice = IndiceRicerca(sessione.vault.credenziali);
 
     Widget conStessoIndice() => MaterialApp(
-          theme: temaDati(TemaId.scuro),
+          theme: temaDati(TemaId.prisma),
           home: SezioneDatabase(sessione: sessione, indice: indice),
         );
 

@@ -32,100 +32,128 @@
    blocco intero, altrimenti questa pagina dice bugie sui contrasti, che e'
    peggio che non averla.
    ========================================================================== */
-:root, [data-tema="scuro"]{
-    /* Superfici, in ordine di vicinanza a chi guarda: s0 e' il fondo della
-       pagina, s3 e' cio' che sta piu' in alto. I nomi di prima (bg, panel,
-       panel2) non dicevano quale stesse sopra quale, e infatti `panel2` era
-       piu' scuro di `panel` ma si usava per gli incassi. */
-    --s0:#080B14; --s1:#0E1524; --s2:#121A2B; --s3:#18223A;
-    --brd:#1F2A40; --brd-forte:#2C3A56;
+:root, body, [data-tema="prisma"]{
+  /* Superfici, in ordine di vicinanza a chi guarda: s0 e' il fondo della
+     pagina, s3 e' cio' che sta piu' in alto. s2 e' il «vetro solido»: il
+     colore delle schede, e quello su cui si calcolano i contrasti. Le
+     schede non sfocano cio' che hanno dietro (vedi `.cred`), quindi il
+     testo sta sempre su s2 e non su una costellazione in movimento. */
+  --s0:#04050E; --s1:#090B1E; --s2:#0D1027; --s3:#151935;
+  /* Bordi traslucidi e non pieni: su un fondo che si muove, un bordo
+     pieno disegna una cornice, uno traslucido un filo di luce. */
+  --brd:rgba(170,178,255,.13); --brd-forte:rgba(170,178,255,.24);
 
-    /* Testo secondario. Ha una storia: sul web valeva #5A6884 (3,51:1, sotto
-       il minimo AA di 4,5) e la prima correzione scelse il valore MINIMO che
-       superasse la soglia. Poi lo stesso valore e' finito su Android, dove
-       `tenue` era gia' #8FA0C0 a 7,45:1 — cioe' la correzione del PC ha
-       peggiorato il telefono, e sul telefono si e' visto: il pulsante
-       «Importa un altro backup» sembrava spento. 4,5 e' un pavimento, non un
-       obiettivo. */
-    /* --t1 esiste per non riscrivere `#fff`, che nel tema chiaro andava
-       corretto elemento per elemento con una lista di selettori a cui
-       bisognava ricordarsi di aggiungere ogni cosa nuova. */
-    --t1:#FFFFFF; --t2:#AEB9CF; --t3:#8FA0C0;
+  /* Testo secondario. 4,5 e' un pavimento, non un obiettivo: --t3 qui
+     vale 6,5:1 su s2. La storia: sul web era #5A6884 (3,51:1), la prima
+     correzione scelse il valore MINIMO che superasse la soglia, e quel
+     valore portato su Android peggioro' il telefono, dove il pulsante
+     «Importa un altro backup» sembro' spento. */
+  --t1:#F3F4FF; --t2:#B6BCE2; --t3:#8F96C6;
 
-    --acc:#38BDF8; --acc-su:#04121C; --acc-velo:rgba(56,189,248,.12);
-    --vio:#7B7DF3; --vio-pieno:#4F46E5;
-    --ok:#34D399; --ok-velo:rgba(52,211,153,.10);
-    /* Rosso e giallo erano scritti a mano (#FCA5A5, #FBBF24) in venti punti e
-       nessuno dei due era corretto dal tema chiaro: finivano su bianco a
-       2:1, cioe' gli errori si leggevano solo sapendo gia' che c'erano. */
-    --err:#FCA5A5; --err-velo:rgba(252,165,165,.09);
-    --warn:#FBBF24; --warn-velo:rgba(251,191,36,.10);
+  /* I tre neon. Il primo e il secondo fanno le sfumature (pulsanti,
+     interruttori, il bordo a prisma), il terzo compare solo dentro il
+     prisma. --acc e' il neon-2 usato come colore di testo. */
+  --neon-1:#8C7CFF; --neon-2:#3CE2FF; --neon-3:#FF5AD9; --su-neon:#060418;
+  --acc:var(--neon-2); --acc-su:var(--su-neon); --acc-velo:rgba(60,226,255,.12);
+  --vio:var(--neon-1); --vio-pieno:#5B48E6;
+  --ok:#46E9B2; --ok-velo:rgba(70,233,178,.10);
+  /* Rosso e giallo erano scritti a mano (#FCA5A5, #FBBF24) in venti punti e
+     nessuno dei due era corretto dal tema chiaro: finivano su bianco a
+     2:1, cioe' gli errori si leggevano solo sapendo gia' che c'erano. */
+  --err:#FF7C95; --err-velo:rgba(255,124,149,.09);
+  --warn:#FFC960; --warn-velo:rgba(255,201,96,.10);
 
-    /* Vetro. La cornice dell'app (intestazione, tab, barra di scrittura,
-       menu) e' una superficie sola: sfoca cio' che ci scorre sotto e si
-       tinge verso il fondo, invece di essere un colore opaco che nel tema
-       chiaro diventava una fascia grigia. */
-    --gl-bg:rgba(9,13,24,.66); --gl-bg-2:rgba(9,13,24,.52);
-    --gl-brd:rgba(255,255,255,.10); --gl-luce:rgba(255,255,255,.34);
-    --gl-blur:18px;
-    /* L'interruttore ha una traccia sua: `--gl-bg` e' un velo che va verso il
-       fondo, e la pallina (bianca) nel tema chiaro ci sparirebbe dentro. */
-    --sw-off:rgba(255,255,255,.10);
-    --gl-acc:rgba(56,189,248,.55); --gl-acc-brd:rgba(56,189,248,.7);
+  /* Vetro. La cornice dell'app (intestazione, tab, barra di scrittura,
+     menu) e' una superficie sola: sfoca cio' che ci scorre sotto e si
+     tinge verso il fondo. Sono le uniche superfici che sfocano: ognuna
+     va ricalcolata a ogni fotogramma della costellazione, e sono poche e
+     quasi vuote di testo. */
+  --gl-bg:rgba(9,11,28,.70); --gl-bg-2:rgba(9,11,28,.55);
+  --gl-brd:rgba(170,178,255,.12); --gl-luce:rgba(255,255,255,.28);
+  --gl-blur:22px;
+  /* L'interruttore ha una traccia sua: `--gl-bg` e' un velo che va verso il
+     fondo, e la pallina (bianca) nel tema chiaro ci sparirebbe dentro. */
+  --sw-off:rgba(255,255,255,.08);
+  --gl-acc:rgba(140,124,255,.55); --gl-acc-brd:rgba(140,124,255,.75);
 
-    /* Ombre, non bagliori: il box-shadow ciano da 28px sulla schermata di
-       sblocco faceva molto videogioco e poco strumento di sicurezza. */
-    --el1:0 1px 2px rgba(0,0,0,.45);
-    --el2:0 8px 28px rgba(0,0,0,.45);
-    --el3:0 24px 64px rgba(0,0,0,.55);
-    --anello:0 0 0 2px var(--s0),0 0 0 4px var(--acc);
+  /* Lo sfondo (vedi #sfondo): il fondo sfumato, i tre aloni dell'aurora,
+     il colore dei punti, la grana e la vignetta. */
+  --abisso-2:#0B0D24;
+  --alone-1:rgba(112,92,255,.34); --alone-2:rgba(40,205,255,.20); --alone-3:rgba(255,80,205,.13);
+  --punto:196,206,255;
+  --velo:rgba(4,5,14,.62);
+  --vignetta:rgba(0,0,0,.5);
+  --grana-op:.07; --grana-modo:overlay;
 
-    --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:24px; --sp6:32px;
-    --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:999px;
-    --dur1:120ms; --dur2:220ms; --dur3:380ms;
-    --ease:cubic-bezier(.2,.7,.3,1);
-    --molla:cubic-bezier(.34,1.56,.64,1);
+  --el1:0 1px 2px rgba(0,0,0,.45);
+  --el2:0 12px 36px -12px rgba(0,0,0,.6);
+  --el3:0 30px 80px -24px rgba(0,0,0,.75);
+  --anello:0 0 0 2px var(--s0),0 0 0 4px var(--acc);
 
-    /* Font di sistema. Prima arrivavano da fonts.googleapis.com: in un
-       gestore di password che si vanta di essere offline, ogni avvio diceva
-       a Google che l'app era aperta -- e senza rete la tipografia spariva
-       comunque, perche' il ripiego era il font di sistema. */
-    --disp:'Space Grotesk','Segoe UI Variable Display','Segoe UI',sans-serif;
-    --body:'Inter','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
-    --mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;
-  
+  --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:24px; --sp6:32px;
+  --r-sm:8px; --r-md:12px; --r-lg:16px; --r-xl:20px; --r-full:999px;
+  --dur1:120ms; --dur2:220ms; --dur3:380ms;
+  --ease:cubic-bezier(.2,.7,.3,1);
+  --molla:cubic-bezier(.34,1.56,.64,1);
+
+  /* I font stanno in app/web/fonts/ (vedi il blocco @font-face piu' sopra).
+     Dopo ognuno resta la catena di ripiego di sistema: se un giorno un file
+     sparisse, l'app resterebbe leggibile invece di cadere sul serif del
+     browser. */
+  --disp:'Space Grotesk','Segoe UI Variable Display','Segoe UI',sans-serif;
+  --body:'Inter','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
+  --mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;
+  /* La grana: rumore in SVG, dentro la pagina. Toglie alle sfumature
+     grandi le bande che lo schermo farebbe vedere. */
+  --grana-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-[data-tema="chiaro"]{
-    --s0:#F4F7FC; --s1:#EEF3FA; --s2:#FFFFFF; --s3:#F8FBFF;
-    --brd:#D9E2F0; --brd-forte:#C2D0E4;
-    --t1:#0F1729; --t2:#2F3D57; --t3:#4F5D75;
-    --acc:#0369A1; --acc-su:#FFFFFF; --acc-velo:rgba(3,105,161,.09);
-    --vio:#4F46E5; --vio-pieno:#4338CA;
-    --ok:#047857; --ok-velo:rgba(4,120,87,.09);
-    --err:#B91C1C; --err-velo:rgba(185,28,28,.08);
-    --warn:#B45309; --warn-velo:rgba(180,83,9,.09);
-    --gl-bg:rgba(255,255,255,.72); --gl-bg-2:rgba(248,251,255,.62);
-    --gl-brd:rgba(15,23,41,.10); --gl-luce:rgba(255,255,255,.9);
-    --sw-off:rgba(15,23,41,.10);
-    --gl-acc:rgba(3,105,161,.55); --gl-acc-brd:rgba(3,105,161,.6);
-    --el1:0 1px 2px rgba(15,23,41,.08);
-    --el2:0 8px 28px rgba(15,23,41,.10);
-    --el3:0 24px 64px rgba(15,23,41,.14);
-  
+/* GHIACCIO */
+[data-tema="ghiaccio"]{
+  --s0:#E4E8F5; --s1:#EEF1FA; --s2:#F6F7FD; --s3:#FFFFFF;
+  --brd:rgba(40,52,130,.14); --brd-forte:rgba(40,52,130,.26);
+  --t1:#0B0F2E; --t2:#343B67; --t3:#515985;
+  --neon-1:#5440E6; --neon-2:#006489; --neon-3:#CF37AE; --su-neon:#FFFFFF;
+  --acc-velo:rgba(0,100,137,.09);
+  --vio-pieno:#4A36E0;
+  --ok:#03684E; --ok-velo:rgba(3,104,78,.09);
+  --err:#B01F41; --err-velo:rgba(176,31,65,.08);
+  --warn:#8A4C00; --warn-velo:rgba(138,76,0,.09);
+  --gl-bg:rgba(255,255,255,.66); --gl-bg-2:rgba(255,255,255,.52);
+  --gl-brd:rgba(40,52,130,.12); --gl-luce:rgba(255,255,255,.9);
+  --sw-off:rgba(20,30,90,.10);
+  --gl-acc:rgba(84,64,230,.55); --gl-acc-brd:rgba(84,64,230,.6);
+  --abisso-2:#F6F8FE;
+  --alone-1:rgba(125,105,255,.32); --alone-2:rgba(0,185,240,.24); --alone-3:rgba(255,105,215,.18);
+  --punto:52,62,140;
+  --velo:rgba(244,246,253,.7);
+  --vignetta:rgba(150,160,205,.35);
+  --grana-op:.10; --grana-modo:soft-light;
+  --el1:0 1px 2px rgba(30,40,100,.10);
+  --el2:0 12px 36px -12px rgba(30,40,100,.22);
+  --el3:0 30px 80px -24px rgba(30,40,100,.35);
 }
 
-[data-tema="notte"]{
-    --s0:#050912; --s1:#0B1226; --s2:#0E1730; --s3:#152043;
-    --brd:#1E2C4C; --brd-forte:#2B3C63;
-    --t1:#FFFFFF; --t2:#B9C4DB; --t3:#8FA0C0;
-    --acc:#E3B341; --acc-su:#1A1206; --acc-velo:rgba(227,179,65,.12);
-    --vio:#D8A544; --vio-pieno:#1E3A8A;
-    --ok:#4ADE80; --ok-velo:rgba(74,222,128,.10);
-    --gl-bg:rgba(5,9,20,.7); --gl-bg-2:rgba(5,9,20,.55);
-    --sw-off:rgba(255,255,255,.09);
-    --gl-acc:rgba(227,179,65,.5); --gl-acc-brd:rgba(227,179,65,.65);
-  
+/* NOTTE E ORO */
+[data-tema="oro"]{
+  --s0:#03050C; --s1:#080B1A; --s2:#0C1024; --s3:#141A36;
+  --brd:rgba(255,215,140,.12); --brd-forte:rgba(255,215,140,.22);
+  --t1:#FFF8EA; --t2:#D6CCB8; --t3:#ABA08B;
+  --neon-1:#E9A93A; --neon-2:#FFD978; --neon-3:#6F8CFF; --su-neon:#1B1306;
+  --acc-velo:rgba(255,217,120,.12);
+  --vio-pieno:#2A3F9E;
+  --ok:#5BE39A; --ok-velo:rgba(91,227,154,.10);
+  --err:#FF8A8A; --err-velo:rgba(255,138,138,.09);
+  --gl-bg:rgba(5,8,20,.72); --gl-bg-2:rgba(5,8,20,.56);
+  --gl-brd:rgba(255,215,140,.12); --gl-luce:rgba(255,240,210,.26);
+  --sw-off:rgba(255,240,210,.08);
+  --gl-acc:rgba(233,169,58,.55); --gl-acc-brd:rgba(233,169,58,.7);
+  --abisso-2:#0D1022;
+  --alone-1:rgba(233,169,58,.22); --alone-2:rgba(60,90,220,.28); --alone-3:rgba(255,190,90,.10);
+  --punto:255,226,170;
+  --velo:rgba(3,5,12,.62);
+  --vignetta:rgba(0,0,0,.55);
+  --el3:0 30px 80px -24px rgba(0,0,0,.8);
 }
 
 /* ==========================================================================
@@ -338,7 +366,7 @@ table.cr td.n{font-family:var(--mono); font-size:12.5px}
 }
 </style>
 </head>
-<body data-tema="scuro">
+<body data-tema="prisma">
 
 <!-- ICONE:INIZIO -->
 <svg width="0" height="0" aria-hidden="true" style="position:absolute">
@@ -412,9 +440,9 @@ table.cr td.n{font-family:var(--mono); font-size:12.5px}
 <header class="top">
   <div class="marchio">VaultMind<small>sistema visivo</small></div>
   <div class="temi" role="group" aria-label="Tema">
-    <button data-t="scuro" aria-pressed="true"><svg class="ic ic-16" aria-hidden="true"><use href="#i-luna"/></svg>Scuro</button>
-    <button data-t="chiaro" aria-pressed="false"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sole"/></svg>Chiaro</button>
-    <button data-t="notte" aria-pressed="false"><svg class="ic ic-16" aria-hidden="true"><use href="#i-notte"/></svg>Notte e oro</button>
+    <button data-t="prisma" aria-pressed="true">Prisma</button>
+    <button data-t="ghiaccio" aria-pressed="false">Ghiaccio</button>
+    <button data-t="oro" aria-pressed="false">Notte e oro</button>
   </div>
 </header>
 
@@ -690,11 +718,12 @@ function cr(a,b){
 }
 
 /* I valori di partenza, per la colonna "prima". Non sono calcolati: sono
-   quelli che stanno oggi in index.html. */
+   quelli dei temi che questi hanno sostituito (Scuro, Chiaro, Notte e oro
+   di prima del 25/10/2026). */
 const PRIMA={
-  scuro:{t3:'#7C8AA8', vio:'#6366F1'},
-  chiaro:{t3:'#5C6C87', vio:'#4F46E5'},
-  notte:{t3:'#7E8CAC', vio:'#C9922E'}
+  prisma:{t3:'#8FA0C0', vio:'#7B7DF3'},
+  ghiaccio:{t3:'#4F5D75', vio:'#4F46E5'},
+  oro:{t3:'#8FA0C0', vio:'#D8A544'}
 };
 const RIGHE=[
   ['--t1','Testo principale'], ['--t2','Testo corrente'],

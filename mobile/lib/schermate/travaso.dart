@@ -228,7 +228,7 @@ class _SchermataTravasoState extends State<SchermataTravaso> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: context.cSuAccento))
+                            strokeWidth: 2, color: context.cAccento))
                     : const Text('Ricevi il vault',
                         style: TextStyle(fontWeight: FontWeight.w600)),
               ),

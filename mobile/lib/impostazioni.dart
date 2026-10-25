@@ -1,4 +1,4 @@
-/// Le preferenze dell'app: tema e auto-blocco.
+/// Le preferenze dell'app: tema, sfondi e auto-blocco.
 ///
 /// Stanno in un file JSON accanto al vault (`deposito.dart`), non in un
 /// pacchetto di impostazioni: sono due valori, e una dipendenza in più è una
@@ -12,13 +12,14 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 
 import 'deposito.dart';
+import 'sfondo.dart';
 import 'sync_protocollo.dart';
 import 'tema.dart';
 
 class Impostazioni {
-  /// Il predefinito è **Scuro**, blu con l'accento azzurro: lo stesso del PC.
-  /// Fino al 16/09/2026 sul telefono era «Notte e oro», e le due app
-  /// sembravano due prodotti.
+  /// Il predefinito è **Prisma**, come sul PC e nell'estensione. Fino al
+  /// 16/09/2026 sul telefono era «Notte e oro», e le due app sembravano due
+  /// prodotti; dal 25/10/2026 i tre temi sono quelli nuovi (vedi [fromJson]).
   TemaId tema;
 
   /// L'utente ha scelto il tema dalle Impostazioni?
@@ -29,6 +30,16 @@ class Impostazioni {
   /// voce, il nuovo predefinito non sarebbe mai arrivato a chi aveva già
   /// aperto l'app una volta.
   bool temaScelto;
+
+  /// Lo sfondo di ognuna delle tre sezioni: costellazione, aurora o tinta
+  /// unita. Le Categorie seguono il Database.
+  ///
+  /// Una scelta per sezione e non una per tutta l'app perché ognuna ha il suo
+  /// carattere: lo sblocco è una porta, la chat una conversazione, il database
+  /// un archivio. I predefiniti sono gli stessi del PC.
+  Sfondo sfondoSblocco;
+  Sfondo sfondoChat;
+  Sfondo sfondoDatabase;
 
   /// Minuti di inattività dopo i quali il vault si richiude. 0 = mai.
   int autoBlocco;
@@ -120,8 +131,11 @@ class Impostazioni {
   int aggRinviataQuando;
 
   Impostazioni({
-    this.tema = TemaId.scuro,
+    this.tema = TemaId.prisma,
     this.temaScelto = false,
+    this.sfondoSblocco = Sfondo.costellazione,
+    this.sfondoChat = Sfondo.aurora,
+    this.sfondoDatabase = Sfondo.costellazione,
     this.autoBlocco = 5,
     List<int>? pinnate,
     this.genLunghezza = 20,
@@ -146,6 +160,14 @@ class Impostazioni {
   Map<String, dynamic> toJson() => {
         'tema': tema.name,
         if (temaScelto) 'temaScelto': true,
+        // Gli sfondi si scrivono solo se diversi dal predefinito: così, se un
+        // giorno il predefinito cambia, arriva anche a chi non l'ha mai
+        // toccato. Col tema si era dovuto inventare `temaScelto` apposta.
+        if (sfondoSblocco != Sfondo.costellazione)
+          'sfondoSblocco': sfondoSblocco.name,
+        if (sfondoChat != Sfondo.aurora) 'sfondoChat': sfondoChat.name,
+        if (sfondoDatabase != Sfondo.costellazione)
+          'sfondoDatabase': sfondoDatabase.name,
         'autoBlocco': autoBlocco,
         'pinnate': pinnate,
         'genLunghezza': genLunghezza,
@@ -165,17 +187,37 @@ class Impostazioni {
         if (aggRinviataQuando > 0) 'aggRinviataQuando': aggRinviataQuando,
       };
 
+  /// Il tema salvato, tradotto dai nomi di prima del 25/10/2026.
+  ///
+  /// Scuro diventa Prisma e Chiaro diventa Ghiaccio: sono i loro posti nella
+  /// nuova terna, e chi aveva voluto il chiaro deve ritrovarsi un tema chiaro.
+  /// «Notte e oro» mai scelto era il predefinito fino al 16/09/2026, quindi
+  /// passa al predefinito di adesso; scelto, resta Notte e oro.
+  static TemaId _tema(Object? nome, bool scelto) {
+    switch (nome) {
+      case 'ghiaccio':
+      case 'chiaro':
+        return TemaId.ghiaccio;
+      case 'oro':
+        return TemaId.oro;
+      case 'notteOro':
+        return scelto ? TemaId.oro : TemaId.prisma;
+      default:
+        return TemaId.prisma;
+    }
+  }
+
+  static Sfondo _sfondo(Object? nome, Sfondo predefinito) => Sfondo.values
+      .firstWhere((s) => s.name == nome, orElse: () => predefinito);
+
   static Impostazioni fromJson(Map<String, dynamic> j) {
     final scelto = j['temaScelto'] == true;
-    final letto = TemaId.values.firstWhere(
-      (t) => t.name == j['tema'],
-      orElse: () => TemaId.scuro,
-    );
     return Impostazioni(
-        // «Notte e oro» mai scelto era il vecchio predefinito: passa al nuovo.
-        // Il chiaro invece non era predefinito, quindi qualcuno l'ha voluto.
-        tema: !scelto && letto == TemaId.notteOro ? TemaId.scuro : letto,
+        tema: _tema(j['tema'], scelto),
         temaScelto: scelto,
+        sfondoSblocco: _sfondo(j['sfondoSblocco'], Sfondo.costellazione),
+        sfondoChat: _sfondo(j['sfondoChat'], Sfondo.aurora),
+        sfondoDatabase: _sfondo(j['sfondoDatabase'], Sfondo.costellazione),
         autoBlocco: (j['autoBlocco'] as num?)?.toInt() ?? 5,
         pinnate: ((j['pinnate'] ?? const []) as List)
             .map((x) => (x as num).toInt())
@@ -214,6 +256,9 @@ class Impostazioni {
   Impostazioni copia({
     TemaId? tema,
     bool? temaScelto,
+    Sfondo? sfondoSblocco,
+    Sfondo? sfondoChat,
+    Sfondo? sfondoDatabase,
     int? autoBlocco,
     List<int>? pinnate,
     int? genLunghezza,
@@ -233,6 +278,9 @@ class Impostazioni {
       Impostazioni(
         tema: tema ?? this.tema,
         temaScelto: temaScelto ?? this.temaScelto,
+        sfondoSblocco: sfondoSblocco ?? this.sfondoSblocco,
+        sfondoChat: sfondoChat ?? this.sfondoChat,
+        sfondoDatabase: sfondoDatabase ?? this.sfondoDatabase,
         autoBlocco: autoBlocco ?? this.autoBlocco,
         pinnate: pinnate ?? this.pinnate,
         genLunghezza: genLunghezza ?? this.genLunghezza,

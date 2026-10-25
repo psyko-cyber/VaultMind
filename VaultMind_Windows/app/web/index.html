@@ -45,60 +45,79 @@
     unicode-range:U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF}
 
   /* ======================================================================
-     I TOKEN.
+     I TOKEN. Tre temi: Prisma (il predefinito), Ghiaccio, Notte e oro.
+     Hanno sostituito Scuro, Chiaro e Notte e oro il 25/10/2026; chi aveva
+     scelto uno dei vecchi ritrova il suo corrispondente (vedi `TEMI_VECCHI`
+     in fondo alla pagina).
+
      Si provano in `design/anteprima.html`, che si apre con doppio clic e
      mostra i tre temi uno accanto all'altro: cambiare un colore qui dentro
      vorrebbe dire ricostruire l'exe per guardarlo.
 
      Gli stessi valori stanno in `mobile/lib/tema.dart` e in
      `extension/popup.html`. Se cambiano qui, cambiano anche li'.
+
+     `:root,body` e non solo `:root`: alcuni token sono fatti di altri
+     (`--acc` e' `var(--neon-2)`), e una variabile si calcola dove e'
+     dichiarata. Dichiarati solo su :root, resterebbero quelli di Prisma
+     anche quando il tema del body cambia --neon-2.
      ====================================================================== */
-  :root{
+  :root,body{
     /* Superfici, in ordine di vicinanza a chi guarda: s0 e' il fondo della
-       pagina, s3 e' cio' che sta piu' in alto. I nomi di prima (bg, panel,
-       panel2) non dicevano quale stesse sopra quale, e infatti `panel2` era
-       piu' scuro di `panel` ma si usava per gli incassi. */
-    --s0:#080B14; --s1:#0E1524; --s2:#121A2B; --s3:#18223A;
-    --brd:#1F2A40; --brd-forte:#2C3A56;
+       pagina, s3 e' cio' che sta piu' in alto. s2 e' il «vetro solido»: il
+       colore delle schede, e quello su cui si calcolano i contrasti. Le
+       schede non sfocano cio' che hanno dietro (vedi `.cred`), quindi il
+       testo sta sempre su s2 e non su una costellazione in movimento. */
+    --s0:#04050E; --s1:#090B1E; --s2:#0D1027; --s3:#151935;
+    /* Bordi traslucidi e non pieni: su un fondo che si muove, un bordo
+       pieno disegna una cornice, uno traslucido un filo di luce. */
+    --brd:rgba(170,178,255,.13); --brd-forte:rgba(170,178,255,.24);
 
-    /* Testo secondario. Ha una storia: sul web valeva #5A6884 (3,51:1, sotto
-       il minimo AA di 4,5) e la prima correzione scelse il valore MINIMO che
-       superasse la soglia. Poi lo stesso valore e' finito su Android, dove
-       `tenue` era gia' #8FA0C0 a 7,45:1 — cioe' la correzione del PC ha
-       peggiorato il telefono, e sul telefono si e' visto: il pulsante
-       «Importa un altro backup» sembrava spento. 4,5 e' un pavimento, non un
-       obiettivo. */
-    /* --t1 esiste per non riscrivere `#fff`, che nel tema chiaro andava
-       corretto elemento per elemento con una lista di selettori a cui
-       bisognava ricordarsi di aggiungere ogni cosa nuova. */
-    --t1:#FFFFFF; --t2:#AEB9CF; --t3:#8FA0C0;
+    /* Testo secondario. 4,5 e' un pavimento, non un obiettivo: --t3 qui
+       vale 6,5:1 su s2. La storia: sul web era #5A6884 (3,51:1), la prima
+       correzione scelse il valore MINIMO che superasse la soglia, e quel
+       valore portato su Android peggioro' il telefono, dove il pulsante
+       «Importa un altro backup» sembro' spento. */
+    --t1:#F3F4FF; --t2:#B6BCE2; --t3:#8F96C6;
 
-    --acc:#38BDF8; --acc-su:#04121C; --acc-velo:rgba(56,189,248,.12);
-    --vio:#7B7DF3; --vio-pieno:#4F46E5;
-    --ok:#34D399; --ok-velo:rgba(52,211,153,.10);
+    /* I tre neon. Il primo e il secondo fanno le sfumature (pulsanti,
+       interruttori, il bordo a prisma), il terzo compare solo dentro il
+       prisma. --acc e' il neon-2 usato come colore di testo. */
+    --neon-1:#8C7CFF; --neon-2:#3CE2FF; --neon-3:#FF5AD9; --su-neon:#060418;
+    --acc:var(--neon-2); --acc-su:var(--su-neon); --acc-velo:rgba(60,226,255,.12);
+    --vio:var(--neon-1); --vio-pieno:#5B48E6;
+    --ok:#46E9B2; --ok-velo:rgba(70,233,178,.10);
     /* Rosso e giallo erano scritti a mano (#FCA5A5, #FBBF24) in venti punti e
        nessuno dei due era corretto dal tema chiaro: finivano su bianco a
        2:1, cioe' gli errori si leggevano solo sapendo gia' che c'erano. */
-    --err:#FCA5A5; --err-velo:rgba(252,165,165,.09);
-    --warn:#FBBF24; --warn-velo:rgba(251,191,36,.10);
+    --err:#FF7C95; --err-velo:rgba(255,124,149,.09);
+    --warn:#FFC960; --warn-velo:rgba(255,201,96,.10);
 
     /* Vetro. La cornice dell'app (intestazione, tab, barra di scrittura,
        menu) e' una superficie sola: sfoca cio' che ci scorre sotto e si
-       tinge verso il fondo, invece di essere un colore opaco che nel tema
-       chiaro diventava una fascia grigia. */
-    --gl-bg:rgba(9,13,24,.66); --gl-bg-2:rgba(9,13,24,.52);
-    --gl-brd:rgba(255,255,255,.10); --gl-luce:rgba(255,255,255,.34);
-    --gl-blur:18px;
+       tinge verso il fondo. Sono le uniche superfici che sfocano: ognuna
+       va ricalcolata a ogni fotogramma della costellazione, e sono poche e
+       quasi vuote di testo. */
+    --gl-bg:rgba(9,11,28,.70); --gl-bg-2:rgba(9,11,28,.55);
+    --gl-brd:rgba(170,178,255,.12); --gl-luce:rgba(255,255,255,.28);
+    --gl-blur:22px;
     /* L'interruttore ha una traccia sua: `--gl-bg` e' un velo che va verso il
        fondo, e la pallina (bianca) nel tema chiaro ci sparirebbe dentro. */
-    --sw-off:rgba(255,255,255,.10);
-    --gl-acc:rgba(56,189,248,.55); --gl-acc-brd:rgba(56,189,248,.7);
+    --sw-off:rgba(255,255,255,.08);
+    --gl-acc:rgba(140,124,255,.55); --gl-acc-brd:rgba(140,124,255,.75);
 
-    /* Ombre, non bagliori: il box-shadow ciano da 28px sulla schermata di
-       sblocco faceva molto videogioco e poco strumento di sicurezza. */
+    /* Lo sfondo (vedi #sfondo): il fondo sfumato, i tre aloni dell'aurora,
+       il colore dei punti, la grana e la vignetta. */
+    --abisso-2:#0B0D24;
+    --alone-1:rgba(112,92,255,.34); --alone-2:rgba(40,205,255,.20); --alone-3:rgba(255,80,205,.13);
+    --punto:196,206,255;
+    --velo:rgba(4,5,14,.62);
+    --vignetta:rgba(0,0,0,.5);
+    --grana-op:.07; --grana-modo:overlay;
+
     --el1:0 1px 2px rgba(0,0,0,.45);
-    --el2:0 8px 28px rgba(0,0,0,.45);
-    --el3:0 24px 64px rgba(0,0,0,.55);
+    --el2:0 12px 36px -12px rgba(0,0,0,.6);
+    --el3:0 30px 80px -24px rgba(0,0,0,.75);
     --anello:0 0 0 2px var(--s0),0 0 0 4px var(--acc);
 
     --sp1:4px; --sp2:8px; --sp3:12px; --sp4:16px; --sp5:24px; --sp6:32px;
@@ -114,7 +133,13 @@
     --disp:'Space Grotesk','Segoe UI Variable Display','Segoe UI',sans-serif;
     --body:'Inter','Segoe UI Variable Text','Segoe UI',system-ui,sans-serif;
     --mono:'JetBrains Mono','Cascadia Mono',Consolas,ui-monospace,monospace;
+    /* La grana: rumore in SVG, dentro la pagina. Toglie alle sfumature
+       grandi le bande che lo schermo farebbe vedere. */
+    --grana-img:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
   }
+  /* L'angolo del bordo a prisma deve potersi animare: senza @property il
+     conic-gradient salterebbe da 0 a 360 gradi invece di girare. */
+  @property --ang{syntax:'<angle>';inherits:false;initial-value:0deg}
   *{box-sizing:border-box} html,body{margin:0;height:100%}
   /* scrollbar discreta e moderna */
   *{scrollbar-width:thin;scrollbar-color:var(--brd) transparent}
@@ -122,21 +147,65 @@
   *::-webkit-scrollbar-track{background:transparent}
   *::-webkit-scrollbar-thumb{background:var(--brd);border-radius:8px;border:2px solid transparent;background-clip:padding-box}
   *::-webkit-scrollbar-thumb:hover{background:var(--t3);background-clip:padding-box;border:2px solid transparent}
-  body{background:var(--s0);color:var(--t2);font-family:var(--body);
-    background-image:radial-gradient(rgba(56,189,248,.025) 1px,transparent 1px);background-size:24px 24px;}
-  /* I due aloni dietro tutto. Non sono decorazione: il vetro sfoca cio' che
-     ha dietro, e dietro una fascia di colore piatto non c'e' niente da
-     sfocare -- l'intestazione resterebbe una pillola opaca. Sono fissi, non
-     scorrono, quindi il contenuto ci passa sotto e il vetro lo mostra. */
-  body::before{content:"";position:fixed;inset:0;pointer-events:none;z-index:0;
-    background:
-      radial-gradient(60vw 50vh at 10% -10%, var(--acc-velo), transparent 70%),
-      radial-gradient(50vw 45vh at 95% 12%, rgba(99,102,241,.10), transparent 70%)}
-  body[data-theme="night"]::before{
-    background:
-      radial-gradient(60vw 50vh at 10% -10%, var(--acc-velo), transparent 70%),
-      radial-gradient(50vw 45vh at 95% 12%, rgba(30,58,138,.16), transparent 70%)}
+  body{background:var(--s0);color:var(--t2);font-family:var(--body);-webkit-font-smoothing:antialiased}
+
+  /* ---- LO SFONDO ---------------------------------------------------------
+     Dietro tutto, fisso: il contenuto ci scorre sopra e il vetro della
+     cornice lo mostra sfocato. Non e' decorazione e basta: dietro una
+     fascia di colore piatto il vetro non avrebbe niente da sfocare, e
+     l'intestazione resterebbe una pillola opaca.
+
+     Tre sfondi, scelti uno per sezione (sblocco, chat, database) in
+     Impostazioni → Aspetto: `body[data-sfondo]` dice quale si vede adesso.
+     - costellazione: l'aurora piu' la nuvola di punti (il canvas #cielo);
+     - aurora: tre aloni che derivano, lentissimi;
+     - tinta: il fondo pieno.
+     I livelli non si accendono e spengono con `display`: sfumano, cosi'
+     passare da una sezione all'altra non fa un lampo. ---- */
+  #sfondo{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;
+    background:radial-gradient(120% 90% at 50% 0%,var(--abisso-2),var(--s0) 70%);
+    transition:background var(--dur3) var(--ease)}
+  #sfondo > *{position:absolute;inset:0;transition:opacity .7s var(--ease)}
+  #sfondo .aurora i{position:absolute;width:62%;aspect-ratio:1;border-radius:50%;will-change:transform}
+  #sfondo .aurora i:nth-child(1){background:radial-gradient(circle,var(--alone-1),transparent 64%);left:-14%;top:-34%;animation:deriva1 70s ease-in-out infinite alternate}
+  #sfondo .aurora i:nth-child(2){background:radial-gradient(circle,var(--alone-2),transparent 64%);right:-20%;top:4%;animation:deriva2 90s ease-in-out infinite alternate}
+  #sfondo .aurora i:nth-child(3){background:radial-gradient(circle,var(--alone-3),transparent 64%);left:24%;bottom:-52%;animation:deriva3 80s ease-in-out infinite alternate}
+  @keyframes deriva1{to{transform:translate(22%,14%) scale(1.15)}}
+  @keyframes deriva2{to{transform:translate(-18%,20%) scale(.9)}}
+  @keyframes deriva3{to{transform:translate(-14%,-18%) scale(1.2)}}
+  #cielo{width:100%;height:100%;display:block}
+  #sfondo .grana{background-image:var(--grana-img);opacity:var(--grana-op);mix-blend-mode:var(--grana-modo)}
+  #sfondo .vignetta{background:radial-gradient(130% 100% at 50% 40%,transparent 55%,var(--vignetta))}
+  body:not([data-sfondo="costellazione"]) #cielo{opacity:0}
+  body[data-sfondo="tinta"] #sfondo .aurora{opacity:0}
+  /* Spenta non vuol dire ferma: tre animazioni infinite sotto una tinta
+     unita farebbero lavorare il compositore per niente. */
+  body[data-sfondo="tinta"] #sfondo .aurora i{animation-play-state:paused}
+  body[data-sfondo="tinta"] #sfondo{background:var(--s0)}
   #lock,#app{position:relative;z-index:1}
+
+  /* ---- IL BORDO A PRISMA -------------------------------------------------
+     UNA cosa per schermata, quella che conta: la porta del vault, la voce
+     appena trovata. Se fosse ovunque non indicherebbe piu' niente. */
+  .prisma{position:relative}
+  .prisma::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;pointer-events:none;z-index:2;
+    background:conic-gradient(from var(--ang),
+      color-mix(in srgb,var(--neon-1) 75%,transparent),
+      color-mix(in srgb,var(--neon-2) 90%,transparent),
+      color-mix(in srgb,var(--neon-3) 65%,transparent),
+      var(--brd-forte) 70%,
+      color-mix(in srgb,var(--neon-1) 75%,transparent));
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+  .prisma.nuova::before{animation:giro 1.8s var(--ease) both}
+  .prisma.acceso::before{animation:giro 14s linear infinite}
+  @keyframes giro{to{--ang:360deg}}
+
+  /* Il logo con l'anello di luce che gli gira intorno: solo nello sblocco. */
+  .gemma{position:relative;display:inline-block;border-radius:24%}
+  .gemma img{position:relative;z-index:1;box-shadow:0 0 0 1px var(--brd-forte)}
+  .gemma::before{content:"";position:absolute;inset:-14px;border-radius:50%;
+    background:conic-gradient(from var(--ang),transparent 0 52%,color-mix(in srgb,var(--neon-2) 90%,transparent) 70%,var(--neon-1) 84%,transparent 97%);
+    filter:blur(12px);animation:giro 7s linear infinite}
   button{font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
   input{font-family:var(--body)}
   .hidden{display:none!important}
@@ -177,19 +246,28 @@
   /* lock */
   #lock{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
   .card{background:var(--s2);border:1px solid var(--brd);border-radius:var(--r-xl);
-    box-shadow:var(--el2)}
-  .lockbox{width:min(92vw,400px);padding:32px}
+    box-shadow:var(--el2),inset 0 1px 0 var(--gl-luce)}
+  /* La porta del vault: l'unica scheda di vetro vero (sfoca la costellazione
+     che ha dietro) e l'unica col prisma acceso in continuazione. */
+  .lockbox{width:min(92vw,420px);padding:36px 34px 28px;border-radius:28px;border-color:transparent;
+    background:color-mix(in srgb,var(--s2) 80%,transparent);box-shadow:var(--el3);
+    backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
+  .lockbox .badge-row{margin-bottom:22px}
   .badge-row{display:flex;justify-content:center;margin-bottom:14px}
   /* Il logo e' un PNG con un fondo quadrato suo, piu' chiaro di quello
      dell'app: senza smussatura si vede il quadrato e l'angolo sembra
      tagliato. Agli angoli c'e' solo fondo, il disegno non ci arriva. */
   .logo{border-radius:24%;display:block}
   .icon-chip{padding:12px;border-radius:var(--r-lg);background:var(--acc-velo);border:1px solid var(--gl-acc-brd);display:inline-flex}
-  .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:var(--t1);text-align:center;font-size:28px}
+  .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:var(--t1);text-align:center;font-size:30px}
   .sub{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--t3);text-align:center;margin-top:6px;text-transform:uppercase}
   label.lbl{font-family:var(--disp);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
   .field{width:100%;margin-top:6px;border-radius:12px;padding:12px 14px;background:var(--s1);
-    border:1px solid var(--brd);color:var(--t1);outline:none;font-family:var(--mono)}
+    border:1px solid var(--brd-forte);color:var(--t1);outline:none;font-family:var(--mono);
+    transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
+  .field:focus{border-color:var(--neon-2);
+    box-shadow:0 0 0 4px color-mix(in srgb,var(--neon-2) 16%,transparent),0 0 28px -10px var(--neon-2)}
+  .field::placeholder{color:var(--t3)}
   /* WebView2 dipinge i campi auto-compilati con un fondo chiaro suo (il giallo
      dell'autofill): nel tema scuro il campo sembrava di un altro tema, ed e'
      pure assurdo che un gestore di password si auto-compili da solo. `background`
@@ -199,23 +277,30 @@
     -webkit-text-fill-color:var(--t1);caret-color:var(--t1);
     -webkit-box-shadow:0 0 0 100px var(--s1) inset;
     transition:background-color 9999s ease-in-out 0s}
-  .btn{width:100%;margin-top:12px;border-radius:12px;padding:12px;font-weight:700;background:var(--acc);color:var(--acc-su)}
-  .btn:disabled{opacity:.4;cursor:default}
+  /* Il pulsante principale e' l'unico pieno di neon: la sfumatura dice
+     «questa e' l'azione», il bagliore sotto la stacca dal vetro. */
+  .btn{width:100%;margin-top:12px;border-radius:12px;padding:12px;font-weight:700;color:var(--su-neon);
+    background:linear-gradient(135deg,var(--neon-1),var(--neon-2));
+    box-shadow:0 10px 30px -12px color-mix(in srgb,var(--neon-1) 85%,transparent),inset 0 1px 0 rgba(255,255,255,.3);
+    transition:box-shadow var(--dur2) var(--ease),transform var(--dur1) var(--ease)}
+  .btn:not(:disabled):hover{box-shadow:0 14px 36px -12px color-mix(in srgb,var(--neon-2) 90%,transparent),inset 0 1px 0 rgba(255,255,255,.35)}
+  .btn:not(:disabled):active{transform:translateY(1px)}
+  .btn:disabled{opacity:.4;cursor:default;box-shadow:none}
   /* Le varianti del pulsante. Erano `style="..."` ripetuti nel markup: lo
      stesso pulsante aveva tre aspetti in tre modali diversi, e cambiare la
      palette non li raggiungeva. */
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px}
-  .btn.fantasma{background:transparent;border:1px solid var(--brd);color:var(--t2);margin-top:8px}
-  .btn.fantasma:hover{background:var(--s3);border-color:var(--brd-forte);color:var(--t1)}
-  .btn.tratteggiato{background:transparent;border:1px dashed var(--acc);color:var(--acc);margin-top:0}
+  .btn.fantasma{background:transparent;border:1px solid var(--brd-forte);color:var(--t2);margin-top:8px;box-shadow:none}
+  .btn.fantasma:hover{background:color-mix(in srgb,var(--t1) 5%,transparent);border-color:color-mix(in srgb,var(--neon-2) 50%,transparent);color:var(--t1);box-shadow:none}
+  .btn.tratteggiato{background:transparent;border:1px dashed var(--acc);color:var(--acc);margin-top:0;box-shadow:none}
   .btn.tratteggiato.vio{border-color:var(--vio);color:var(--vio)}
   .btn.compatto{padding:8px;width:auto}
-  .btn.pieno-vio{background:var(--vio-pieno);color:#fff}
+  .btn.pieno-vio{background:var(--vio-pieno);color:#fff;box-shadow:var(--el1)}
   .hint{font-size:11px;color:var(--t3);margin-top:12px;line-height:1.4}
   .err{color:var(--err);font-size:12px;margin-top:8px;font-family:var(--mono)}
   /* avviso di primo avvio: il vault non esiste ancora, la password va CREATA */
   .firstrun{margin-top:20px;padding:12px 14px;border-radius:12px;font-size:12px;line-height:1.5;
-    background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);color:var(--t2)}
+    background:color-mix(in srgb,var(--acc) 7%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);color:var(--t2)}
   .firstrun b{color:var(--acc);display:block;margin-bottom:3px}
 
   /* barra di avanzamento (import, operazioni lunghe).
@@ -237,9 +322,9 @@
   .hbrand{display:flex;align-items:center;gap:10px;color:var(--t1);font-family:var(--disp);font-weight:600;letter-spacing:-.3px;font-size:18px}
   .pills{display:flex;align-items:center;gap:8px}
   .pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
-  .pill.net{color:var(--ok);border:1px solid rgba(52,211,153,.35)}
-  .pill.db{color:var(--acc);border:1px solid rgba(34,211,238,.35)}
-  .pill.llm{color:var(--vio);border:1px solid rgba(167,139,250,.35)}
+  .pill.net{color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
+  .pill.db{color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
+  .pill.llm{color:var(--vio);border:1px solid color-mix(in srgb,var(--vio) 35%,transparent)}
   /* Il pulsante-icona. `inline-flex` non e' un vezzo: un <svg> e' un elemento
      in linea e poggia sulla linea di base del testo, quindi senza centratura
      esplicita il pulsante cresce di qualche pixel sotto e la fila di pulsanti
@@ -249,7 +334,7 @@
     border:1px solid var(--brd);color:var(--t2);
     transition:color var(--dur1) var(--ease),border-color var(--dur1) var(--ease),
                background var(--dur1) var(--ease)}
-  .iconbtn:hover{background:var(--s3);color:var(--t1);border-color:var(--brd-forte)}
+  .iconbtn:hover{background:color-mix(in srgb,var(--t1) 6%,transparent);color:var(--t1);border-color:color-mix(in srgb,var(--neon-2) 45%,transparent)}
   /* Le tre tinte che prima erano `style="border-color:...;color:..."` ripetuti
      nel markup, cioe' invisibili a chi cambia la palette. */
   .iconbtn.pericolo{border-color:var(--err);color:var(--err)}
@@ -264,13 +349,22 @@
   .row{display:flex;margin-bottom:12px}
   .row.user{justify-content:flex-end}
   .bubble{max-width:88%;border-radius:18px;padding:10px 16px;font-size:15px;line-height:1.5}
-  .b-user{background:var(--vio-pieno);color:#fff;box-shadow:var(--el1)}
-  .b-ai{background:var(--s2);border:1px solid var(--brd);color:var(--t2)}
+  /* Le due voci della chat: la tua e' tinta dei due neon, quella di mind e'
+     vetro solido. Nessuna delle due sfoca: sotto c'e' lo sfondo che si
+     muove, e il testo deve stare fermo su un colore pieno. */
+  .b-user{color:var(--t1);border-bottom-right-radius:6px;
+    background:linear-gradient(135deg,color-mix(in srgb,var(--neon-1) 34%,var(--s2)),color-mix(in srgb,var(--neon-2) 18%,var(--s2)));
+    border:1px solid color-mix(in srgb,var(--neon-1) 45%,transparent);
+    box-shadow:0 10px 30px -14px color-mix(in srgb,var(--neon-1) 70%,transparent)}
+  .b-ai{background:var(--s2);border:1px solid var(--brd);color:var(--t2);border-bottom-left-radius:6px;box-shadow:inset 0 1px 0 var(--gl-luce)}
   .ai-tag{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--acc);margin-bottom:5px;display:flex;align-items:center;gap:6px}
   .ai-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 6px var(--acc)}
 
-  .cred{position:relative;overflow:hidden;border-radius:12px;padding:14px;margin-top:8px;background:var(--s1);border:1px solid var(--brd)}
-  .cred .accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--acc)}
+  .cred{position:relative;overflow:hidden;border-radius:14px;padding:14px;margin-top:8px;background:var(--s2);border:1px solid var(--brd);
+    box-shadow:var(--el2),inset 0 1px 0 var(--gl-luce)}
+  .cred .accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--neon-1),var(--neon-2))}
+  /* La voce appena trovata ha il prisma, e un alone che la stacca dalle altre. */
+  .cred.prisma{border-color:transparent;box-shadow:var(--el3),0 0 70px -26px color-mix(in srgb,var(--neon-1) 70%,transparent)}
   .cred .title{display:flex;align-items:center;gap:8px;color:var(--t1);font-weight:600}
   .credline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
   .credline .meta{min-width:0}
@@ -280,19 +374,30 @@
   .credline .v.urlv{color:var(--acc);font-size:13px}
   .acts{display:flex;gap:6px;flex-shrink:0}
   .pickbtn{margin-top:8px;width:100%;text-align:left;border-radius:10px;padding:8px 12px;
-    background:rgba(34,211,238,.08);border:1px solid var(--acc);color:var(--acc)}
+    background:color-mix(in srgb,var(--acc) 8%,transparent);border:1px solid var(--acc);color:var(--acc)}
 
 
   .composer{border-top:1px solid var(--gl-brd);background:var(--gl-bg);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)}
   .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:13px 20px 16px;display:flex;align-items:center;gap:8px}
-  .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:12px;padding:10px 14px;background:var(--s2);border:1px solid var(--brd)}
+  .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:var(--r-full);padding:10px 16px;
+    background:color-mix(in srgb,var(--s2) 75%,transparent);border:1px solid var(--brd-forte);
+    transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
+  .searchbox:focus-within{border-color:color-mix(in srgb,var(--neon-2) 60%,transparent);
+    box-shadow:0 0 0 4px color-mix(in srgb,var(--neon-2) 12%,transparent)}
+  .searchbox input::placeholder{color:var(--t3)}
+  /* Il fuoco lo mostra la pillola intera (:focus-within): l'anello del campo
+     dentro disegnerebbe un rettangolo in mezzo a una forma tonda. */
+  .searchbox input:focus-visible{box-shadow:none}
   .searchbox input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:15px}
   .send{display:inline-flex;align-items:center;justify-content:center;
-    width:40px;height:40px;border-radius:var(--r-md);
-    background:var(--acc);color:var(--acc-su)}
-  .send:hover{filter:brightness(1.1)}
+    width:42px;height:42px;border-radius:var(--r-full);color:var(--su-neon);
+    background:linear-gradient(135deg,var(--neon-1),var(--neon-2));
+    box-shadow:0 6px 20px -6px var(--neon-1)}
+  .send:hover{box-shadow:0 8px 26px -6px var(--neon-2)}
 
-  .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:rgba(0,0,0,.6);z-index:50}
+  /* Il velo dei modali e' fatto del fondo del tema: nero su Ghiaccio
+     sembrava un'altra app. */
+  .modal{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:16px;background:color-mix(in srgb,var(--s0) 74%,transparent);z-index:50}
   .modalcard{width:min(92vw,420px);padding:24px}
   .modalcard.media{width:min(94vw,560px);max-height:88vh;overflow-y:auto}
   .modalcard.larga{width:min(94vw,620px);max-height:88vh;overflow-y:auto}
@@ -326,7 +431,7 @@
     background:var(--warn-velo);border:1px solid var(--warn);color:var(--warn);white-space:nowrap}
 
   /* TOTP / 2FA */
-  .totp{margin-top:8px;padding:10px 12px;border-radius:10px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.3)}
+  .totp{margin-top:8px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--ok) 6%,transparent);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}
   .totp .trow{display:flex;align-items:center;justify-content:space-between;gap:10px}
   .totp .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ok)}
   .totp .tcode{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--t1);letter-spacing:3px;margin-top:2px}
@@ -362,7 +467,8 @@
     color:var(--t3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
     transition:color var(--dur2) var(--ease),border-color var(--dur2) var(--ease)}
   .tab-btn:hover{color:var(--t2)}
-  .tab-btn.active{color:var(--acc);border-bottom-color:var(--acc)}
+  .tab-btn.active{color:var(--acc);border-bottom-color:var(--acc);
+    background:linear-gradient(180deg,transparent 30%,color-mix(in srgb,var(--neon-1) 14%,transparent))}
 
   /* database panel */
   #dbPanel{flex:1;overflow-y:auto;padding:20px;max-width:980px;width:100%;margin:0 auto}
@@ -370,64 +476,87 @@
      con 800 voci risalire in cima per filtrare era una punizione.
      Sfondo da --s0 e non fisso: nel tema chiaro un colore scuro fisso
      farebbe la solita fascia grigia. */
-  .db-head{display:flex;align-items:center;justify-content:space-between;
-    position:sticky;top:0;z-index:5;background:var(--s0);
-    padding:10px 0 12px;margin-bottom:10px}
+  /* Vetro e non --s0: un colore pieno sopra la costellazione sarebbe una
+     fascia piatta che taglia lo sfondo. Galleggia staccata dal bordo. */
+  .db-head{display:flex;align-items:center;justify-content:space-between;gap:12px;
+    position:sticky;top:0;z-index:5;padding:10px 12px;margin-bottom:14px;
+    border-radius:var(--r-lg);border:1px solid var(--gl-brd);background:var(--gl-bg);
+    backdrop-filter:blur(var(--gl-blur)) saturate(160%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(160%);
+    box-shadow:var(--el2)}
   .db-title{font-family:var(--disp);font-size:13px;letter-spacing:1px;color:var(--acc)}
   #dbGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
   #dbEmpty{text-align:center;padding:48px 20px;color:var(--t3);font-family:var(--mono);font-size:13px}
   .dbcard{display:flex;flex-direction:column;gap:6px}
   .dbcard .dbtitle{color:var(--t1);font-weight:600;font-size:14px;flex:1;word-break:break-word}
   .dbtags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
-  .dbtag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;background:rgba(34,211,238,.08);border:1px solid rgba(34,211,238,.2);color:var(--acc)}
+  .dbtag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--acc) 8%,transparent);border:1px solid color-mix(in srgb,var(--acc) 22%,transparent);color:var(--acc)}
   .del-confirm{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--err-velo);
     border:1px solid var(--err);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .del-confirm .msg{font-family:var(--mono);font-size:12px;color:var(--err)}
 
   /* ---- TEMI ---- */
-  /* default = scuro (gia' definito in :root). Qui le varianti. */
-  /* CHIARO — barre bianche leggermente azzurrate invece della fascia grigia
-     che veniva fuori tenendo lo sfondo scuro del tema notte. */
-  body[data-theme="light"]{
-    --s0:#F4F7FC; --s1:#EEF3FA; --s2:#FFFFFF; --s3:#F8FBFF;
-    --brd:#D9E2F0; --brd-forte:#C2D0E4;
-    --t1:#0F1729; --t2:#2F3D57; --t3:#4F5D75;
-    --acc:#0369A1; --acc-su:#FFFFFF; --acc-velo:rgba(3,105,161,.09);
-    --vio:#4F46E5; --vio-pieno:#4338CA;
-    --ok:#047857; --ok-velo:rgba(4,120,87,.09);
-    --err:#B91C1C; --err-velo:rgba(185,28,28,.08);
-    --warn:#B45309; --warn-velo:rgba(180,83,9,.09);
-    --gl-bg:rgba(255,255,255,.72); --gl-bg-2:rgba(248,251,255,.62);
-    --gl-brd:rgba(15,23,41,.10); --gl-luce:rgba(255,255,255,.9);
-    --sw-off:rgba(15,23,41,.10);
-    --gl-acc:rgba(3,105,161,.55); --gl-acc-brd:rgba(3,105,161,.6);
-    --el1:0 1px 2px rgba(15,23,41,.08);
-    --el2:0 8px 28px rgba(15,23,41,.10);
-    --el3:0 24px 64px rgba(15,23,41,.14);
+  /* Prisma e' gia' in :root. Qui le varianti. */
+  /* GHIACCIO — il chiaro. I neon qui sono scuri, non pastello: sono
+     colori di testo prima che di luce, e su questo fondo devono stare
+     sopra 5:1. Il #0079A5 delle bozze faceva 4,0 su s0. */
+  body[data-theme="ghiaccio"]{
+    --s0:#E4E8F5; --s1:#EEF1FA; --s2:#F6F7FD; --s3:#FFFFFF;
+    --brd:rgba(40,52,130,.14); --brd-forte:rgba(40,52,130,.26);
+    --t1:#0B0F2E; --t2:#343B67; --t3:#515985;
+    --neon-1:#5440E6; --neon-2:#006489; --neon-3:#CF37AE; --su-neon:#FFFFFF;
+    --acc-velo:rgba(0,100,137,.09);
+    --vio-pieno:#4A36E0;
+    --ok:#03684E; --ok-velo:rgba(3,104,78,.09);
+    --err:#B01F41; --err-velo:rgba(176,31,65,.08);
+    --warn:#8A4C00; --warn-velo:rgba(138,76,0,.09);
+    --gl-bg:rgba(255,255,255,.66); --gl-bg-2:rgba(255,255,255,.52);
+    --gl-brd:rgba(40,52,130,.12); --gl-luce:rgba(255,255,255,.9);
+    --sw-off:rgba(20,30,90,.10);
+    --gl-acc:rgba(84,64,230,.55); --gl-acc-brd:rgba(84,64,230,.6);
+    --abisso-2:#F6F8FE;
+    --alone-1:rgba(125,105,255,.32); --alone-2:rgba(0,185,240,.24); --alone-3:rgba(255,105,215,.18);
+    --punto:52,62,140;
+    --velo:rgba(244,246,253,.7);
+    --vignetta:rgba(150,160,205,.35);
+    --grana-op:.10; --grana-modo:soft-light;
+    --el1:0 1px 2px rgba(30,40,100,.10);
+    --el2:0 12px 36px -12px rgba(30,40,100,.22);
+    --el3:0 30px 80px -24px rgba(30,40,100,.35);
   }
-  body[data-theme="light"]{background-image:radial-gradient(rgba(3,105,161,.05) 1px,transparent 1px)}
 
-  /* NOTTE E ORO — blu notte profondo, ottone come contrasto. */
-  body[data-theme="night"]{
-    --s0:#050912; --s1:#0B1226; --s2:#0E1730; --s3:#152043;
-    --brd:#1E2C4C; --brd-forte:#2B3C63;
-    --t1:#FFFFFF; --t2:#B9C4DB; --t3:#8FA0C0;
-    --acc:#E3B341; --acc-su:#1A1206; --acc-velo:rgba(227,179,65,.12);
-    --vio:#D8A544; --vio-pieno:#1E3A8A;
-    --ok:#4ADE80; --ok-velo:rgba(74,222,128,.10);
-    --gl-bg:rgba(5,9,20,.7); --gl-bg-2:rgba(5,9,20,.55);
-    --sw-off:rgba(255,255,255,.09);
-    --gl-acc:rgba(227,179,65,.5); --gl-acc-brd:rgba(227,179,65,.65);
+  /* NOTTE E ORO — blu notte profondo, oro come luce, un blu freddo come
+     terzo neon. Il --vio-pieno resta blu: e' il pulsante «Analizza», e
+     d'oro su oro non si distinguerebbe dal pulsante principale. */
+  body[data-theme="oro"]{
+    --s0:#03050C; --s1:#080B1A; --s2:#0C1024; --s3:#141A36;
+    --brd:rgba(255,215,140,.12); --brd-forte:rgba(255,215,140,.22);
+    --t1:#FFF8EA; --t2:#D6CCB8; --t3:#ABA08B;
+    --neon-1:#E9A93A; --neon-2:#FFD978; --neon-3:#6F8CFF; --su-neon:#1B1306;
+    --acc-velo:rgba(255,217,120,.12);
+    --vio-pieno:#2A3F9E;
+    --ok:#5BE39A; --ok-velo:rgba(91,227,154,.10);
+    --err:#FF8A8A; --err-velo:rgba(255,138,138,.09);
+    --gl-bg:rgba(5,8,20,.72); --gl-bg-2:rgba(5,8,20,.56);
+    --gl-brd:rgba(255,215,140,.12); --gl-luce:rgba(255,240,210,.26);
+    --sw-off:rgba(255,240,210,.08);
+    --gl-acc:rgba(233,169,58,.55); --gl-acc-brd:rgba(233,169,58,.7);
+    --abisso-2:#0D1022;
+    --alone-1:rgba(233,169,58,.22); --alone-2:rgba(60,90,220,.28); --alone-3:rgba(255,190,90,.10);
+    --punto:255,226,170;
+    --velo:rgba(3,5,12,.62);
+    --vignetta:rgba(0,0,0,.55);
+    --el3:0 30px 80px -24px rgba(0,0,0,.8);
   }
-  body[data-theme="night"]{background-image:radial-gradient(rgba(227,179,65,.05) 1px,transparent 1px)}
 
   /* mini menu tema */
-  #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--s2);border:1px solid var(--brd);
-    border-radius:12px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,.4);min-width:160px}
+  #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--s2);border:1px solid var(--brd-forte);
+    border-radius:14px;padding:8px;box-shadow:var(--el3);min-width:180px}
   #themeMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;border-radius:8px;
     color:var(--t2);font-size:13px}
   #themeMenu button:hover{background:rgba(127,127,127,.12)}
   #themeMenu button.sel{color:var(--acc)}
+  /* Il campione del tema: i suoi due neon, come li vedrai. */
+  #themeMenu .campione{width:16px;height:16px;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25)}
 
   /* generatore password */
   .gen-pop{margin-top:10px;padding:12px;border-radius:12px;background:var(--s1);border:1px solid var(--vio)}
@@ -446,8 +575,8 @@
   .db-filter input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:13px;font-family:var(--mono)}
 
   /* menu hamburger */
-  #mainMenu{position:absolute;top:54px;left:16px;z-index:60;background:var(--s2);border:1px solid var(--brd);
-    border-radius:12px;padding:8px;box-shadow:0 8px 28px rgba(0,0,0,.45);min-width:200px}
+  #mainMenu{position:absolute;top:54px;left:16px;z-index:60;background:var(--s2);border:1px solid var(--brd-forte);
+    border-radius:14px;padding:8px;box-shadow:var(--el3);min-width:200px}
   #mainMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:8px;
     color:var(--t2);font-size:13px}
   #mainMenu button:hover{background:rgba(127,127,127,.1)}
@@ -466,6 +595,15 @@
   .set-row .lab{font-size:13px;color:var(--t2);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
   .set-row .desc{font-size:11px;color:var(--t3);margin-top:3px;line-height:1.4}
   .set-row .ctl{flex:0 0 auto;white-space:nowrap}
+  /* Poche opzioni, tutte in vista: il tema e gli sfondi. Una tendina
+     nasconderebbe proprio le cose da confrontare. */
+  .segmenti{display:flex;gap:2px;padding:3px;border-radius:var(--r-full);
+    background:color-mix(in srgb,var(--t1) 5%,transparent);border:1px solid var(--brd)}
+  .segmenti button{height:30px;padding:0 12px;border-radius:var(--r-full);font:500 13px var(--body);color:var(--t2);white-space:nowrap;
+    transition:background var(--dur2) var(--ease),color var(--dur2) var(--ease)}
+  .segmenti button:hover{color:var(--t1)}
+  .segmenti button[aria-pressed="true"]{color:var(--su-neon);background:linear-gradient(135deg,var(--neon-1),var(--neon-2));
+    box-shadow:0 4px 16px -6px var(--neon-1)}
   /* ---- L'interruttore in vetro -------------------------------------------
      Tre livelli, e l'ordine conta: la traccia sfocata, il riflesso in alto
      (::before), la pallina (::after). Il riflesso e' cio' che distingue il
@@ -492,7 +630,7 @@
     /* La molla e' cio' che si sente col dito: la pallina supera di poco la
        fine corsa e torna. Lineare sembra plastica. */
     transition:transform var(--dur3) var(--molla),width var(--dur2) var(--ease)}
-  .sw.on{background:var(--gl-acc);border-color:var(--gl-acc-brd);
+  .sw.on{background:linear-gradient(135deg,color-mix(in srgb,var(--neon-1) 80%,transparent),color-mix(in srgb,var(--neon-2) 70%,transparent));border-color:var(--gl-acc-brd);
     box-shadow:inset 0 1px 1px var(--gl-luce),inset 0 -2px 4px rgba(0,0,0,.12),
                0 0 14px var(--acc-velo),var(--el1)}
   .sw.on::after{transform:translateX(21px)}
@@ -501,7 +639,7 @@
   .sw.on:active::after{transform:translateX(16px);width:30px}
   .set-sel{background:var(--s1);border:1px solid var(--brd);color:var(--t1);border-radius:8px;padding:7px 10px;font-size:13px;font-family:var(--mono)}
   .set-status{font-size:11px;font-family:var(--mono);padding:2px 8px;border-radius:999px}
-  .set-status.ok{color:var(--ok);border:1px solid rgba(52,211,153,.35)}
+  .set-status.ok{color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
   .set-status.off{color:var(--t3);border:1px solid var(--brd)}
   .set-msg{font-size:12px;font-family:var(--mono);margin-top:8px;min-height:16px}
   .set-msg.ok{color:var(--ok)} .set-msg.err{color:var(--err)}
@@ -523,6 +661,13 @@
 </style>
 </head>
 <body>
+<!-- Lo sfondo: vedi `#sfondo` nello stile e `Costellazione` in fondo. -->
+<div id="sfondo" aria-hidden="true">
+  <div class="aurora"><i></i><i></i><i></i></div>
+  <canvas id="cielo"></canvas>
+  <div class="grana"></div>
+  <div class="vignetta"></div>
+</div>
 
 <!-- Sprite delle icone. Lo scrive `py -3 design/genera_icone.py` dalla
      sorgente `design/icone.json`: a mano qui dentro non si tocca, verrebbe
@@ -598,8 +743,8 @@
 
 <!-- LOCK -->
 <div id="lock">
-  <div class="card lockbox rise">
-    <div class="badge-row"><img class="logo" src="/static/logo.png" alt="" width="64" height="64"></div>
+  <div class="card lockbox prisma acceso rise">
+    <div class="badge-row"><span class="gemma"><img class="logo" src="/static/logo.png" alt="" width="72" height="72"></span></div>
     <div class="brand">VAULTMIND</div>
     <div class="sub">LOCALE · OFFLINE · AES-256</div>
     <div id="firstRunNote" class="firstrun hidden">
@@ -648,9 +793,11 @@
 
   <!-- MENU TEMA -->
   <div id="themeMenu" class="hidden">
-    <button data-theme="dark" class="sel"><svg class="ic ic-16" aria-hidden="true"><use href="#i-luna"/></svg>Scuro</button>
-    <button data-theme="light"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sole"/></svg>Chiaro</button>
-    <button data-theme="night"><svg class="ic ic-16" aria-hidden="true"><use href="#i-notte"/></svg>Notte e oro</button>
+    <!-- I campioni hanno i colori scritti qui e non i token: i token
+         cambiano col tema scelto, e ogni campione deve mostrare il suo. -->
+    <button data-theme="prisma" class="sel"><span class="campione" style="background:linear-gradient(135deg,#090B1E 0 46%,#8C7CFF 46% 73%,#3CE2FF 73%)"></span>Prisma</button>
+    <button data-theme="ghiaccio"><span class="campione" style="background:linear-gradient(135deg,#EEF1FA 0 46%,#5440E6 46% 73%,#006489 73%)"></span>Ghiaccio</button>
+    <button data-theme="oro"><span class="campione" style="background:linear-gradient(135deg,#080B1A 0 46%,#E9A93A 46% 73%,#FFD978 73%)"></span>Notte e oro</button>
   </div>
 
   <!-- MENU HAMBURGER -->
@@ -671,6 +818,47 @@
     <div class="card" style="max-height:88vh;overflow:auto">
       <div class="mhead"><span><svg class="ic ic-20" aria-hidden="true"><use href="#i-impostazioni"/></svg>Impostazioni</span><button class="iconbtn" id="setClose" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
 
+      <!-- Il tema vale per tutta l'app; lo sfondo si sceglie per sezione,
+           perché ognuna ha il suo carattere: lo sblocco è una porta, la
+           chat una conversazione, il database un archivio. -->
+      <div class="set-section">
+        <h4>Aspetto</h4>
+        <div class="set-row">
+          <div><div class="lab">Tema</div></div>
+          <div class="segmenti ctl" id="segTema" role="group" aria-label="Tema">
+            <button data-valore="prisma">Prisma</button>
+            <button data-valore="ghiaccio">Ghiaccio</button>
+            <button data-valore="oro">Notte e oro</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">Sfondo dello sblocco</div>
+            <div class="desc">Lo vedi quando il vault è bloccato.</div></div>
+          <div class="segmenti ctl" data-sezione="sblocco" role="group" aria-label="Sfondo dello sblocco">
+            <button data-valore="costellazione">Costellazione</button>
+            <button data-valore="aurora">Aurora</button>
+            <button data-valore="tinta">Tinta unita</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">Sfondo della chat</div></div>
+          <div class="segmenti ctl" data-sezione="chat" role="group" aria-label="Sfondo della chat">
+            <button data-valore="costellazione">Costellazione</button>
+            <button data-valore="aurora">Aurora</button>
+            <button data-valore="tinta">Tinta unita</button>
+          </div>
+        </div>
+        <div class="set-row">
+          <div><div class="lab">Sfondo del database</div>
+            <div class="desc">Vale anche per Categorie.</div></div>
+          <div class="segmenti ctl" data-sezione="db" role="group" aria-label="Sfondo del database">
+            <button data-valore="costellazione">Costellazione</button>
+            <button data-valore="aurora">Aurora</button>
+            <button data-valore="tinta">Tinta unita</button>
+          </div>
+        </div>
+      </div>
+
       <div class="set-section">
         <h4>Sicurezza</h4>
         <div class="set-row">
@@ -682,7 +870,7 @@
           <input id="cmOld" class="field" type="password" placeholder="Password attuale" />
           <input id="cmNew" class="field" type="password" placeholder="Nuova password (min 8)" />
           <input id="cmNew2" class="field" type="password" placeholder="Ripeti nuova password" />
-          <button id="cmSave" class="btn" style="background:var(--acc)">Aggiorna password</button>
+          <button id="cmSave" class="btn">Aggiorna password</button>
           <div id="cmMsg" class="set-msg"></div>
         </div>
         <div class="set-row">
@@ -886,7 +1074,7 @@
     </div>
 
     <div id="syncCodice" class="hidden" style="margin-top:14px;padding:14px;border-radius:12px;
-         background:rgba(56,189,248,.07);border:1px solid rgba(56,189,248,.35);text-align:center">
+         background:color-mix(in srgb,var(--acc) 7%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);text-align:center">
       <div style="font-size:11px;letter-spacing:1.4px;color:var(--t3);text-transform:uppercase">Codice di abbinamento</div>
       <div id="syncCodiceVal" style="font-family:var(--mono);font-size:34px;letter-spacing:8px;color:var(--acc);margin:8px 0"></div>
       <div style="font-size:12px;color:var(--t2);line-height:1.55">
@@ -962,7 +1150,7 @@
     <div id="addFields"></div>
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">
       <button id="addFieldRow" class="btn tratteggiato compatto" style="flex:1 1 40%">+ Aggiungi campo</button>
-      <button id="addOtpRow" class="btn" style="background:transparent;border:1px dashed var(--ok);color:var(--ok);margin-top:0;padding:8px;flex:0 0 auto" title="Inserisci a mano il secret 2FA">+ 2FA / OTP</button>
+      <button id="addOtpRow" class="btn" style="background:transparent;border:1px dashed var(--ok);color:var(--ok);margin-top:0;padding:8px;flex:0 0 auto;box-shadow:none" title="Inserisci a mano il secret 2FA">+ 2FA / OTP</button>
       <button id="qrBtn" class="btn tratteggiato vio compatto" title="Leggi un QR (screenshot di setup o export authenticator)"><svg class="ic ic-16" aria-hidden="true"><use href="#i-qr"/></svg>Da QR</button>
       <button id="genBtn" class="btn tratteggiato vio compatto" title="Genera una password sicura"><svg class="ic ic-16" aria-hidden="true"><use href="#i-dado"/></svg>Genera</button>
     </div>
@@ -1121,6 +1309,7 @@ function addAI(text, results, ambiguous){
   const b=document.createElement("div"); b.className="bubble b-ai"; b.textContent=text; wrap.appendChild(b);
   (results||[]).forEach(c=> wrap.appendChild(credCard(c, ambiguous)));
   r.appendChild(wrap); $("#chat").appendChild(r); scroll();
+  return wrap;
 }
 /* Messaggio di mind con un PERCORSO in evidenza: selezionabile col mouse e
    con il pulsante di copia. Un percorso che non si può copiare costringe a
@@ -1168,7 +1357,7 @@ function credCard(c, picker){
     if(c.id!=null && (c.fields||[]).some(f=>labelLooksOtp(f.label))) attachTotp(card, c.id);
     if(c.id!=null && c.fields){
       const edit=document.createElement("button"); edit.className="pickbtn";
-      edit.style.background="rgba(167,139,250,.08)"; edit.style.borderColor="var(--vio)"; edit.style.color="var(--vio)";
+      edit.style.background="color-mix(in srgb,var(--vio) 8%,transparent)"; edit.style.borderColor="var(--vio)"; edit.style.color="var(--vio)";
       edit.innerHTML=ic("matita","ic-16")+" Modifica / completa";
       edit.onclick=()=>openEdit(c);
       card.appendChild(edit);
@@ -1252,9 +1441,23 @@ async function send(){
     return;
   }
   addUser(q); $("#q").value="";
-  const {ok,j}=await api("/api/query",{text:q});
+  // Mentre il server cerca, un'onda corre nella costellazione verso il punto
+  // dove comparira' la risposta. Corre accanto alla richiesta, non prima:
+  // la risposta aspetta al massimo la fine dell'onda, mai il contrario.
+  const [{ok,j}] = await Promise.all([api("/api/query",{text:q}), CIELO.cerca(puntoRisposta())]);
   if(!ok){ addAI(j.detail||"Errore."); return; }
-  addAI(j.reply, j.results, j.kind==="ambiguous");
+  const wrap = addAI(j.reply, j.results, j.kind==="ambiguous");
+  if(j.kind==="single"){
+    // Il prisma va alla voce appena trovata, e a quella sola: le schede
+    // trovate prima lo perdono, o non indicherebbe piu' niente.
+    document.querySelectorAll("#chat .cred.prisma").forEach(c=> c.classList.remove("prisma","nuova"));
+    const card = wrap.querySelector(".cred");
+    if(card){ card.classList.add("prisma","nuova"); CIELO.accendi((sx,sy)=>bordoVicino(card,sx,sy)); }
+  } else if(j.kind==="ambiguous"){
+    // Due voci troppo vicine: l'app chiede e non sceglie, quindi nessuna
+    // scheda ha il prisma. Il lampo dice solo che qualcosa c'e'.
+    CIELO.accendi(null);
+  }
 }
 $("#sendBtn").addEventListener("click", send);
 $("#q").addEventListener("keydown", e=>{ if(e.key==="Enter") send(); });
@@ -1599,7 +1802,7 @@ async function renderImportList(entries, source){
     card.innerHTML = `<div class="accent" style="background:var(--vio)"></div>`;
     const head=document.createElement("div"); head.style.display="flex"; head.style.alignItems="center"; head.style.gap="8px"; head.style.marginBottom="8px";
     const chk=document.createElement("input"); chk.type="checkbox"; chk.checked=true; chk.className="imp-chk";
-    const ttlIn=document.createElement("input"); ttlIn.className="field imp-title"; ttlIn.value=e.title||""; ttlIn.style.padding="7px 10px"; ttlIn.style.fontSize="14px"; ttlIn.style.fontWeight="600"; ttlIn.style.color="#fff";
+    const ttlIn=document.createElement("input"); ttlIn.className="field imp-title"; ttlIn.value=e.title||""; ttlIn.style.padding="7px 10px"; ttlIn.style.fontSize="14px"; ttlIn.style.fontWeight="600"; ttlIn.style.color="var(--t1)";
     head.appendChild(chk); head.appendChild(ttlIn); card.appendChild(head);
 
     const fieldsBox=document.createElement("div"); fieldsBox.className="imp-fields";
@@ -1919,6 +2122,7 @@ function switchTab(tab){
   $("#catPanel").classList.toggle("hidden", tab!=="cat");
   if(tab==="db") loadDb();
   if(tab==="cat") loadCats();
+  sezioneSfondo(tab);
 }
 document.querySelectorAll(".tab-btn").forEach(b=> b.addEventListener("click", ()=> switchTab(b.dataset.tab)));
 
@@ -2265,7 +2469,7 @@ function avviso(testo, importante){
   }
   box.textContent = testo;
   box.style.borderColor = importante ? "var(--warn)" : "var(--brd)";
-  box.style.color = importante ? "var(--warn)" : "var(--fg)";
+  box.style.color = importante ? "var(--warn)" : "var(--t1)";
   box.classList.remove("hidden");
   clearTimeout(_avvisoTimer);
   _avvisoTimer = setTimeout(()=>box.classList.add("hidden"), importante ? 9000 : 4000);
@@ -2477,7 +2681,7 @@ async function mostraDiagnosi(box){
   }catch(e){}
 
   const t = document.createElement("div");
-  t.style.cssText = "font-size:12.5px;color:var(--fg);margin-bottom:6px";
+  t.style.cssText = "font-size:12.5px;color:var(--t1);margin-bottom:6px";
   t.textContent = "Nessun dispositivo ha risposto.";
   box.appendChild(t);
 
@@ -2993,16 +3197,265 @@ function promptClearAll(){
 }
 $("#dbClearBtn").addEventListener("click", ()=>{ switchTab("chat"); promptClearAll(); });
 
-/* ================= TEMA ================= */
+/* ================= LA COSTELLAZIONE =================
+   Lo sfondo «costellazione»: punti su un guscio sferico, ruotati piano e
+   proiettati in prospettiva, legati ai vicini da fili sottili. Le coppie di
+   vicini si calcolano una volta sola: una rotazione non cambia le distanze,
+   quindi i fili restano gli stessi a ogni fotogramma.
+
+   Nata in design/bozze-cristallo.html; qui in piu' sa quando NON disegnare
+   (vedi `attiva`), perche' nell'app resta accesa per ore. */
+const RIDOTTO = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const attesa = ms=>new Promise(r=>setTimeout(r,ms));
+const morbido = p=>p<.5 ? 4*p*p*p : 1-Math.pow(-2*p+2,3)/2;
+function hexRgb(h){ h=h.trim().replace("#",""); if(h.length===3) h=[...h].map(c=>c+c).join("");
+  const n=parseInt(h,16); return [(n>>16)&255,(n>>8)&255,n&255]; }
+
+class Costellazione{
+  constructor(canvas,o={}){
+    this.c=canvas; this.g=canvas.getContext("2d");
+    this.n=o.n??180; this.raggio=o.raggio??.40; this.cx=o.cx??.5; this.cy=o.cy??.5;
+    this.intensita=o.intensita??1; this.periodo=o.periodo??150;
+    this.animata=!RIDOTTO;
+    this.t=24; this.ultimo=0; this.finoA=0; this.gira=false;
+    this.semina(o.seme??7); this.misura();
+    new ResizeObserver(()=>{ this.misura(); this.disegna(); }).observe(canvas);
+    // Finestra ridotta a icona o dietro un'altra: nessun fotogramma. Al
+    // ritorno riparte da sola.
+    document.addEventListener("visibilitychange", ()=> this.sveglia());
+  }
+  semina(seme){
+    let s=seme*7919+13; const rnd=()=>{ s=(s*16807)%2147483647; return (s-1)/2147483646; };
+    const p=[], n=this.n, oro=Math.PI*(3-Math.sqrt(5));
+    for(let i=0;i<n;i++){
+      const y=1-(i/(n-1))*2, r=Math.sqrt(1-y*y), th=oro*i, k=.84+rnd()*.18;
+      p.push({x:Math.cos(th)*r*k+(rnd()-.5)*.07, y:y*k+(rnd()-.5)*.07, z:Math.sin(th)*r*k+(rnd()-.5)*.07, f:rnd()});
+    }
+    for(let i=0;i<Math.round(n*.18);i++){
+      const a=rnd()*6.283, b=Math.acos(2*rnd()-1), k=1.2+rnd()*.7;
+      p.push({x:Math.sin(b)*Math.cos(a)*k*1.3, y:Math.cos(b)*k*.8, z:Math.sin(b)*Math.sin(a)*k, f:rnd(), polvere:true});
+    }
+    this.p=p; this.coppie=[];
+    // Circa quattro vicini per punto: la distanza media fra punti su una
+    // sfera di raggio ~0,93 e' 3,3/sqrt(n). Con meno fili e' un cielo
+    // stellato qualunque, con di piu' una ragnatela.
+    const soglia=Math.min(.5,4/Math.sqrt(n));
+    for(let i=0;i<n;i++) for(let j=i+1;j<n;j++){
+      const a=p[i], b=p[j]; if(Math.hypot(a.x-b.x,a.y-b.y,a.z-b.z)<soglia) this.coppie.push([i,j]);
+    }
+  }
+  // I colori vengono dal tema. Da `body` e non da :root: e' li' che
+  // `body[data-theme]` li cambia.
+  colori(){
+    const cs=getComputedStyle(document.body);
+    this.cPunto=cs.getPropertyValue("--punto").trim();
+    const A=hexRgb(cs.getPropertyValue("--neon-1")), B=hexRgb(cs.getPropertyValue("--neon-2")), P=this.cPunto.split(",").map(Number);
+    this.cNeon=B.join(","); this.cNeon1=A.join(",");
+    // Ogni punto ha la sua tinta fra i due neon, secondo dove sta: una
+    // nuvola tutta bianca si legge come stelle, non come una rete di voci.
+    for(const q of this.p){ const t=Math.max(0,Math.min(1,(q.x*.7-q.y*.5+1)/2));
+      q.col=A.map((a,k)=>Math.round((a+(B[k]-a)*t)*.6+P[k]*.4)).join(","); }
+    this.disegna();
+  }
+  misura(){
+    const w=this.c.clientWidth, h=this.c.clientHeight; if(!w||!h) return;
+    this.dpr=Math.min(devicePixelRatio||1,2); this.c.width=w*this.dpr; this.c.height=h*this.dpr; this.w=w; this.h=h;
+  }
+  proietta(t){
+    const a=t/this.periodo*2*Math.PI, b=.36+.07*Math.sin(t/41);
+    const ca=Math.cos(a), sa=Math.sin(a), cb=Math.cos(b), sb=Math.sin(b);
+    const R=this.raggio*Math.min(this.w,this.h)*1.15, cx=this.cx*this.w, cy=this.cy*this.h, D=3.4;
+    for(const q of this.p){
+      const x1=q.x*ca+q.z*sa, z1=-q.x*sa+q.z*ca, y2=q.y*cb-z1*sb, z2=q.y*sb+z1*cb, s=D/(D-z2);
+      q.sx=cx+x1*s*R; q.sy=cy+y2*s*R; q.d=Math.max(0,Math.min(1,(z2+1.2)/2.4));
+    }
+  }
+  eccita(q,b,fronte){ const d=Math.hypot(q.x-b.x,q.y-b.y,q.z-b.z)-fronte; return Math.exp(-(d*d)/.03); }
+  disegna(){
+    if(!this.w || !this.cPunto) return;
+    const g=this.g, now=performance.now();
+    this.passoTween(now);
+    g.setTransform(this.dpr,0,0,this.dpr,0,0); g.clearRect(0,0,this.w,this.h);
+    this.proietta(this.t);
+    const I=this.intensita; if(I<=.001) return;
+    // L'onda arriva da fuori e si stringe sul punto trovato.
+    let fronte=-1, bers=null;
+    if(this.onda){ const p=(now-this.onda.t0)/this.onda.dur; if(p>=1) this.onda=null; else { fronte=(1-morbido(p))*2.4; bers=this.p[this.onda.i]; } }
+    g.lineWidth=.7;
+    for(const [i,j] of this.coppie){
+      const a=this.p[i], b=this.p[j]; let al=(.04+.22*Math.min(a.d,b.d))*I, col=a.col;
+      if(bers){ const e=Math.max(this.eccita(a,bers,fronte),this.eccita(b,bers,fronte)); if(e>.05){ al+=e*.32; col=this.cNeon; } }
+      g.strokeStyle=`rgba(${col},${al})`; g.beginPath(); g.moveTo(a.sx,a.sy); g.lineTo(b.sx,b.sy); g.stroke();
+    }
+    const ord=this.p.slice().sort((a,b)=>a.d-b.d);
+    for(const q of ord){
+      let r=(q.polvere?.5:.8)+1.6*q.d, al=((q.polvere?.10:.18)+.52*q.d)*I*(.82+.18*Math.sin(this.t*.7+q.f*30)), col=q.polvere?this.cPunto:q.col;
+      if(bers && !q.polvere){ const e=this.eccita(q,bers,fronte); if(e>.02){ al=Math.min(1,al+e*.85); r+=e*1.8; col=this.cNeon; } }
+      // I punti davanti hanno un alone: e' quello che li fa sembrare luce.
+      if(q.d>.66 && !q.polvere){ g.fillStyle=`rgba(${col},${al*.14})`; g.beginPath(); g.arc(q.sx,q.sy,r*3.4,0,6.2832); g.fill(); }
+      g.fillStyle=`rgba(${col},${al})`; g.beginPath(); g.arc(q.sx,q.sy,r,0,6.2832); g.fill();
+    }
+    if(this.lampo){
+      const p=(now-this.lampo.t0)/this.lampo.dur;
+      if(p>=1) this.lampo=null; else {
+        const q=this.p[this.lampo.i], k=p<.18?p/.18:1-morbido((p-.18)/.82), rr=10+34*k;
+        const gr=g.createRadialGradient(q.sx,q.sy,0,q.sx,q.sy,rr*2);
+        gr.addColorStop(0,`rgba(${this.cNeon},${.95*k})`); gr.addColorStop(.22,`rgba(${this.cNeon},${.4*k})`); gr.addColorStop(1,`rgba(${this.cNeon},0)`);
+        g.fillStyle=gr; g.beginPath(); g.arc(q.sx,q.sy,rr*2,0,6.2832); g.fill();
+        g.strokeStyle=`rgba(${this.cNeon},${.7*(1-p)})`; g.lineWidth=1.3; g.beginPath(); g.arc(q.sx,q.sy,8+70*morbido(Math.min(1,p*1.4)),0,6.2832); g.stroke();
+        if(this.lampo.verso){
+          const v=this.lampo.verso(q.sx,q.sy);
+          if(v){ const [tx,ty]=v, lg=g.createLinearGradient(q.sx,q.sy,tx,ty);
+            lg.addColorStop(0,`rgba(${this.cNeon},${.8*k})`); lg.addColorStop(1,`rgba(${this.cNeon1},${.15*k})`);
+            g.strokeStyle=lg; g.lineWidth=1.5; g.beginPath(); g.moveTo(q.sx,q.sy); g.lineTo(tx,ty); g.stroke(); }
+        }
+      }
+    }
+  }
+  // Si disegna solo se si vede: finestra in primo piano e costellazione come
+  // sfondo della sezione (o appena tolta: `finoA` la lascia girare mentre
+  // sfuma). Altrimenti il giro si ferma del tutto, invece di girare a vuoto
+  // per tutte le ore in cui l'app resta aperta sulla chat.
+  attiva(){
+    return !document.hidden && (document.body.dataset.sfondo==="costellazione" || performance.now()<this.finoA);
+  }
+  sveglia(ms=0){
+    this.finoA=Math.max(this.finoA, performance.now()+ms);
+    if(!this.attiva()) return;
+    if(!this.animata){ this.disegna(); return; }
+    if(this.gira) return;
+    this.gira=true; let prima=performance.now();
+    const giro=now=>{
+      if(!this.attiva()){ this.gira=false; return; }
+      // Al ritorno da una pausa lunga la rotazione riprende da dov'era,
+      // non salta avanti di quanto e' rimasta ferma.
+      const dt=Math.min(.1,(now-prima)/1000); prima=now; this.t+=dt;
+      // A riposo 30 fotogrammi al secondo bastano: il moto e' lentissimo.
+      const occupata=this.onda||this.lampo||this.tween;
+      if(occupata || now-this.ultimo>32){ this.ultimo=now; this.disegna(); }
+      requestAnimationFrame(giro);
+    };
+    requestAnimationFrame(giro);
+  }
+  // Il punto trovato: fra quelli davanti, il piu' vicino a dove si vedra'
+  // (pref, in frazioni della finestra). Al centro finirebbe sotto la scheda.
+  scegli(pref){
+    this.proietta(this.t); let best=0, bv=-9;
+    const R=this.raggio*Math.min(this.w,this.h), px=(pref?.x??this.cx)*this.w, py=(pref?.y??this.cy)*this.h;
+    for(let i=0;i<this.n;i++){ const q=this.p[i], dc=Math.hypot(q.sx-px,q.sy-py)/R, v=q.d*1.1-dc*1.2+Math.random()*.15; if(v>bv){ bv=v; best=i; } }
+    return best;
+  }
+  // L'onda dura meno che nelle bozze: li' fingeva la ricerca, qui le corre
+  // accanto, e la risposta non deve aspettare lei.
+  cerca(pref){
+    if(!this.animata || !this.attiva() || !this.w) return Promise.resolve();
+    this.bersaglio=this.scegli(pref);
+    this.onda={t0:performance.now(), dur:650, i:this.bersaglio};
+    return attesa(420);
+  }
+  accendi(verso){
+    if(!this.animata || !this.attiva() || !this.w) return;
+    this.lampo={t0:performance.now(), dur:2200, i:this.bersaglio??this.scegli(), verso};
+    this.bersaglio=null;
+  }
+  vai(pose,ms=1000){
+    // Un movimento nuovo chiude quello in corso: chi lo aspettava va avanti.
+    if(this.tween){ const tw=this.tween; this.tween=null; tw.res(); }
+    if(!this.animata || !this.w){ Object.assign(this,pose); this.disegna(); return Promise.resolve(); }
+    const da={}; for(const k in pose) da[k]=this[k];
+    return new Promise(res=>{ this.tween={da, a:pose, t0:performance.now(), ms, res}; });
+  }
+  passoTween(now){
+    const tw=this.tween; if(!tw) return;
+    const p=Math.min(1,(now-tw.t0)/tw.ms), e=morbido(p);
+    for(const k in tw.a) this[k]=tw.da[k]+(tw.a[k]-tw.da[k])*e;
+    if(p>=1){ this.tween=null; tw.res(); }
+  }
+}
+
+/* ================= SFONDI =================
+   Uno per sezione, scelto in Impostazioni → Aspetto. Stanno nel
+   localStorage della finestra come il tema: sono una preferenza di questo
+   computer, non un dato del vault, e devono valere gia' nella schermata di
+   sblocco, quando il vault non si puo' ancora leggere. */
+const SFONDI_PREDEFINITI = {sblocco:"costellazione", chat:"aurora", db:"costellazione"};
+const SFONDI_VALIDI = ["costellazione","aurora","tinta"];
+const SFONDI = {...SFONDI_PREDEFINITI};
+try{
+  const s=JSON.parse(localStorage.getItem("vaultmind_sfondi")||"{}");
+  for(const k in SFONDI) if(SFONDI_VALIDI.includes(s[k])) SFONDI[k]=s[k];
+}catch(e){}
+// Dove sta la nuvola in ogni sezione: al centro dietro la porta e dietro la
+// chat (abbastanza larga da uscire dalla colonna, dove si accende il lampo),
+// a destra nel database, dove l'elenco lascia spazio.
+const POSE = {sblocco:{cx:.5,cy:.52,raggio:.40,intensita:1}, chat:{cx:.5,cy:.46,raggio:.40,intensita:.8}, db:{cx:.67,cy:.5,raggio:.44,intensita:.72}};
+let SEZIONE = "sblocco";
+const CIELO = new Costellazione($("#cielo"), {...POSE.sblocco, seme:3});
+
+function sezioneSfondo(s){
+  if(s==="cat") s="db";
+  const prima=SEZIONE; SEZIONE=s;
+  document.body.dataset.sfondo=SFONDI[s];
+  CIELO.sveglia(900);
+  if(prima===s) return;
+  // Uscendo dallo sblocco la nuvola si apre, come una porta, e poi si
+  // ricompone dove la vuole la sezione nuova.
+  if(prima==="sblocco") CIELO.vai({raggio:.75,intensita:.5},520).then(()=>{ if(SEZIONE===s) CIELO.vai(POSE[s],1100); });
+  else CIELO.vai(POSE[s],1100);
+}
+function segnaSfondi(){
+  document.querySelectorAll(".segmenti[data-sezione]").forEach(g=>
+    g.querySelectorAll("button").forEach(b=> b.setAttribute("aria-pressed", b.dataset.valore===SFONDI[g.dataset.sezione])));
+}
+function scegliSfondo(sezione, valore){
+  SFONDI[sezione]=valore;
+  try{ localStorage.setItem("vaultmind_sfondi", JSON.stringify(SFONDI)); }catch(e){}
+  segnaSfondi();
+  // La sezione aperta cambia subito, dietro le impostazioni: si vede
+  // l'effetto senza chiuderle.
+  if(sezione===SEZIONE){ document.body.dataset.sfondo=valore; CIELO.sveglia(900); }
+}
+document.querySelectorAll(".segmenti[data-sezione] button").forEach(b=>
+  b.addEventListener("click", ()=> scegliSfondo(b.closest(".segmenti").dataset.sezione, b.dataset.valore)));
+segnaSfondi();
+
+/* La scheda appena trovata riceve il lampo: il raggio va dal punto al bordo
+   piu' vicino della scheda, perche' verso il centro passerebbe sotto e non
+   si vedrebbe. */
+function bordoVicino(el,sx,sy){
+  if(!el.isConnected) return null;
+  const r=el.getBoundingClientRect();
+  return [Math.max(r.left,Math.min(r.right,sx)), Math.max(r.top,Math.min(r.bottom,sy))];
+}
+// Dove comparira' la risposta: in basso, appena a destra della colonna della
+// chat (680 px), dove le schede non arrivano.
+function puntoRisposta(){
+  const W=innerWidth||1;
+  return {x:Math.min(.92,((W+680)/2+80)/W), y:.66};
+}
+
+/* ================= TEMA =================
+   Prisma, Ghiaccio, Notte e oro hanno sostituito Scuro, Chiaro e Notte e
+   oro il 25/10/2026: chi aveva scelto uno dei vecchi ritrova il suo
+   corrispondente invece del predefinito. */
+const TEMI = ["prisma","ghiaccio","oro"];
+const TEMI_VECCHI = {dark:"prisma", light:"ghiaccio", night:"oro"};
 function applyTheme(name){
-  if(name==="dark") document.body.removeAttribute("data-theme");
-  else document.body.setAttribute("data-theme", name);
-  THEME=name;
+  name=TEMI_VECCHI[name]||name;
+  if(!TEMI.includes(name)) name="prisma";
+  // Scritto anche per Prisma, che vive in :root: cosi' l'attributo dice
+  // sempre il tema, e uno vecchio («dark») non resta appeso.
+  document.body.dataset.theme=name;
   try{ localStorage.setItem("vaultmind_theme", name); }catch(e){}
   document.querySelectorAll("#themeMenu button").forEach(btn=> btn.classList.toggle("sel", btn.dataset.theme===name));
+  document.querySelectorAll("#segTema button").forEach(b=> b.setAttribute("aria-pressed", b.dataset.valore===name));
+  CIELO.colori();
 }
-let THEME="dark";
-try{ const saved=localStorage.getItem("vaultmind_theme"); if(saved) applyTheme(saved); }catch(e){}
+let salvato=null;
+try{ salvato=localStorage.getItem("vaultmind_theme"); }catch(e){}
+applyTheme(salvato);
+document.querySelectorAll("#segTema button").forEach(b=> b.addEventListener("click", ()=> applyTheme(b.dataset.valore)));
+sezioneSfondo("sblocco");
 $("#themeBtn").addEventListener("click", (e)=>{ e.stopPropagation(); $("#themeMenu").classList.toggle("hidden"); });
 document.querySelectorAll("#themeMenu button").forEach(btn=>{
   btn.addEventListener("click", ()=>{ applyTheme(btn.dataset.theme); $("#themeMenu").classList.add("hidden"); });

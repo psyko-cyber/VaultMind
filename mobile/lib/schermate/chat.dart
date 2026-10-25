@@ -169,9 +169,14 @@ class _SezioneChatState extends State<SezioneChat> {
               IconButton.filled(
                 onPressed: _chiedi,
                 tooltip: 'Invia',
+                // La sfumatura dei pulsanti pieni (`sfondoNeon` in tema.dart):
+                // il tema dei pulsanti icona non la prende da solo.
                 style: IconButton.styleFrom(
                   backgroundColor: context.cAccento,
                   foregroundColor: context.cSuAccento,
+                ).copyWith(
+                  backgroundBuilder: sfondoNeon(context.cristallo.sfumatura,
+                      forma: const StadiumBorder()),
                 ),
                 // L'aereo di carta, lo stesso del PC. Prima era una freccia in
                 // su, che sul telefono vuol dire «vai in cima», non «manda».
@@ -227,8 +232,11 @@ class _Bolla extends StatelessWidget {
           constraints: BoxConstraints(
               maxWidth: MediaQuery.of(context).size.width * 0.78),
           decoration: BoxDecoration(
+            // Piena anche la bolla mia: una tinta trasparente lascerebbe
+            // passare la costellazione sotto le parole.
             color: battuta.mia
-                ? context.cAccento.withValues(alpha: 0.16)
+                ? Color.alphaBlend(
+                    context.cAccento.withValues(alpha: 0.16), context.cPannello)
                 : context.cPannello,
             borderRadius: BorderRadius.circular(14),
             border: Border.all(

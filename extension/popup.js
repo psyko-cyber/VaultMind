@@ -3,11 +3,17 @@
  * Principi (gli stessi dell'app, non negoziabili):
  * - Il vault non si muove: qui non esiste una seconda copia. Le voci vivono
  *   in memoria SOLO finché il popup è aperto; chiuso il popup, il processo
- *   muore e con lui i dati. In chrome.storage sta un'unica cosa: il token di
- *   abbinamento — che non è una chiave del vault, è il permesso di chiedere
- *   all'app sbloccata, ed è revocabile dalle impostazioni dell'app.
+ *   muore e con lui i dati. In chrome.storage sta il token di abbinamento —
+ *   che non è una chiave del vault, è il permesso di chiedere all'app
+ *   sbloccata, ed è revocabile dalle impostazioni dell'app — più tre
+ *   preferenze (tema, privacy, pannello).
  * - App chiusa o vault bloccato = estensione cieca.
  * - La master password non passa MAI di qui.
+ *
+ * Lo stesso file fa da finestrella e da PANNELLO LATERALE (servizio.js
+ * sceglie quale si apre). Il pannello cambia una cosa sola, ma grossa: non si
+ * chiude più da sé, quindi «chiuso il popup, i dati muoiono» da solo non
+ * basta più. Vedi `sorveglia()`.
  */
 
 const BASE = "http://127.0.0.1:8731";
@@ -15,6 +21,13 @@ let TOKEN = null;
 let ENTRIES = [];      // solo in RAM del popup
 
 const $ = (s) => document.querySelector(s);
+
+/* Siamo nel pannello laterale? Una finestrella a comparsa e' fra le viste di
+ * tipo "popup"; il pannello no. Si decide qui, prima del primo disegno: la
+ * finestrella ha una larghezza fissa, il pannello la prende da Chrome. */
+const PANNELLO = !((chrome.extension && chrome.extension.getViews)
+  ? chrome.extension.getViews({ type: "popup" }) : []).includes(window);
+document.body.classList.toggle("pannello", PANNELLO);
 
 /* Un'icona come stringa. I nomi sono quelli di design/icone.json; lo sprite
  * che li definisce sta in popup.html e lo scrive il generatore. La CSP di
@@ -38,10 +51,15 @@ async function apiFetch(path, body) {
 /* ---------- viste ---------- */
 const VISTE = ["viewOff", "viewLocked", "viewPair", "viewMain"];
 
+let VISTA = null;      // quella a schermo, o sotto le impostazioni
+
 function show(id) {
+  VISTA = id;
   VISTE.forEach(v => $("#" + v).classList.toggle("hidden", v !== id));
   $("#viewImpostazioni").classList.add("hidden");
 }
+
+const impostazioniAperte = () => !$("#viewImpostazioni").classList.contains("hidden");
 
 /* ---------- tema ----------
  * Gli stessi tre dell'app e del telefono, con gli stessi nomi. La scelta sta
@@ -52,10 +70,15 @@ function show(id) {
  * far riconoscere il tema PRIMA di sceglierlo, quindi devono mostrare i colori
  * di quel tema mentre sei ancora in un altro. */
 const TEMI = [
-  { id: "dark",  nome: "Scuro",       colori: ["#0A0E1A", "#121A2B", "#38BDF8"] },
-  { id: "light", nome: "Chiaro",      colori: ["#F4F7FC", "#FFFFFF", "#0369A1"] },
-  { id: "night", nome: "Notte e oro", colori: ["#070C1A", "#0E1730", "#E3B341"] },
+  { id: "prisma",   nome: "Prisma",      fondo: "#04050E", neon: ["#8C7CFF", "#3CE2FF"] },
+  { id: "ghiaccio", nome: "Ghiaccio",    fondo: "#E4E8F5", neon: ["#5440E6", "#006489"] },
+  { id: "oro",      nome: "Notte e oro", fondo: "#03050C", neon: ["#E9A93A", "#FFD978"] },
 ];
+
+/* I nomi di prima del 25/10/2026. Qui un tema si salvava solo scegliendolo,
+ * quindi chi ha «night» l'ha voluto: resta Notte e oro, non va al
+ * predefinito (sul telefono invece si salvava sempre, e la regola e' un'altra). */
+const TEMI_VECCHI = { dark: "prisma", light: "ghiaccio", night: "oro" };
 
 function temaValido(id) { return TEMI.some(t => t.id === id); }
 
@@ -103,7 +126,11 @@ function ridisegna() {
 }
 
 async function caricaTema() {
-  const t = (await chrome.storage.local.get("vm_tema")).vm_tema;
+  let t = (await chrome.storage.local.get("vm_tema")).vm_tema;
+  if (TEMI_VECCHI[t]) {
+    t = TEMI_VECCHI[t];
+    await chrome.storage.local.set({ vm_tema: t });
+  }
   if (temaValido(t)) document.body.dataset.tema = t;
 }
 
@@ -123,11 +150,10 @@ function renderTemi() {
     b.className = "tema" + (t.id === attivo ? " sel" : "");
     const pall = document.createElement("span");
     pall.className = "pall";
-    t.colori.forEach(c => {
-      const i = document.createElement("i");
-      i.style.background = c;
-      pall.appendChild(i);
-    });
+    pall.style.background = t.fondo;
+    const i = document.createElement("i");
+    i.style.background = `linear-gradient(135deg,${t.neon[0]},${t.neon[1]})`;
+    pall.appendChild(i);
     const nome = document.createElement("span");
     nome.textContent = t.nome;
     b.append(pall, nome);
@@ -142,21 +168,48 @@ function renderTemi() {
   });
 }
 
-/* Da quale vista si e' entrati nelle impostazioni: si torna li'. Senza,
- * chiudendole da "vault bloccato" ci si ritrovava sulla ricerca vuota. */
-let VISTA_PREC = "viewMain";
+/* ---------- apertura ----------
+ * Pannello laterale o finestrella: la scelta la applica servizio.js, che la
+ * legge da chrome.storage. Senza pannello nel browser la riga non compare:
+ * un interruttore che non cambia niente insegna solo a non fidarsi. */
+async function renderApertura() {
+  $("#sezApertura").classList.toggle("hidden", !chrome.sidePanel);
+  if (!chrome.sidePanel) return;
+  const acceso = (await chrome.storage.local.get("vm_pannello")).vm_pannello !== false;
+  const box = $("#apertura");
+  box.innerHTML = "";
+  const b = document.createElement("button");
+  b.className = "tema" + (acceso ? " sel" : "");
+  const t = document.createElement("span");
+  t.textContent = acceso ? "Pannello laterale" : "Finestrella a comparsa";
+  const s = document.createElement("span");
+  s.className = "segno";
+  s.textContent = acceso ? "ON" : "OFF";
+  b.append(t, s);
+  b.addEventListener("click", async () => {
+    await chrome.storage.local.set({ vm_pannello: !acceso });
+    renderApertura();
+  });
+  box.appendChild(b);
+}
 
+/* Si torna alla vista da cui si e' entrati nelle impostazioni, che `VISTA`
+ * ricorda. Senza, chiudendole da "vault bloccato" ci si ritrovava sulla
+ * ricerca vuota. */
 $("#impBtn").addEventListener("click", () => {
-  VISTA_PREC = VISTE.find(v => !$("#" + v).classList.contains("hidden")) || "viewMain";
   VISTE.forEach(v => $("#" + v).classList.add("hidden"));
   $("#viewImpostazioni").classList.remove("hidden");
   renderTemi();
   renderPrivacy();
+  renderApertura();
 });
 
 $("#impChiudi").addEventListener("click", () => {
   $("#viewImpostazioni").classList.add("hidden");
-  $("#" + VISTA_PREC).classList.remove("hidden");
+  $("#" + (VISTA || "viewMain")).classList.remove("hidden");
+  // Nel frattempo il vault puo' essere stato sbloccato: il giro di
+  // sorveglianza aspettava che le impostazioni si chiudessero.
+  if (PANNELLO) sorveglia();
 });
 
 function toast(msg) {
@@ -176,7 +229,14 @@ async function copia(v, label) {
 }
 
 /* ---------- avvio ---------- */
-async function init() {
+let AVVIO = null;   // un avvio alla volta: il pannello lo chiede anche da solo
+
+function init() {
+  if (!AVVIO) AVVIO = avvia().finally(() => { AVVIO = null; });
+  return AVVIO;
+}
+
+async function avvia() {
   await caricaTema();
   await caricaPrivacy();
   TOKEN = (await chrome.storage.local.get("vm_token")).vm_token || null;
@@ -187,7 +247,7 @@ async function init() {
   try {
     st = await apiFetch("/api/status");
   } catch (e) {
-    show("viewOff"); return;                      // porta chiusa: app non aperta
+    cieco("viewOff"); return;                     // porta chiusa: app non aperta
   }
   if (st.status === 401 || st.status === 403) {
     // token revocato dall'app (o abbinamento rifatto): si torna al codice
@@ -197,20 +257,81 @@ async function init() {
     $("#pairMsg").textContent = "L'abbinamento non è più valido: rifallo dall'app.";
     return;
   }
-  if (!st.j.unlocked) { show("viewLocked"); return; }
+  if (!st.j.unlocked) { cieco("viewLocked"); return; }
 
   show("viewMain");
   await caricaVoci();
-  $("#q").focus();
+  // Il pannello si riapre anche da solo, mentre scrivi in una pagina: li'
+  // prendersi il cursore vorrebbe dire rubarti il campo che stai compilando.
+  if (!PANNELLO || document.hasFocus()) $("#q").focus();
 }
+
+let CARICATE = 0;    // quando sono arrivate le voci, per il pannello
 
 async function caricaVoci() {
   const r = await apiFetch("/api/list");
   if (!r.ok) { ENTRIES = []; return; }
   ENTRIES = r.j.entries || [];
+  CARICATE = Date.now();
   $("#stato").textContent = ENTRIES.length + " voci";
   await mostraSito();
-  render(ENTRIES, $("#results"), "Tutte le voci");
+  // Una ricerca in corso non si butta via: si aggiorna al prossimo tasto.
+  if (!$("#q").value.trim()) render(ENTRIES, $("#results"), "Tutte le voci");
+}
+
+/* ---------- il pannello ----------
+ * La finestrella si chiude da sola, e con lei le voci. Il pannello no: puo'
+ * restare aperto per ore accanto a qualsiasi pagina. Quindi ogni pochi
+ * secondi si chiede all'app se il vault e' ancora aperto, e quando non lo e'
+ * (bloccato dall'inattivita', a mano, o app chiusa) le voci si cancellano
+ * dalla memoria e dallo schermo, come se il pannello fosse stato chiuso.
+ *
+ * Questa domanda NON tiene sveglio il vault: l'auto-blocco dell'app conta i
+ * tocchi nella sua finestra (resetAutolock in index.html), non le chiamate.
+ * Altrimenti un pannello aperto avrebbe tenuto il vault aperto per sempre.
+ *
+ * Al contrario, quando il vault si riapre il pannello se ne accorge e torna
+ * da solo: chi l'ha lasciato aperto non deve ricordarsi di ricaricarlo. */
+function cieco(vista) {
+  ENTRIES = [];
+  ["#results", "#site"].forEach(sel => { const b = $(sel); b.innerHTML = ""; b._ultimo = null; });
+  $("#q").value = "";
+  $("#stato").textContent = "";
+  if (impostazioniAperte()) VISTA = vista;   // ci si torna chiudendole
+  else show(vista);
+}
+
+async function sorveglia() {
+  if (AVVIO || !TOKEN) return;   // si sta gia' chiedendo, o manca l'abbinamento
+  let st;
+  try {
+    st = await apiFetch("/api/status");
+  } catch (e) {
+    if (VISTA !== "viewOff") cieco("viewOff");
+    return;
+  }
+  if (st.status === 401 || st.status === 403) { cieco("viewPair"); init(); return; }
+  if (!st.j.unlocked) {
+    if (VISTA !== "viewLocked") cieco("viewLocked");
+    return;
+  }
+  if (VISTA !== "viewMain" && !impostazioniAperte()) init();
+}
+
+if (PANNELLO) {
+  setInterval(sorveglia, 4000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) sorveglia(); });
+  // Tornando nel pannello dopo aver lavorato nell'app, le voci nuove ci
+  // sono: si ricaricano quando ci si rientra, non a ogni giro.
+  window.addEventListener("focus", () => {
+    if (VISTA === "viewMain" && !AVVIO && Date.now() - CARICATE > 5000) caricaVoci();
+  });
+  // «Per questo sito» segue la scheda che hai davanti: cambiandola, o
+  // cambiando pagina dentro di lei.
+  chrome.tabs.onActivated.addListener(() => { if (VISTA === "viewMain") mostraSito(); });
+  chrome.tabs.onUpdated.addListener((id, info, tab) => {
+    if (VISTA === "viewMain" && tab.active && (info.url || info.status === "complete")) mostraSito();
+  });
 }
 
 /* ---------- voci del sito corrente ----------
@@ -228,6 +349,7 @@ function campiUrl(e) {
 async function mostraSito() {
   const box = $("#site");
   box.innerHTML = "";
+  box._ultimo = null;
   let tab;
   try { [tab] = await chrome.tabs.query({ active: true, currentWindow: true }); } catch (e) { return; }
   if (!tab || !tab.url || !/^https?:/i.test(tab.url)) return;

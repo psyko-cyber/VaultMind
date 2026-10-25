@@ -82,7 +82,8 @@ Future<bool?> confermaSovrascrittura(BuildContext context) => showDialog<bool>(
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
             style: FilledButton.styleFrom(
-                backgroundColor: c.cErrore, foregroundColor: Colors.white),
+                    backgroundColor: c.cErrore, foregroundColor: Colors.white)
+                .copyWith(backgroundBuilder: senzaNeon),
             child: const Text('Sostituisci'),
           ),
         ],
@@ -111,7 +112,8 @@ Future<bool?> confermaDistruttiva(
           FilledButton(
             onPressed: () => Navigator.pop(c, true),
             style: FilledButton.styleFrom(
-                backgroundColor: c.cErrore, foregroundColor: Colors.white),
+                    backgroundColor: c.cErrore, foregroundColor: Colors.white)
+                .copyWith(backgroundBuilder: senzaNeon),
             child: Text(conferma),
           ),
         ],

@@ -130,12 +130,15 @@ class _SezioneCategorieState extends State<SezioneCategorie> {
 
         return Scaffold(
           backgroundColor: Colors.transparent,
-          floatingActionButton: FloatingActionButton.extended(
-            onPressed: _crea,
-            backgroundColor: context.cAccento,
-            foregroundColor: context.cSuAccento,
-            icon: const IconaVM(Icone.cartellaPiu),
-            label: const Text('Nuova categoria'),
+          floatingActionButton: sottoNeon(
+            context,
+            FloatingActionButton.extended(
+              onPressed: _crea,
+              backgroundColor: Colors.transparent,
+              foregroundColor: context.cSuAccento,
+              icon: const IconaVM(Icone.cartellaPiu),
+              label: const Text('Nuova categoria'),
+            ),
           ),
           body: vault.categorie.isEmpty && senza.isEmpty
               ? Center(

@@ -17,6 +17,7 @@ import '../aggiornamenti.dart';
 import '../impostazioni.dart';
 import '../ricerca.dart';
 import '../sessione.dart';
+import '../sfondo.dart';
 import '../sync_gestore.dart';
 import '../tema.dart';
 import '../vault.dart';
@@ -240,110 +241,132 @@ class _SchermataCasaState extends State<SchermataCasa>
       // Qualsiasi tocco rimanda il blocco: si conta l'inattività vera, non il
       // tempo trascorso.
       onPointerDown: (_) => _riarmaBlocco(),
-      child: ValueListenableBuilder<Vault>(
-        valueListenable: widget.sessione,
-        builder: (context, vault, _) => Scaffold(
-          appBar: AppBar(
-            title: const Text('VaultMind',
-                style: TextStyle(
-                    fontFamily: 'Space Grotesk',
-                    fontWeight: FontWeight.w600,
-                    letterSpacing: 0.2)),
-            actions: [
-              Center(
-                child: Text('${vault.credenziali.length} voci',
-                    style: TextStyle(fontSize: 12, color: context.cTenue)),
-              ),
-              // Toccarlo SINCRONIZZA, non apre una schermata: è quello che
-              // vuol dire un'icona così in una barra, ed è la cosa che si fa
-              // spesso. L'abbinamento e i dispositivi fidati stanno nelle
-              // impostazioni, dov'è giusto che stia una cosa da configurare
-              // una volta sola.
-              // Nel browser niente sync (`sync_rete_web.dart`): un pulsante che
-              // non trova mai nessuno insegna solo a non fidarsi dei pulsanti.
-              if (!kIsWeb) IconButton(
-                icon: Badge(
-                  isLabelVisible: _sync.conflitti.isNotEmpty,
-                  label: Text('${_sync.conflitti.length}'),
-                  child: _syncInCorso
-                      ? SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                              strokeWidth: 2, color: context.cTenue),
-                        )
-                      : const IconaVM(Icone.sync),
-                ),
-                tooltip: 'Sincronizza ora',
-                onPressed: _syncInCorso ? null : () => _syncAutomatico(aMano: true),
-              ),
-              IconButton(
-                icon: const IconaVM(Icone.impostazioni),
-                tooltip: 'Impostazioni',
-                onPressed: () {
-                  Navigator.of(context)
-                      .push(MaterialPageRoute(
-                        builder: (_) => SchermataImpostazioni(
-                            sessione: widget.sessione,
-                            gestoreSync: _sync,
-                            quanteVoci: vault.credenziali.length),
-                      ))
-                      .then((_) => _riarmaBlocco());
-                },
-              ),
-              IconButton(
-                icon: const IconaVM(Icone.lucchetto),
-                tooltip: 'Blocca',
-                onPressed: _blocca,
-              ),
-            ],
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Uno sfondo solo per tutte le sezioni, e DIETRO allo Scaffold, non
+          // dentro: cambiando scheda la nuvola scivola al posto nuovo invece
+          // di ricominciare, e quando la tastiera della chat si apre il corpo
+          // si accorcia ma il cielo resta dov'era. Categorie segue il
+          // database, come sul PC.
+          ValueListenableBuilder<Impostazioni>(
+            valueListenable: impostazioni,
+            builder: (context, imp, _) => SfondoCristallo(
+              tipo: _sezione == 0 ? imp.sfondoChat : imp.sfondoDatabase,
+              posa: _sezione == 0 ? posaChat : posaDatabase,
+            ),
           ),
-          // IndexedStack e non uno switch: passando da una sezione all'altra
-          // non si perdono il testo cercato, lo scorrimento e la conversazione.
-          body: IndexedStack(
-            index: _sezione,
-            children: [
-              if (_visitate.contains(0))
-                SezioneChat(
-                    sessione: widget.sessione,
-                    indice: _indicePer(vault.credenziali))
-              else
-                const SizedBox.shrink(),
-              if (_visitate.contains(1))
-                SezioneDatabase(
-                    sessione: widget.sessione,
-                    indice: _indicePer(vault.credenziali))
-              else
-                const SizedBox.shrink(),
-              if (_visitate.contains(2))
-                SezioneCategorie(
-                    sessione: widget.sessione,
-                    indice: _indicePer(vault.credenziali))
-              else
-                const SizedBox.shrink(),
-            ],
-          ),
-          bottomNavigationBar: NavigationBar(
-            selectedIndex: _sezione,
-            onDestinationSelected: (i) => setState(() {
-              _sezione = i;
-              _visitate.add(i);
-            }),
-            destinations: const [
-              NavigationDestination(
-                  icon: IconaVM(Icone.chat),
-                  selectedIcon: IconaVM(Icone.chat),
-                  label: 'Chat'),
-              NavigationDestination(
-                  icon: IconaVM(Icone.elenco),
-                  selectedIcon: IconaVM(Icone.elenco),
-                  label: 'Database'),
-              NavigationDestination(
-                  icon: IconaVM(Icone.cartella),
-                  selectedIcon: IconaVM(Icone.cartella),
-                  label: 'Categorie'),
-            ],
-          ),
+          _scaffold(),
+        ],
+      ),
+    );
+  }
+
+  Widget _scaffold() {
+    return ValueListenableBuilder<Vault>(
+      valueListenable: widget.sessione,
+      builder: (context, vault, _) => Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          title: const Text('VaultMind',
+              style: TextStyle(
+                  fontFamily: 'Space Grotesk',
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.2)),
+          actions: [
+            Center(
+              child: Text('${vault.credenziali.length} voci',
+                  style: TextStyle(fontSize: 12, color: context.cTenue)),
+            ),
+            // Toccarlo SINCRONIZZA, non apre una schermata: è quello che
+            // vuol dire un'icona così in una barra, ed è la cosa che si fa
+            // spesso. L'abbinamento e i dispositivi fidati stanno nelle
+            // impostazioni, dov'è giusto che stia una cosa da configurare
+            // una volta sola.
+            // Nel browser niente sync (`sync_rete_web.dart`): un pulsante che
+            // non trova mai nessuno insegna solo a non fidarsi dei pulsanti.
+            if (!kIsWeb) IconButton(
+              icon: Badge(
+                isLabelVisible: _sync.conflitti.isNotEmpty,
+                label: Text('${_sync.conflitti.length}'),
+                child: _syncInCorso
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, color: context.cTenue),
+                      )
+                    : const IconaVM(Icone.sync),
+              ),
+              tooltip: 'Sincronizza ora',
+              onPressed: _syncInCorso ? null : () => _syncAutomatico(aMano: true),
+            ),
+            IconButton(
+              icon: const IconaVM(Icone.impostazioni),
+              tooltip: 'Impostazioni',
+              onPressed: () {
+                Navigator.of(context)
+                    .push(MaterialPageRoute(
+                      builder: (_) => SchermataImpostazioni(
+                          sessione: widget.sessione,
+                          gestoreSync: _sync,
+                          quanteVoci: vault.credenziali.length),
+                    ))
+                    .then((_) => _riarmaBlocco());
+              },
+            ),
+            IconButton(
+              icon: const IconaVM(Icone.lucchetto),
+              tooltip: 'Blocca',
+              onPressed: _blocca,
+            ),
+          ],
+        ),
+        // IndexedStack e non uno switch: passando da una sezione all'altra
+        // non si perdono il testo cercato, lo scorrimento e la conversazione.
+        body: IndexedStack(
+          index: _sezione,
+          children: [
+            if (_visitate.contains(0))
+              SezioneChat(
+                  sessione: widget.sessione,
+                  indice: _indicePer(vault.credenziali))
+            else
+              const SizedBox.shrink(),
+            if (_visitate.contains(1))
+              SezioneDatabase(
+                  sessione: widget.sessione,
+                  indice: _indicePer(vault.credenziali))
+            else
+              const SizedBox.shrink(),
+            if (_visitate.contains(2))
+              SezioneCategorie(
+                  sessione: widget.sessione,
+                  indice: _indicePer(vault.credenziali))
+            else
+              const SizedBox.shrink(),
+          ],
+        ),
+        bottomNavigationBar: NavigationBar(
+          selectedIndex: _sezione,
+          onDestinationSelected: (i) => setState(() {
+            _sezione = i;
+            _visitate.add(i);
+          }),
+          destinations: const [
+            NavigationDestination(
+                icon: IconaVM(Icone.chat),
+                selectedIcon: IconaVM(Icone.chat),
+                label: 'Chat'),
+            NavigationDestination(
+                icon: IconaVM(Icone.elenco),
+                selectedIcon: IconaVM(Icone.elenco),
+                label: 'Database'),
+            NavigationDestination(
+                icon: IconaVM(Icone.cartella),
+                selectedIcon: IconaVM(Icone.cartella),
+                label: 'Categorie'),
+          ],
         ),
       ),
     );

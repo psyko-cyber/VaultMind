@@ -369,7 +369,7 @@ class _ModuloVoceState extends State<ModuloVoce> {
                       width: 20,
                       height: 20,
                       child: CircularProgressIndicator(
-                          strokeWidth: 2, color: context.cSuAccento))
+                          strokeWidth: 2, color: context.cAccento))
                   : Text(_nuova ? 'Aggiungi al vault' : 'Salva le modifiche',
                       style: const TextStyle(fontWeight: FontWeight.w600)),
             ),

@@ -168,7 +168,7 @@ class _SchermataNuovoVaultState extends State<SchermataNuovoVault> {
                         width: 20,
                         height: 20,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: context.cSuAccento))
+                            strokeWidth: 2, color: context.cAccento))
                     : const Text('Crea il vault',
                         style: TextStyle(fontWeight: FontWeight.w600)),
               ),

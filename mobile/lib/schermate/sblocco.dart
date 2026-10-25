@@ -9,7 +9,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../archivio.dart';
+import '../impostazioni.dart';
 import '../sessione.dart';
+import '../sfondo.dart';
 import '../tema.dart';
 import '../ponte_file.dart';
 import '../vault.dart';
@@ -170,70 +172,114 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(28),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Solo nel browser, e solo quando serve: una versione nuova è
-                // già attiva ma questa pagina è la vecchia. Qui e non dentro
-                // il vault aperto, perché ricaricare chiude la sessione — e
-                // mai da solo, perché qualcuno potrebbe star scrivendo.
-                ValueListenableBuilder<bool>(
-                  valueListenable: aggiornamentoWeb,
-                  builder: (context, pronto, _) => !pronto
-                      ? const SizedBox.shrink()
-                      : Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
-                          child: OutlinedButton.icon(
-                            onPressed: ricaricaApp,
-                            icon: IconaVM(Icone.aggiorna,
-                                size: 18, color: context.cAccento),
-                            label: Text(
-                                'È pronta una versione nuova: tocca per aggiornare',
+    final k = context.cristallo;
+    // Lo sfondo sta dietro allo Scaffold per la stessa ragione della casa:
+    // all'apertura della tastiera il corpo si accorcia, e il cielo, se ci
+    // stesse dentro, salterebbe in alto proprio mentre si scrive.
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ValueListenableBuilder<Impostazioni>(
+          valueListenable: impostazioni,
+          builder: (context, imp, _) =>
+              SfondoCristallo(tipo: imp.sfondoSblocco, posa: posaSblocco),
+        ),
+        Scaffold(
+          backgroundColor: Colors.transparent,
+          body: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Solo nel browser, e solo quando serve: una versione nuova è
+                    // già attiva ma questa pagina è la vecchia. Qui e non dentro
+                    // il vault aperto, perché ricaricare chiude la sessione — e
+                    // mai da solo, perché qualcuno potrebbe star scrivendo.
+                    ValueListenableBuilder<bool>(
+                      valueListenable: aggiornamentoWeb,
+                      builder: (context, pronto, _) => !pronto
+                          ? const SizedBox.shrink()
+                          : Padding(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              child: OutlinedButton.icon(
+                                onPressed: ricaricaApp,
+                                icon: IconaVM(Icone.aggiorna,
+                                    size: 18, color: context.cAccento),
+                                label: Text(
+                                    'È pronta una versione nuova: tocca per aggiornare',
+                                    style: TextStyle(
+                                        color: context.cAccento, fontSize: 13)),
+                                style: OutlinedButton.styleFrom(
+                                    side: BorderSide(color: context.cAccento)),
+                              ),
+                            ),
+                    ),
+                    // Il logo come una gemma: due aloni, uno per neon, al posto
+                    // della luce che sul PC gli gira intorno. Un'ombra e non
+                    // un'animazione: questa schermata è quella che si guarda di
+                    // più, e deve costare poco.
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(24),
+                        boxShadow: [
+                          BoxShadow(
+                              color: k.neon1.withValues(alpha: .42),
+                              blurRadius: 34,
+                              spreadRadius: -6),
+                          BoxShadow(
+                              color: k.neon2.withValues(alpha: .20),
+                              blurRadius: 60,
+                              offset: const Offset(0, 10)),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset('assets/logo.png', width: 96, height: 96,
+                            errorBuilder: (_, _, _) => IconaVM(Icone.scudo,
+                                size: 88, color: context.cAccento)),
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    const Text('VAULTMIND',
+                        style: TextStyle(
+                            fontFamily: 'Space Grotesk',
+                            fontSize: 26,
+                            letterSpacing: 6,
+                            fontWeight: FontWeight.w600)),
+                    const SizedBox(height: 6),
+                    Text('LOCALE · OFFLINE · AES-256',
+                        style: TextStyle(
+                            fontFamily: 'JetBrains Mono',
+                            fontSize: 11,
+                            letterSpacing: 2,
+                            color: context.cTenue)),
+                    const SizedBox(height: 30),
+                    _Vetro(
+                      bordo: k.prisma,
+                      child: Column(
+                        children: [
+                          if (_presente) ..._formSblocco() else ..._invitoImport(),
+                          if (_errore != null) ...[
+                            const SizedBox(height: 16),
+                            // Dal tema: il rosso unico di prima sul Ghiaccio
+                            // valeva 3,3:1.
+                            Text(_errore!,
+                                textAlign: TextAlign.center,
                                 style: TextStyle(
-                                    color: context.cAccento, fontSize: 13)),
-                            style: OutlinedButton.styleFrom(
-                                side: BorderSide(color: context.cAccento)),
-                          ),
-                        ),
+                                    color: context.cErrore, fontSize: 13)),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(24),
-                  child: Image.asset('assets/logo.png', width: 96, height: 96,
-                      errorBuilder: (_, _, _) =>
-                          IconaVM(Icone.scudo, size: 88, color: context.cAccento)),
-                ),
-                const SizedBox(height: 18),
-                const Text('VAULTMIND',
-                    style: TextStyle(
-                        fontFamily: 'Space Grotesk',
-                        fontSize: 26,
-                        letterSpacing: 6,
-                        fontWeight: FontWeight.w600)),
-                const SizedBox(height: 6),
-                Text('LOCALE · OFFLINE · AES-256',
-                    style: TextStyle(
-                        fontFamily: 'JetBrains Mono',
-                        fontSize: 11,
-                        letterSpacing: 2,
-                        color: context.cTenue)),
-                const SizedBox(height: 34),
-                if (_presente) ..._formSblocco() else ..._invitoImport(),
-                if (_errore != null) ...[
-                  const SizedBox(height: 16),
-                  Text(_errore!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Color(0xFFE36868), fontSize: 13)),
-                ],
-              ],
+              ),
             ),
           ),
         ),
-      ),
+      ],
     );
   }
 
@@ -261,12 +307,14 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
             ),
             child: _occupato
                 // Niente const: il colore viene dal tema, e in Flutter un
-                // const non può leggere il context.
+                // const non può leggere il context. Accento e non «su
+                // accento»: mentre lavora il pulsante è spento, quindi grigio,
+                // e un cerchio scuro lì sopra non si vedeva.
                 ? SizedBox(
                     width: 20,
                     height: 20,
                     child: CircularProgressIndicator(
-                        strokeWidth: 2, color: context.cSuAccento))
+                        strokeWidth: 2, color: context.cAccento))
                 : const Text('Sblocca vault',
                     style: TextStyle(fontWeight: FontWeight.w600)),
           ),
@@ -384,4 +432,41 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
           ),
         ),
       ];
+}
+
+/// La scheda dello sblocco: un pannello pieno dentro un filo prismatico.
+///
+/// Pieno e non sfocato: dietro gira la costellazione, e una sfocatura vera
+/// andrebbe ricalcolata a ogni suo fotogramma. Il testo sta così su un colore
+/// fermo, e il contrasto si può calcolare una volta per tutte.
+class _Vetro extends StatelessWidget {
+  final Gradient bordo;
+  final Widget child;
+  const _Vetro({required this.bordo, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    return ConstrainedBox(
+      constraints: const BoxConstraints(maxWidth: 420),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: bordo,
+          borderRadius: BorderRadius.circular(26),
+          boxShadow: const [
+            BoxShadow(
+                color: Color(0x59000000), blurRadius: 40, offset: Offset(0, 18)),
+          ],
+        ),
+        child: Container(
+          margin: const EdgeInsets.all(1.2),
+          padding: const EdgeInsets.fromLTRB(20, 22, 20, 18),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surfaceContainerLow,
+            borderRadius: BorderRadius.circular(25),
+          ),
+          child: child,
+        ),
+      ),
+    );
+  }
 }

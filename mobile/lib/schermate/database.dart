@@ -134,12 +134,15 @@ class _SezioneDatabaseState extends State<SezioneDatabase> {
     return Scaffold(
       // Trasparente: lo sfondo è quello dello Scaffold della casa.
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton(
-        onPressed: _nuova,
-        backgroundColor: context.cAccento,
-        foregroundColor: context.cSuAccento,
-        tooltip: 'Nuova voce',
-        child: const IconaVM(Icone.piu),
+      floatingActionButton: sottoNeon(
+        context,
+        FloatingActionButton(
+          onPressed: _nuova,
+          backgroundColor: Colors.transparent,
+          foregroundColor: context.cSuAccento,
+          tooltip: 'Nuova voce',
+          child: const IconaVM(Icone.piu),
+        ),
       ),
       body: Column(
         children: [

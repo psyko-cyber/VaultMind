@@ -43,7 +43,7 @@ class InterruttoreVetro extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final chiaro = context.temaChiaro;
-    final acc = context.cAccento;
+    final k = context.cristallo;
     final attivo = onChanged != null;
 
     // La traccia spenta non può essere un velo bianco come il resto del
@@ -72,11 +72,20 @@ class InterruttoreVetro extends StatelessWidget {
                 curve: Curves.easeOutCubic,
                 width: _larghezza,
                 height: _altezza,
+                // Acceso, la stessa sfumatura dei pulsanti pieni: il neon
+                // vuol dire «attivo» in tutta l'app. `AnimatedContainer`
+                // passa da tinta a sfumatura senza scatti.
                 decoration: BoxDecoration(
-                  color: acceso ? acc.withValues(alpha: .55) : tracciaSpenta,
+                  color: acceso ? null : tracciaSpenta,
+                  gradient: acceso
+                      ? LinearGradient(colors: [
+                          k.neon1.withValues(alpha: .78),
+                          k.neon2.withValues(alpha: .78),
+                        ])
+                      : null,
                   borderRadius: BorderRadius.circular(_altezza / 2),
                   border: Border.all(
-                    color: acceso ? acc.withValues(alpha: .7) : bordo,
+                    color: acceso ? k.neon2.withValues(alpha: .7) : bordo,
                   ),
                 ),
                 child: Stack(
