@@ -20,6 +20,9 @@ settings.json
 Consegnabili/*.zip
 Consegnabili/*.exe
 Consegnabili/*.apk
+# Lo rigenera rilascio.ps1 a ogni release, sulle impronte dei file appena
+# costruiti: in git sarebbe sempre vecchio di un rilascio.
+Consegnabili/SHA256SUMS.txt
 
 # Installer compilato (installer/build-installer.ps1): rigenerabile, ~100 MB
 installer/Output/
