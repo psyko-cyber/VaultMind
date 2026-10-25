@@ -31,6 +31,7 @@ class SchermataSblocco extends StatefulWidget {
 
 class _SchermataSbloccoState extends State<SchermataSblocco> {
   final _password = TextEditingController();
+  final _fuoco = FocusNode();
   late bool _presente = widget.vaultPresente;
   bool _occupato = false;
   String? _errore;
@@ -55,6 +56,7 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
   @override
   void dispose() {
     _password.dispose();
+    _fuoco.dispose();
     super.dispose();
   }
 
@@ -62,9 +64,14 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     // Il pulsante compare solo se l'impronta è stata davvero attivata: farlo
     // vedere e poi dire "non è attivo" sarebbe una promessa non mantenuta.
     final attiva = await improntaAttiva();
-    if (mounted && attiva && _presente) {
+    if (!mounted || !_presente) return;
+    if (attiva) {
       setState(() => _impronta = true);
       _sbloccaConImpronta(); // si prova subito: è il gesto che ci si aspetta
+    } else {
+      // La tastiera solo quando l'impronta non c'è: aperta subito, copriva
+      // proprio il cerchio dell'impronta.
+      _fuoco.requestFocus();
     }
   }
 
@@ -241,38 +248,43 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
                                 size: 88, color: context.cAccento)),
                       ),
                     ),
-                    const SizedBox(height: 18),
-                    const Text('VAULTMIND',
+                    const SizedBox(height: 20),
+                    // Il nome scritto come si scrive, non in maiuscolo spaziato,
+                    // e sotto una frase vera al posto della sigla tecnica.
+                    const Text('VaultMind',
                         style: TextStyle(
                             fontFamily: 'Space Grotesk',
-                            fontSize: 26,
-                            letterSpacing: 6,
+                            fontSize: 32,
+                            letterSpacing: 0.2,
                             fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 6),
-                    Text('LOCALE · OFFLINE · AES-256',
-                        style: TextStyle(
-                            fontFamily: 'JetBrains Mono',
-                            fontSize: 11,
-                            letterSpacing: 2,
-                            color: context.cTenue)),
+                    const SizedBox(height: 8),
+                    Text(
+                        _presente
+                            ? (kIsWeb
+                                ? 'Il vault è cifrato in questo browser.'
+                                : 'Il vault è cifrato su questo telefono.')
+                            : (kIsWeb
+                                ? 'Le password restano in questo browser, cifrate.'
+                                : 'Le password restano su questo telefono, cifrate.'),
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 14, color: context.cTenue)),
                     const SizedBox(height: 30),
-                    _Vetro(
-                      bordo: k.prisma,
-                      child: Column(
-                        children: [
-                          if (_presente) ..._formSblocco() else ..._invitoImport(),
-                          if (_errore != null) ...[
-                            const SizedBox(height: 16),
-                            // Dal tema: il rosso unico di prima sul Ghiaccio
-                            // valeva 3,3:1.
-                            Text(_errore!,
-                                textAlign: TextAlign.center,
-                                style: TextStyle(
-                                    color: context.cErrore, fontSize: 13)),
-                          ],
-                        ],
+                    // Lo sblocco senza scheda intorno, come nella bozza: sono
+                    // un campo e un pulsante, e la scheda li faceva sembrare
+                    // un modulo da compilare. Le tre strade per avere un vault
+                    // invece restano dentro al vetro: lì c'è da leggere.
+                    if (_presente)
+                      ConstrainedBox(
+                        constraints: const BoxConstraints(maxWidth: 420),
+                        child: Column(
+                            children: [..._formSblocco(), ..._erroreSotto()]),
+                      )
+                    else
+                      _Vetro(
+                        bordo: k.prisma,
+                        child: Column(
+                            children: [..._invitoImport(), ..._erroreSotto()]),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -283,11 +295,42 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
     );
   }
 
+  List<Widget> _erroreSotto() => [
+        if (_errore != null) ...[
+          const SizedBox(height: 16),
+          // Dal tema: il rosso unico di prima sul Ghiaccio valeva 3,3:1.
+          Text(_errore!,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: context.cErrore, fontSize: 13)),
+        ],
+      ];
+
+  /// L'impronta per prima, la password sotto: con l'impronta attiva è il
+  /// gesto di tutti i giorni, e la password diventa la riserva.
   List<Widget> _formSblocco() => [
+        if (_impronta) ...[
+          _CerchioImpronta(onTocco: _occupato ? null : _sbloccaConImpronta),
+          const SizedBox(height: 14),
+          Text("Tocca per usare l'impronta",
+              style: TextStyle(fontSize: 13.5, color: context.cTesto)),
+          const SizedBox(height: 28),
+          Row(
+            children: [
+              Expanded(child: Divider(color: context.cristallo.bordoForte)),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12),
+                child: Text('oppure',
+                    style: TextStyle(fontSize: 12.5, color: context.cTenue)),
+              ),
+              Expanded(child: Divider(color: context.cristallo.bordoForte)),
+            ],
+          ),
+          const SizedBox(height: 16),
+        ],
         TextField(
           controller: _password,
+          focusNode: _fuoco,
           obscureText: true,
-          autofocus: true,
           enabled: !_occupato,
           onSubmitted: (_) => _sblocca(),
           decoration: InputDecoration(
@@ -315,23 +358,10 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
                     height: 20,
                     child: CircularProgressIndicator(
                         strokeWidth: 2, color: context.cAccento))
-                : const Text('Sblocca vault',
+                : const Text('Sblocca',
                     style: TextStyle(fontWeight: FontWeight.w600)),
           ),
         ),
-        if (_impronta) ...[
-          const SizedBox(height: 14),
-          OutlinedButton.icon(
-            onPressed: _occupato ? null : _sbloccaConImpronta,
-            icon: IconaVM(Icone.impronta, color: context.cAccento),
-            label: Text('Sblocca con l\'impronta',
-                style: TextStyle(color: context.cAccento)),
-            style: OutlinedButton.styleFrom(
-              side: BorderSide(color: context.cBordo),
-              padding: const EdgeInsets.symmetric(vertical: 13, horizontal: 20),
-            ),
-          ),
-        ],
         const SizedBox(height: 14),
         Text(
           'Da lei si deriva la chiave del vault, e non viene salvata da nessuna '
@@ -465,6 +495,47 @@ class _Vetro extends StatelessWidget {
             borderRadius: BorderRadius.circular(25),
           ),
           child: child,
+        ),
+      ),
+    );
+  }
+}
+
+/// Il cerchio dell'impronta, al centro dello sblocco. Un alone fermo e non
+/// il respiro della bozza: questa schermata è quella che si guarda di più,
+/// e un'animazione continua qui costerebbe batteria a ogni sblocco.
+class _CerchioImpronta extends StatelessWidget {
+  final VoidCallback? onTocco;
+  const _CerchioImpronta({required this.onTocco});
+
+  @override
+  Widget build(BuildContext context) {
+    final n = context.cristallo.neon2;
+    return Semantics(
+      button: true,
+      label: "Sblocca con l'impronta",
+      excludeSemantics: true,
+      child: Container(
+        width: 84,
+        height: 84,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: context.cPannello,
+          border: Border.all(color: n.withValues(alpha: .55)),
+          boxShadow: [
+            BoxShadow(color: n.withValues(alpha: .08), spreadRadius: 6),
+            BoxShadow(
+                color: n.withValues(alpha: .5), blurRadius: 40, spreadRadius: -6),
+          ],
+        ),
+        child: Material(
+          type: MaterialType.transparency,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: onTocco,
+            child: Center(child: IconaVM(Icone.impronta, size: 38, color: n)),
+          ),
         ),
       ),
     );

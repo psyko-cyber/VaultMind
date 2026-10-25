@@ -186,6 +186,20 @@ class SearchIndex:
         results.sort(key=lambda r: r.score, reverse=True)
         return results[:top_k]
 
+    def vicine(self, cred_id: int, k: int = 3) -> List[SearchResult]:
+        """Le voci piu' simili a una voce, nello stesso spazio in cui cerca la
+        chat. Coseno puro fra i vettori delle voci, senza bonus lessicale:
+        quello misura una RICHIESTA contro una voce, qui non c'e' richiesta.
+        Il punteggio sta fra -1 e 1, e si puo' mostrare cosi' com'e'."""
+        if not self._creds or self._matrix is None:
+            return []
+        i = next((n for n, c in enumerate(self._creds) if c.id == cred_id), None)
+        if i is None:
+            return []
+        sims = self._matrix @ self._matrix[i]
+        ordine = [n for n in np.argsort(-sims) if n != i][:k]
+        return [SearchResult(self._creds[n], float(sims[n])) for n in ordine]
+
 
 def interpret(results: List[SearchResult],
               min_score: float = 0.22,

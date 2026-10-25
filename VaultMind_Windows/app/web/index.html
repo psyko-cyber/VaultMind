@@ -64,10 +64,12 @@
      ====================================================================== */
   :root,body{
     /* Superfici, in ordine di vicinanza a chi guarda: s0 e' il fondo della
-       pagina, s3 e' cio' che sta piu' in alto. s2 e' il «vetro solido»: il
-       colore delle schede, e quello su cui si calcolano i contrasti. Le
-       schede non sfocano cio' che hanno dietro (vedi `.cred`), quindi il
-       testo sta sempre su s2 e non su una costellazione in movimento. */
+       pagina, s3 e' cio' che sta piu' in alto. s2 e' il «vetro solido»:
+       quello su cui si calcolano i contrasti. Le schede della chat (fumetti,
+       voci trovate) non sfocano cio' che hanno dietro: sono tante, e ognuna
+       andrebbe ricalcolata a ogni fotogramma. Stanno su `--vetro-forte`, cioe'
+       s2 all'82%: lo sfondo si intravede, ma non abbastanza da muovere il
+       testo. */
     --s0:#04050E; --s1:#090B1E; --s2:#0D1027; --s3:#151935;
     /* Bordi traslucidi e non pieni: su un fondo che si muove, un bordo
        pieno disegna una cornice, uno traslucido un filo di luce. */
@@ -93,14 +95,21 @@
     --err:#FF7C95; --err-velo:rgba(255,124,149,.09);
     --warn:#FFC960; --warn-velo:rgba(255,201,96,.10);
 
-    /* Vetro. La cornice dell'app (intestazione, tab, barra di scrittura,
-       menu) e' una superficie sola: sfoca cio' che ci scorre sotto e si
-       tinge verso il fondo. Sono le uniche superfici che sfocano: ognuna
-       va ricalcolata a ogni fotogramma della costellazione, e sono poche e
-       quasi vuote di testo. */
+    /* Vetro. La cornice dell'app (binario a sinistra, chip in alto, barra
+       di scrittura, pannello di contesto, elenco e dettaglio del database)
+       sfoca cio' che le passa sotto e si tinge verso il fondo. Sono le
+       uniche superfici che sfocano: ognuna va ricalcolata a ogni fotogramma
+       della costellazione, e queste sono poche e ferme -- non scorrono e
+       non si moltiplicano come i messaggi. */
     --gl-bg:rgba(9,11,28,.70); --gl-bg-2:rgba(9,11,28,.55);
     --gl-brd:rgba(170,178,255,.12); --gl-luce:rgba(255,255,255,.28);
     --gl-blur:22px;
+    /* I due gradi di vetro della bozza: il forte porta testo sopra lo
+       sfondo (pannelli, schede, barra di scrittura), il chiaro sta DENTRO un
+       pannello (campi, righe, dispositivi). Fatti di s2 e t1, quindi seguono
+       il tema senza essere riscritti in ognuno. */
+    --vetro-forte:color-mix(in srgb,var(--s2) 82%,transparent);
+    --vetro-chiaro:color-mix(in srgb,var(--t1) 4.5%,transparent);
     /* L'interruttore ha una traccia sua: `--gl-bg` e' un velo che va verso il
        fondo, e la pallina (bianca) nel tema chiaro ci sparirebbe dentro. */
     --sw-off:rgba(255,255,255,.08);
@@ -200,10 +209,13 @@
   .prisma.acceso::before{animation:giro 14s linear infinite}
   @keyframes giro{to{--ang:360deg}}
 
-  /* Il logo con l'anello di luce che gli gira intorno: solo nello sblocco. */
-  .gemma{position:relative;display:inline-block;border-radius:24%}
-  .gemma img{position:relative;z-index:1;box-shadow:0 0 0 1px var(--brd-forte)}
-  .gemma::before{content:"";position:absolute;inset:-14px;border-radius:50%;
+  /* Il logo con l'anello di luce che gli gira intorno: solo nello sblocco.
+     E' il medaglione tondo del telefono (logo-tondo.png, da genera_logo.py):
+     il logo.png del PC ha ancora la toppa in basso a destra, e a 92 px si
+     vedeva. */
+  .gemma{position:relative;width:92px;height:92px;margin:0 auto 18px;flex:0 0 auto}
+  .gemma img{position:relative;z-index:1;width:100%;height:100%;border-radius:50%;display:block;box-shadow:0 0 0 1px var(--brd-forte)}
+  .gemma::before{content:"";position:absolute;inset:-16px;border-radius:50%;
     background:conic-gradient(from var(--ang),transparent 0 52%,color-mix(in srgb,var(--neon-2) 90%,transparent) 70%,var(--neon-1) 84%,transparent 97%);
     filter:blur(12px);animation:giro 7s linear infinite}
   button{font-family:var(--body);cursor:pointer;border:none;background:none;color:inherit}
@@ -249,19 +261,37 @@
     box-shadow:var(--el2),inset 0 1px 0 var(--gl-luce)}
   /* La porta del vault: l'unica scheda di vetro vero (sfoca la costellazione
      che ha dietro) e l'unica col prisma acceso in continuazione. */
-  .lockbox{width:min(92vw,420px);padding:36px 34px 28px;border-radius:28px;border-color:transparent;
-    background:color-mix(in srgb,var(--s2) 80%,transparent);box-shadow:var(--el3);
+  .lockbox{width:min(92vw,420px);padding:38px 36px 28px;border-radius:28px;border-color:transparent;text-align:center;
+    background:var(--vetro-forte);box-shadow:var(--el3);
     backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
-  .lockbox .badge-row{margin-bottom:22px}
-  .badge-row{display:flex;justify-content:center;margin-bottom:14px}
-  /* Il logo e' un PNG con un fondo quadrato suo, piu' chiaro di quello
-     dell'app: senza smussatura si vede il quadrato e l'angolo sembra
-     tagliato. Agli angoli c'e' solo fondo, il disegno non ci arriva. */
-  .logo{border-radius:24%;display:block}
-  .icon-chip{padding:12px;border-radius:var(--r-lg);background:var(--acc-velo);border:1px solid var(--gl-acc-brd);display:inline-flex}
-  .brand{font-family:var(--disp);font-weight:600;letter-spacing:-.5px;color:var(--t1);text-align:center;font-size:30px}
-  .sub{font-family:var(--mono);font-size:10px;letter-spacing:.15em;color:var(--t3);text-align:center;margin-top:6px;text-transform:uppercase}
-  label.lbl{font-family:var(--disp);font-size:10px;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
+  /* Il nome scritto come si scrive, non in maiuscolo spaziato: le etichette
+     tutte maiuscole erano il modo piu' rapido di sembrare un modello. */
+  .marchio{font:600 34px/1 var(--disp);letter-spacing:-.025em;color:var(--t1)}
+  .motto{margin:10px 0 28px;color:var(--t2);font-size:14.5px}
+  .lockbox .firstrun{text-align:left;margin:-8px 0 22px}
+  .lockbox .btn{height:46px;padding:0 22px;border-radius:14px;margin-top:14px;font:600 15px var(--body)}
+  .lockbox .hint,.lockbox .err{text-align:left}
+  .etichetta{display:block;text-align:left;font:500 13px var(--body);color:var(--t2);margin:0 0 7px 2px}
+  /* Il campo della master password: niente rettangolo dentro una forma
+     tonda, il fuoco lo mostra il contenitore. */
+  .campo-neon{display:flex;align-items:center;height:50px;padding:0 6px 0 16px;border-radius:14px;
+    background:var(--vetro-chiaro);border:1px solid var(--brd-forte);
+    transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
+  .campo-neon + .campo-neon{margin-top:10px}
+  .campo-neon:focus-within{border-color:var(--neon-2);
+    box-shadow:0 0 0 4px color-mix(in srgb,var(--neon-2) 18%,transparent),0 0 30px -8px var(--neon-2)}
+  .campo-neon input{flex:1;min-width:0;height:100%;background:none;border:0;outline:0;color:var(--t1);font:500 17px var(--mono);letter-spacing:.14em}
+  .campo-neon input::placeholder{color:var(--t3);letter-spacing:0;font-family:var(--body);font-size:15px}
+  .campo-neon input:focus-visible{box-shadow:none}
+  .link-btn{margin-top:16px;color:var(--t2);font:500 14px var(--body);transition:color var(--dur1) var(--ease)}
+  .link-btn:hover{color:var(--neon-2)}
+  /* Il pulsante-icona piccolo dentro un campo o una riga (occhio, copia,
+     apri). Senza bordo: in una riga di tre farebbe una griglia di scatole. */
+  .azione{width:32px;height:32px;border-radius:10px;display:inline-grid;place-items:center;flex:0 0 auto;color:var(--t2);
+    transition:background var(--dur1) var(--ease),color var(--dur1) var(--ease)}
+  .azione:hover{background:var(--vetro-chiaro);color:var(--neon-2)}
+  .azione.fatto{color:var(--ok)}
+  label.lbl{font:500 12.5px var(--body);color:var(--t2)}
   .field{width:100%;margin-top:6px;border-radius:12px;padding:12px 14px;background:var(--s1);
     border:1px solid var(--brd-forte);color:var(--t1);outline:none;font-family:var(--mono);
     transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
@@ -315,16 +345,113 @@
   @keyframes prgslide{0%{transform:translateX(-110%)}100%{transform:translateX(320%)}}
   .prg-txt{font-family:var(--mono);font-size:11px;color:var(--t3);margin-top:7px;text-align:center}
 
-  /* app */
-  #app{display:flex;flex-direction:column;height:100vh}
-  header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;
-    border-bottom:1px solid var(--gl-brd);background:var(--gl-bg);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)}
-  .hbrand{display:flex;align-items:center;gap:10px;color:var(--t1);font-family:var(--disp);font-weight:600;letter-spacing:-.3px;font-size:18px}
-  .pills{display:flex;align-items:center;gap:8px}
-  .pill{font-family:var(--mono);font-size:11px;padding:4px 10px;border-radius:999px;display:inline-flex;align-items:center;gap:6px}
-  .pill.net{color:var(--ok);border:1px solid color-mix(in srgb,var(--ok) 35%,transparent)}
-  .pill.db{color:var(--acc);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)}
-  .pill.llm{color:var(--vio);border:1px solid color-mix(in srgb,var(--vio) 35%,transparent)}
+  /* ---- La finestra ------------------------------------------------------
+     Un binario di sezioni a sinistra e l'area a destra: la testata con le
+     schede e il menu a scomparsa nascondevano proprio Sincronizza e
+     Impostazioni, che adesso stanno in vista. Sfoca solo la cornice (binario,
+     pannelli, campo di scrittura): bolle e voci trovate sono vetro pieno,
+     perche' il testo deve stare fermo mentre lo sfondo si muove. */
+  #app{display:grid;grid-template-columns:84px minmax(0,1fr);height:100vh}
+  .binario{display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 8px;min-height:0;overflow-y:auto;overflow-x:hidden;
+    background:var(--gl-bg);border-right:1px solid var(--brd);box-shadow:inset 0 1px 0 var(--gl-luce);
+    backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
+  .bin-logo{width:38px;height:38px;border-radius:50%;margin:0 0 16px;flex:0 0 auto;box-shadow:0 0 0 1px var(--brd-forte),0 0 24px -6px var(--neon-1)}
+  .voce-bin{position:relative;width:68px;padding:10px 0 8px;border-radius:14px;display:flex;flex-direction:column;align-items:center;gap:5px;
+    flex:0 0 auto;color:var(--t3);font:500 11px/1 var(--body);transition:background var(--dur2) var(--ease),color var(--dur2) var(--ease)}
+  .voce-bin:hover{background:var(--vetro-chiaro);color:var(--t1)}
+  .voce-bin[aria-current="page"]{color:var(--t1);background:linear-gradient(180deg,color-mix(in srgb,var(--neon-1) 24%,transparent),color-mix(in srgb,var(--neon-2) 8%,transparent))}
+  .voce-bin[aria-current="page"] .ic{color:var(--neon-2);filter:drop-shadow(0 0 6px color-mix(in srgb,var(--neon-2) 70%,transparent))}
+  .voce-bin[aria-current="page"]::before{content:"";position:absolute;left:-8px;top:12px;bottom:12px;width:3px;border-radius:0 3px 3px 0;background:var(--neon-2);box-shadow:0 0 12px var(--neon-2)}
+  .voce-bin .ic{width:22px;height:22px;vertical-align:0}
+  /* I conflitti del sync: un numero sulla voce, non un colore sul menu. */
+  .voce-bin .conta{position:absolute;top:4px;right:10px;min-width:17px;height:17px;padding:0 4px;border-radius:999px;
+    background:var(--warn);color:var(--s0);font:700 10.5px/17px var(--body);text-align:center}
+  .bin-vuoto{flex:1}
+
+  .area{position:relative;display:flex;flex-direction:column;min-width:0;min-height:0}
+  .vista-chat{display:grid;grid-template-columns:minmax(0,1fr) 296px;gap:20px;padding:16px 20px 20px 12px;flex:1;min-height:0}
+  .centro{display:flex;flex-direction:column;min-height:0;min-width:0}
+  .barra-alta{position:relative;display:flex;justify-content:flex-end;align-items:center;gap:8px;flex-wrap:wrap}
+  .chip{display:inline-flex;align-items:center;justify-content:center;gap:7px;height:30px;padding:0 12px;border-radius:999px;
+    font:500 12.5px var(--body);color:var(--t2);white-space:nowrap;
+    background:var(--gl-bg);border:1px solid var(--brd);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  .chip .ic{width:15px;height:15px;vertical-align:0}
+  button.chip{transition:color var(--dur1) var(--ease),border-color var(--dur1) var(--ease)}
+  button.chip:hover{color:var(--t1);border-color:color-mix(in srgb,var(--neon-2) 45%,transparent)}
+  .chip.solo{width:30px;padding:0}
+  .punto-vivo{width:7px;height:7px;border-radius:50%;background:var(--ok);flex:0 0 auto;
+    box-shadow:0 0 0 3px color-mix(in srgb,var(--ok) 22%,transparent),0 0 10px var(--ok)}
+
+  /* Il saluto: l'unico testo che non sta su vetro, quindi un velo dietro
+     attenua i punti della costellazione che gli passano sotto. */
+  .benvenuto{position:relative;isolation:isolate;text-align:center;padding:12px 0 24px;margin:auto 0}
+  .benvenuto::before{content:"";position:absolute;inset:-60px -90px;background:radial-gradient(closest-side,var(--velo),transparent);z-index:-1}
+  .saluto{font:600 clamp(34px,4.2vw,50px)/1.06 var(--disp);letter-spacing:-.03em;color:var(--t1);margin:0 0 14px;text-wrap:balance}
+  .benvenuto p{color:var(--t2);font-size:16.5px;margin:0 auto 28px;max-width:44ch}
+  .suggerimenti{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}
+  .suggerimenti button{height:38px;padding:0 16px;border-radius:999px;background:var(--gl-bg);border:1px solid var(--brd-forte);color:var(--t1);
+    font:500 14px var(--body);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+    transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
+  .suggerimenti button:hover{border-color:color-mix(in srgb,var(--neon-2) 60%,transparent);box-shadow:0 0 0 3px color-mix(in srgb,var(--neon-2) 14%,transparent),0 0 26px -6px var(--neon-2)}
+
+  .contesto{border-radius:22px;padding:20px 18px;display:flex;flex-direction:column;gap:8px;overflow:auto;min-height:0;
+    background:var(--vetro-forte);border:1px solid var(--brd);box-shadow:inset 0 1px 0 var(--gl-luce);
+    backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
+  .contesto h3{font:600 13px var(--body);color:var(--t3);margin:14px 4px 4px}
+  .contesto h3:first-child{margin-top:0}
+  .contesto .vuoto{color:var(--t3);font-size:13px;margin:0 4px}
+  .disp{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--vetro-chiaro);border:1px solid var(--brd);color:var(--t2)}
+  .disp > div{min-width:0}
+  .disp b{display:block;color:var(--t1);font:600 14px var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .disp small{display:block;color:var(--t3);font-size:12.5px}
+  .disp .punto-vivo{margin-left:auto}
+  .recente{width:100%;display:flex;align-items:center;gap:12px;padding:7px 8px;border-radius:12px;text-align:left;transition:background var(--dur1) var(--ease)}
+  .recente:hover{background:var(--vetro-chiaro)}
+  .recente .mono{width:32px;height:32px;font-size:14px;border-radius:10px}
+  .recente b{color:var(--t1);font:500 14px var(--body);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cat-riga{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 10px;align-items:center;padding:3px 6px;font-size:13.5px;color:var(--t2)}
+  .cat-riga span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cat-riga b{font:500 13px var(--mono);color:var(--t1)}
+  .cat-riga i{grid-column:1/-1;height:3px;border-radius:3px;background:var(--brd)}
+  .cat-riga i::after{content:"";display:block;height:100%;width:var(--w);border-radius:3px;
+    background:linear-gradient(90deg,var(--da),var(--a));box-shadow:0 0 8px color-mix(in srgb,var(--da) 60%,transparent)}
+  .autoblocco{margin-top:auto;padding:14px 12px 4px;border-top:1px solid var(--brd)}
+  .autoblocco div:first-child{display:flex;justify-content:space-between;gap:10px;font-size:13px;color:var(--t3);margin-bottom:8px}
+  .autoblocco b{color:var(--t2);font-weight:500}
+  .barretta{height:3px;border-radius:3px;background:var(--brd-forte);overflow:hidden}
+  .barretta i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--neon-1),var(--neon-2));transition:width 1s linear}
+
+  /* Il monogramma: l'iniziale della voce su due neon del tema. La coppia la
+     sceglie la categoria, quindi le voci di una stessa categoria si
+     somigliano; tre tinte e non una ruota di colori, o lo schermo diventa
+     un arlecchino che non c'entra col tema. */
+  .mono{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;flex:0 0 auto;
+    font:600 17px/1 var(--disp);color:var(--su-neon);
+    background:linear-gradient(135deg,var(--da),var(--a));
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.35),inset 0 -10px 16px rgba(0,0,0,.18),0 6px 18px -6px color-mix(in srgb,var(--da) 60%,transparent)}
+  .mono,.cat-riga{--da:var(--neon-1);--a:var(--neon-2)}
+  [data-tinta="1"]{--da:var(--neon-2);--a:var(--neon-3)}
+  [data-tinta="2"]{--da:var(--neon-3);--a:var(--neon-1)}
+  .mono.xl{width:76px;height:76px;border-radius:22px;font-size:32px}
+
+  .tag{display:inline-block;font:500 12px/1.6 var(--body);color:var(--t2);padding:1px 9px;border-radius:999px;background:var(--vetro-chiaro);border:1px solid var(--brd)}
+  .fant-btn{display:inline-flex;align-items:center;gap:8px;height:40px;padding:0 15px;border-radius:12px;white-space:nowrap;
+    border:1px solid var(--brd-forte);color:var(--t1);font:500 14px var(--body);
+    transition:background var(--dur1) var(--ease),border-color var(--dur1) var(--ease)}
+  .fant-btn:hover{background:var(--vetro-chiaro);border-color:color-mix(in srgb,var(--neon-2) 50%,transparent)}
+  .fant-btn.rosso{color:var(--err);border-color:color-mix(in srgb,var(--err) 35%,transparent)}
+  .fant-btn.rosso:hover{background:var(--err-velo);border-color:var(--err)}
+
+  /* L'avviso in basso: una riga, poi sparisce. Centrato sull'area, non sulla
+     finestra, per questo i 42px (meta' del binario). */
+  .avviso{position:fixed;left:calc(50% + 42px);bottom:100px;transform:translate(-50%,12px);opacity:0;display:flex;align-items:center;gap:10px;
+    max-width:70vw;padding:10px 16px;border-radius:14px;background:var(--vetro-forte);border:1px solid var(--brd-forte);color:var(--t1);
+    font:500 14px/1.4 var(--body);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);box-shadow:var(--el3);
+    transition:opacity var(--dur2) var(--ease),transform var(--dur2) var(--ease);pointer-events:none;z-index:60}
+  .avviso.su{opacity:1;transform:translate(-50%,0);pointer-events:auto;cursor:pointer}
+  .avviso .ic{color:var(--ok)}
+  .avviso.importante{border-color:var(--warn)}
+  .avviso.importante .ic{color:var(--warn)}
   /* Il pulsante-icona. `inline-flex` non e' un vezzo: un <svg> e' un elemento
      in linea e poggia sulla linea di base del testo, quindi senza centratura
      esplicita il pulsante cresce di qualche pixel sotto e la fila di pulsanti
@@ -345,7 +472,10 @@
      quando dice qualcosa invece di decorare (vedi .iconbtn.rec). */
   .lente{display:inline-flex;color:var(--t3);flex:0 0 auto}
 
-  main{flex:1;overflow-y:auto;padding:20px;max-width:680px;width:100%;margin:0 auto}
+  /* La colonna della conversazione: larga al massimo 720px, ma la barra di
+     scorrimento resta sul bordo dell'area e non in mezzo allo schermo. */
+  #chat{flex:1;min-height:0;overflow-y:auto;display:flex;flex-direction:column;
+    padding:24px max(8px,calc((100% - 720px) / 2));scrollbar-width:thin;scrollbar-color:var(--brd-forte) transparent}
   .row{display:flex;margin-bottom:12px}
   .row.user{justify-content:flex-end}
   .bubble{max-width:88%;border-radius:18px;padding:10px 16px;font-size:15px;line-height:1.5}
@@ -356,44 +486,80 @@
     background:linear-gradient(135deg,color-mix(in srgb,var(--neon-1) 34%,var(--s2)),color-mix(in srgb,var(--neon-2) 18%,var(--s2)));
     border:1px solid color-mix(in srgb,var(--neon-1) 45%,transparent);
     box-shadow:0 10px 30px -14px color-mix(in srgb,var(--neon-1) 70%,transparent)}
-  .b-ai{background:var(--s2);border:1px solid var(--brd);color:var(--t2);border-bottom-left-radius:6px;box-shadow:inset 0 1px 0 var(--gl-luce)}
-  .ai-tag{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.05em;color:var(--acc);margin-bottom:5px;display:flex;align-items:center;gap:6px}
-  .ai-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--acc);box-shadow:0 0 6px var(--acc)}
+  .b-ai{background:var(--vetro-forte);border:1px solid var(--brd);color:var(--t1);border-bottom-left-radius:6px;box-shadow:inset 0 1px 0 var(--gl-luce)}
+  .mente{max-width:100%;min-width:0}
+  .ai-tag{display:flex;align-items:center;gap:7px;font:600 12px var(--body);color:var(--t3);margin-bottom:5px}
+  .ai-tag::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--neon-2);box-shadow:0 0 8px var(--neon-2)}
 
-  .cred{position:relative;overflow:hidden;border-radius:14px;padding:14px;margin-top:8px;background:var(--s2);border:1px solid var(--brd);
+  /* Il riquadro dell'importazione: ancora la .cred di prima, senza la
+     striscia colorata a sinistra (nessun riquadro ne ha piu' una). */
+  .cred{position:relative;overflow:hidden;border-radius:14px;padding:14px;margin-top:8px;background:var(--vetro-forte);border:1px solid var(--brd);
     box-shadow:var(--el2),inset 0 1px 0 var(--gl-luce)}
-  .cred .accent{position:absolute;left:0;top:0;bottom:0;width:3px;background:linear-gradient(180deg,var(--neon-1),var(--neon-2))}
-  /* La voce appena trovata ha il prisma, e un alone che la stacca dalle altre. */
-  .cred.prisma{border-color:transparent;box-shadow:var(--el3),0 0 70px -26px color-mix(in srgb,var(--neon-1) 70%,transparent)}
-  .cred .title{display:flex;align-items:center;gap:8px;color:var(--t1);font-weight:600}
-  .credline{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
-  .credline .meta{min-width:0}
-  .credline .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--t3)}
-  .credline .v{font-family:var(--mono);color:var(--t2);letter-spacing:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .credline .v.shown{color:var(--t1);letter-spacing:0}
-  .credline .v.urlv{color:var(--acc);font-size:13px}
-  .acts{display:flex;gap:6px;flex-shrink:0}
+
+  /* La voce trovata. Un solo bordo a prisma per volta: l'ultima. */
+  .trovata{position:relative;width:580px;max-width:100%;margin-top:10px;padding:16px 18px 14px;border-radius:20px;
+    background:var(--vetro-forte);border:1px solid var(--brd);box-shadow:var(--el2),inset 0 1px 0 var(--gl-luce)}
+  .trovata.prisma{border-color:transparent;box-shadow:var(--el3),0 0 70px -24px color-mix(in srgb,var(--neon-1) 70%,transparent)}
+  .trovata header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .trovata header > div{min-width:0}
+  .trovata h3{margin:0 0 3px;font:600 18px/1.2 var(--disp);color:var(--t1);overflow-wrap:anywhere}
+  .trovata .tag + .badge-crit,.trovata h3 + .badge-crit{margin-left:6px}
+  .trovata .piede{display:flex;justify-content:flex-end;margin-top:12px}
+  /* Quanto la voce somiglia alla richiesta: il numero che ha deciso, non
+     un voto. Sta fra 0 e 1 perche' la barra non puo' andare oltre. */
+  .somiglianza{margin-left:auto;text-align:right;font-size:12px;color:var(--t3);flex:0 0 auto}
+  .somiglianza b{display:block;font:600 15px var(--mono);color:var(--neon-2)}
+  .somiglianza i{display:block;width:76px;height:3px;border-radius:3px;background:var(--brd-forte);margin-top:5px;position:relative;overflow:hidden}
+  .somiglianza i::after{content:"";position:absolute;inset:0;width:calc(var(--v) * 100%);background:linear-gradient(90deg,var(--neon-1),var(--neon-2));box-shadow:0 0 8px var(--neon-2)}
+  .scegli{display:flex;gap:10px;margin-top:12px;flex-wrap:wrap}
+  .scegli button{display:flex;align-items:center;gap:10px;max-width:100%;padding:8px 14px 8px 8px;border-radius:14px;text-align:left;
+    background:var(--vetro-forte);border:1px solid var(--brd-forte);transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
+  .scegli button:hover{border-color:var(--neon-2);box-shadow:0 0 24px -8px var(--neon-2)}
+  .scegli span{min-width:0}
+  .scegli b{display:block;color:var(--t1);font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .scegli small{display:block;color:var(--t3);font-size:12px}
+  .scegli .mono{width:34px;height:34px;font-size:15px;border-radius:10px}
+
+  /* I campi di una voce: etichetta, valore, azioni. I segreti in monospazio
+     perche' l e 1, O e 0 devono essere distinguibili, non per fare «tech». */
+  .campi{display:flex;flex-direction:column;border-top:1px solid var(--brd)}
+  .campo{display:grid;grid-template-columns:128px minmax(0,1fr) auto;align-items:center;gap:12px;padding:9px 2px;border-bottom:1px solid var(--brd)}
+  .campo:last-child{border-bottom:0}
+  .campo .lab{font-size:13px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .val{color:var(--t1);font-size:14.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .val.seg{font-family:var(--mono);letter-spacing:.06em}
+  .val.seg[data-vis="1"]{letter-spacing:.02em;color:var(--neon-2)}
+  /* Note e valori lunghi vanno a capo: tagliati coi puntini non si leggono. */
+  .val.lunga{white-space:pre-wrap;overflow-wrap:anywhere;line-height:1.5}
+  .val a{color:var(--neon-2);text-decoration:none}
+  .val a:hover{text-decoration:underline}
+  .azioni{display:flex;gap:2px}
   .pickbtn{margin-top:8px;width:100%;text-align:left;border-radius:10px;padding:8px 12px;
     background:color-mix(in srgb,var(--acc) 8%,transparent);border:1px solid var(--acc);color:var(--acc)}
 
 
-  .composer{border-top:1px solid var(--gl-brd);background:var(--gl-bg);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)}
-  .composer .inner{max-width:680px;width:100%;margin:0 auto;padding:13px 20px 16px;display:flex;align-items:center;gap:8px}
-  .searchbox{flex:1;display:flex;align-items:center;gap:8px;border-radius:var(--r-full);padding:10px 16px;
-    background:color-mix(in srgb,var(--s2) 75%,transparent);border:1px solid var(--brd-forte);
+  /* Il campo per scrivere: una pillola che galleggia sotto la conversazione,
+     non una fascia che taglia la finestra. */
+  .scrivi{display:flex;align-items:center;gap:6px;width:100%;max-width:760px;margin:12px auto 0;padding:7px;border-radius:999px;flex:0 0 auto;
+    background:var(--vetro-forte);border:1px solid var(--brd-forte);box-shadow:var(--el3);
+    backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
     transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
-  .searchbox:focus-within{border-color:color-mix(in srgb,var(--neon-2) 60%,transparent);
-    box-shadow:0 0 0 4px color-mix(in srgb,var(--neon-2) 12%,transparent)}
-  .searchbox input::placeholder{color:var(--t3)}
+  .scrivi:focus-within{border-color:color-mix(in srgb,var(--neon-2) 55%,transparent);box-shadow:var(--el3),0 0 0 4px color-mix(in srgb,var(--neon-2) 12%,transparent)}
+  .tondo{width:40px;height:40px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;color:var(--t2);
+    transition:background var(--dur1) var(--ease),color var(--dur1) var(--ease)}
+  .tondo:hover{background:var(--vetro-chiaro);color:var(--t1)}
+  .tondo .ic{vertical-align:0}
+  .scrivi-campo{flex:1;min-width:0;display:flex;align-items:center;gap:10px;padding:0 8px;color:var(--t3)}
+  .scrivi-campo input{flex:1;min-width:0;height:40px;background:none;border:0;outline:0;color:var(--t1);font-size:15.5px}
+  .scrivi-campo input::placeholder{color:var(--t3)}
   /* Il fuoco lo mostra la pillola intera (:focus-within): l'anello del campo
      dentro disegnerebbe un rettangolo in mezzo a una forma tonda. */
-  .searchbox input:focus-visible{box-shadow:none}
-  .searchbox input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:15px}
-  .send{display:inline-flex;align-items:center;justify-content:center;
-    width:42px;height:42px;border-radius:var(--r-full);color:var(--su-neon);
-    background:linear-gradient(135deg,var(--neon-1),var(--neon-2));
-    box-shadow:0 6px 20px -6px var(--neon-1)}
-  .send:hover{box-shadow:0 8px 26px -6px var(--neon-2)}
+  .scrivi-campo input:focus-visible{box-shadow:none}
+  .invia{width:44px;height:44px;border-radius:50%;display:grid;place-items:center;flex:0 0 auto;color:var(--su-neon);
+    background:linear-gradient(135deg,var(--neon-1),var(--neon-2));box-shadow:0 6px 20px -6px var(--neon-1);
+    transition:box-shadow var(--dur2) var(--ease)}
+  .invia:hover{box-shadow:0 8px 26px -6px var(--neon-2)}
+  .invia .ic{vertical-align:0}
 
   /* Il velo dei modali e' fatto del fondo del tema: nero su Ghiaccio
      sembrava un'altra app. */
@@ -430,15 +596,20 @@
   .badge-crit{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;
     background:var(--warn-velo);border:1px solid var(--warn);color:var(--warn);white-space:nowrap}
 
-  /* TOTP / 2FA */
-  .totp{margin-top:8px;padding:10px 12px;border-radius:10px;background:color-mix(in srgb,var(--ok) 6%,transparent);border:1px solid color-mix(in srgb,var(--ok) 30%,transparent)}
-  .totp .trow{display:flex;align-items:center;justify-content:space-between;gap:10px}
-  .totp .k{font-family:var(--disp);font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--ok)}
-  .totp .tcode{font-family:var(--mono);font-size:24px;font-weight:700;color:var(--t1);letter-spacing:3px;margin-top:2px}
+  /* TOTP / 2FA: il codice e un anello che si consuma. Arancione negli
+     ultimi 5 secondi: copiarlo adesso vuol dire incollarlo scaduto. */
+  .totp{display:flex;align-items:center;gap:14px;margin-top:12px;padding:12px 14px;border-radius:16px;background:var(--vetro-chiaro);border:1px solid var(--brd)}
+  .totp > div{min-width:0}
+  .totp .lab{display:block;font-size:13px;color:var(--t3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .totp-codice{display:block;font:600 22px/1.2 var(--mono);letter-spacing:.08em;color:var(--t1)}
+  .totp .azione{margin-left:auto}
   .totp .terr{font-family:var(--mono);font-size:12px;color:var(--err);margin-top:4px}
-  .totp .tbar{margin-top:8px;height:4px;border-radius:4px;background:var(--brd);overflow:hidden}
-  .totp .tbar i{display:block;height:100%;background:var(--ok);width:100%;transition:width 1s linear}
-  .iconbtn.rec{border-color:var(--ok);color:var(--ok);background:var(--ok-velo)}
+  .anello{width:40px;height:40px;transform:rotate(-90deg);flex:0 0 auto}
+  .anello circle{fill:none;stroke-width:3}
+  .anello-fondo{stroke:var(--brd-forte)}
+  .anello-arco{stroke:var(--neon-2);stroke-linecap:round;filter:drop-shadow(0 0 4px var(--neon-2));transition:stroke-dashoffset 1s linear,stroke .3s}
+  .totp.scade .anello-arco{stroke:var(--warn);filter:drop-shadow(0 0 4px var(--warn))}
+  .iconbtn.rec,.tondo.rec{border-color:var(--ok);color:var(--ok);background:var(--ok-velo)}
   .onb-sec{border:1px solid var(--brd);border-radius:12px;padding:12px;margin-top:12px;background:var(--s1)}
   .onb-head{display:flex;align-items:center;gap:8px;color:var(--t1);font-weight:600}
 
@@ -461,17 +632,66 @@
   .pickrow .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--t2)}
   .pickrow .w{font-size:11px;color:var(--t3);white-space:nowrap}
 
-  /* tab nav */
-  .tab-btn{flex:1;display:inline-flex;align-items:center;justify-content:center;gap:8px;
-    padding:11px;font-family:var(--disp);font-size:11px;letter-spacing:1px;text-transform:uppercase;
-    color:var(--t3);background:none;border:none;border-bottom:2px solid transparent;cursor:pointer;
-    transition:color var(--dur2) var(--ease),border-color var(--dur2) var(--ease)}
-  .tab-btn:hover{color:var(--t2)}
-  .tab-btn.active{color:var(--acc);border-bottom-color:var(--acc);
-    background:linear-gradient(180deg,transparent 30%,color-mix(in srgb,var(--neon-1) 14%,transparent))}
+  /* ---- Il database: l'elenco a sinistra, la voce aperta a destra --------
+     Le schede a griglia mostravano solo i titoli: per sapere cosa c'era in
+     una voce bisognava aprirla in un modale. Adesso la voce si legge accanto
+     all'elenco, e i filtri sono le categorie. */
+  .vista-db{display:grid;grid-template-columns:392px minmax(0,1fr);gap:20px;padding:20px;flex:1;min-height:0}
+  .elenco,.dettaglio{background:var(--gl-bg);border:1px solid var(--brd);box-shadow:inset 0 1px 0 var(--gl-luce);
+    backdrop-filter:blur(24px) saturate(150%);-webkit-backdrop-filter:blur(24px) saturate(150%)}
+  .elenco{display:flex;flex-direction:column;border-radius:22px;padding:14px;min-height:0}
+  .cerca{display:flex;align-items:center;gap:6px;height:42px;padding:0 4px 0 14px;border-radius:14px;flex:0 0 auto;
+    background:var(--vetro-chiaro);border:1px solid var(--brd);color:var(--t3)}
+  .cerca:focus-within{border-color:var(--neon-2)}
+  .cerca input{flex:1;min-width:0;margin-left:4px;background:none;border:0;outline:0;color:var(--t1);font-size:14.5px}
+  .cerca input:focus-visible{box-shadow:none}
+  .cerca input::placeholder{color:var(--t3)}
+  .cerca .azione.pericolo:hover{color:var(--err);background:var(--err-velo)}
+  .filtri{display:flex;flex-wrap:wrap;gap:6px;margin:12px 0 10px;flex:0 0 auto}
+  .filtri button{height:28px;padding:0 11px;border-radius:999px;font:500 12.5px var(--body);color:var(--t2);border:1px solid var(--brd);
+    transition:background var(--dur1) var(--ease),color var(--dur1) var(--ease)}
+  .filtri button:hover{color:var(--t1);background:var(--vetro-chiaro)}
+  .filtri button[aria-pressed="true"]{color:var(--su-neon);background:var(--neon-2);border-color:transparent;box-shadow:0 0 16px -4px var(--neon-2)}
+  .righe{overflow:auto;flex:1;min-height:0;margin:0 -6px;padding:0 6px;scrollbar-width:thin;scrollbar-color:var(--brd-forte) transparent}
+  .riga{width:100%;display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:14px;text-align:left;transition:background var(--dur1) var(--ease)}
+  .riga:hover{background:var(--vetro-chiaro)}
+  .riga[aria-selected="true"]{background:linear-gradient(90deg,color-mix(in srgb,var(--neon-1) 22%,transparent),transparent 90%);box-shadow:inset 2px 0 0 var(--neon-2)}
+  .riga > span{min-width:0}
+  .riga b{display:block;color:var(--t1);font:600 14.5px/1.3 var(--body);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .riga small{display:block;color:var(--t3);font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .segno-2fa{margin-left:auto;flex:0 0 auto;font:600 11px var(--body);color:var(--neon-2);padding:2px 7px;border-radius:999px;border:1px solid color-mix(in srgb,var(--neon-2) 40%,transparent)}
+  .riga .badge-crit{margin-left:auto}
+  .riga .badge-crit + .segno-2fa{margin-left:0}
+  .vuoto-lista{color:var(--t3);text-align:center;padding:24px 12px;margin:0}
+  .dettaglio{border-radius:24px;padding:32px 36px;overflow:auto;min-height:0;scrollbar-width:thin;scrollbar-color:var(--brd-forte) transparent}
+  .det-testa{display:flex;align-items:center;gap:20px;margin-bottom:26px}
+  .det-testa > div:not(.det-azioni){min-width:0}
+  .det-testa h2{font:600 34px/1.1 var(--disp);letter-spacing:-.025em;color:var(--t1);margin:0 0 8px;overflow-wrap:anywhere}
+  .det-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;color:var(--t3);font-size:13px}
+  .det-azioni{margin-left:auto;display:flex;gap:8px;align-self:flex-start}
+  .det-tag{display:flex;flex-wrap:wrap;gap:6px}
+  .campi.det .campo{grid-template-columns:170px minmax(0,1fr) auto;padding:14px 4px}
+  .campi.det .val{font-size:15.5px}
+  .dettaglio .totp{margin-top:20px;padding:16px 18px}
+  .dettaglio .totp-codice{font-size:28px}
+  .vicine{margin-top:26px}
+  .vicine h3{font:600 15px var(--body);color:var(--t1);margin:0 0 4px}
+  .vicine p{margin:0 0 12px;color:var(--t3);font-size:13.5px}
+  .vicine-el{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+  .vicina{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;text-align:left;background:var(--vetro-chiaro);border:1px solid var(--brd);
+    transition:border-color var(--dur2) var(--ease),box-shadow var(--dur2) var(--ease)}
+  .vicina:hover{border-color:color-mix(in srgb,var(--neon-2) 55%,transparent);box-shadow:0 0 24px -8px var(--neon-2)}
+  .vicina .mono{width:32px;height:32px;font-size:14px;border-radius:10px}
+  .vicina span{min-width:0}
+  .vicina b{display:block;color:var(--t1);font:600 13.5px var(--body);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .vicina small{display:block;color:var(--neon-2);font:500 12px var(--mono)}
+  .det-piede{display:flex;justify-content:flex-end;margin-top:28px}
+  .det-piede .del-confirm{flex:1;margin-top:0}
+  .det-indietro{display:none}
+  .det-vuoto{height:100%;display:grid;place-items:center;text-align:center;color:var(--t3);font-size:14.5px}
+  .dettaglio.nuova{animation:rise var(--dur3) var(--ease) both}
 
-  /* database panel */
-  #dbPanel{flex:1;overflow-y:auto;padding:20px;max-width:980px;width:100%;margin:0 auto}
+  #catPanel{flex:1;overflow-y:auto;padding:20px;max-width:980px;width:100%;margin:0 auto}
   /* La testata (ricerca + svuota) resta in vista durante lo scorrimento:
      con 800 voci risalire in cima per filtrare era una punizione.
      Sfondo da --s0 e non fisso: nel tema chiaro un colore scuro fisso
@@ -483,13 +703,6 @@
     border-radius:var(--r-lg);border:1px solid var(--gl-brd);background:var(--gl-bg);
     backdrop-filter:blur(var(--gl-blur)) saturate(160%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(160%);
     box-shadow:var(--el2)}
-  .db-title{font-family:var(--disp);font-size:13px;letter-spacing:1px;color:var(--acc)}
-  #dbGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
-  #dbEmpty{text-align:center;padding:48px 20px;color:var(--t3);font-family:var(--mono);font-size:13px}
-  .dbcard{display:flex;flex-direction:column;gap:6px}
-  .dbcard .dbtitle{color:var(--t1);font-weight:600;font-size:14px;flex:1;word-break:break-word}
-  .dbtags{display:flex;flex-wrap:wrap;gap:4px;margin-top:2px}
-  .dbtag{font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:999px;background:color-mix(in srgb,var(--acc) 8%,transparent);border:1px solid color-mix(in srgb,var(--acc) 22%,transparent);color:var(--acc)}
   .del-confirm{margin-top:8px;padding:10px 12px;border-radius:10px;background:var(--err-velo);
     border:1px solid var(--err);display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
   .del-confirm .msg{font-family:var(--mono);font-size:12px;color:var(--err)}
@@ -549,7 +762,7 @@
   }
 
   /* mini menu tema */
-  #themeMenu{position:absolute;top:54px;right:16px;z-index:60;background:var(--s2);border:1px solid var(--brd-forte);
+  #themeMenu{position:absolute;top:38px;right:0;z-index:60;background:var(--s2);border:1px solid var(--brd-forte);
     border-radius:14px;padding:8px;box-shadow:var(--el3);min-width:180px}
   #themeMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:9px 12px;border-radius:8px;
     color:var(--t2);font-size:13px}
@@ -574,21 +787,12 @@
     padding:7px 12px;background:var(--s2);border:1px solid var(--brd)}
   .db-filter input{flex:1;background:none;border:none;outline:none;color:var(--t1);font-size:13px;font-family:var(--mono)}
 
-  /* menu hamburger */
-  #mainMenu{position:absolute;top:54px;left:16px;z-index:60;background:var(--s2);border:1px solid var(--brd-forte);
-    border-radius:14px;padding:8px;box-shadow:var(--el3);min-width:200px}
-  #mainMenu button{display:flex;align-items:center;gap:10px;width:100%;text-align:left;padding:10px 12px;border-radius:8px;
-    color:var(--t2);font-size:13px}
-  #mainMenu button:hover{background:rgba(127,127,127,.1)}
-  #mainMenu .sep{height:1px;background:var(--brd);margin:6px 4px}
-
   /* pannello impostazioni.
      Il modale usa .card (non .modalcard): il padding sta tutto lì, quindi senza
      questa riga il contenuto tocca i bordi e sembra tagliato ai lati. */
   #setModal .card{max-width:600px !important;width:100% !important;padding:24px 26px}
   .set-section{margin-top:18px}
-  .set-section h4{font-family:var(--disp);font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;
-    color:var(--acc);margin:0 0 10px}
+  .set-section h4{font:600 15px var(--disp);color:var(--t1);margin:0 0 10px}
   .set-row{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:12px 0;border-top:1px solid var(--brd)}
   .set-row:first-of-type{border-top:none}
   .set-row > div:first-child{flex:1;min-width:0}
@@ -658,6 +862,23 @@
     background:var(--s1);border:1px solid var(--brd);border-radius:10px}
   .pathval{flex:1;font-family:var(--mono);font-size:12px;color:var(--t2);
     user-select:text;-webkit-user-select:text;cursor:text;word-break:break-all}
+
+  /* Finestra stretta: prima se ne va il pannello di contesto (e' un di
+     piu'), poi il database mostra o l'elenco o la voce, con «Indietro». */
+  @media (max-width:1080px){
+    .vista-chat{grid-template-columns:minmax(0,1fr)}
+    .contesto{display:none}
+    .vicine-el{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+  @media (max-width:900px){
+    .vista-db{grid-template-columns:minmax(0,1fr)}
+    .vista-db .dettaglio{display:none}
+    .vista-db.aperta .elenco{display:none}
+    .vista-db.aperta .dettaglio{display:block}
+    .det-indietro{display:inline-flex}
+    .dettaglio{padding:24px 22px}
+    .campi.det .campo{grid-template-columns:120px minmax(0,1fr) auto}
+  }
 </style>
 </head>
 <body>
@@ -744,73 +965,121 @@
 <!-- LOCK -->
 <div id="lock">
   <div class="card lockbox prisma acceso rise">
-    <div class="badge-row"><span class="gemma"><img class="logo" src="/static/logo.png" alt="" width="72" height="72"></span></div>
-    <div class="brand">VAULTMIND</div>
-    <div class="sub">LOCALE · OFFLINE · AES-256</div>
+    <div class="gemma"><img src="/static/logo-tondo.png" alt="" width="92" height="92"></div>
+    <div class="marchio">VaultMind</div>
+    <p class="motto">Il vault resta cifrato su questo computer.</p>
     <div id="firstRunNote" class="firstrun hidden">
       <b>Primo avvio su questo dispositivo</b>
       Non c'è ancora nessun vault: la master password che scegli adesso è quella
       che proteggerà tutte le credenziali.
     </div>
-    <div style="margin-top:26px">
-      <label class="lbl" id="masterLbl">Master password</label>
-      <input id="master" class="field" type="password" placeholder="••••••••••••" autofocus />
-      <input id="master2" class="field hidden" type="password" placeholder="Ripeti la master password" />
-      <button id="unlockBtn" class="btn" disabled>Sblocca vault</button>
-      <button id="restoreBtn" class="btn fantasma">Ripristina da backup…</button>
-      <input id="restoreFile" type="file" accept="application/json,.json" class="hidden" />
-      <div id="lockErr" class="err"></div>
-      <p class="hint" id="lockHint">La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.</p>
+    <label class="etichetta" id="masterLbl" for="master">Master password</label>
+    <div class="campo-neon">
+      <input id="master" type="password" autocomplete="current-password" autofocus />
+      <button type="button" class="azione" id="masterOcchio" title="Mostra la password" aria-label="Mostra la password"><svg class="ic" aria-hidden="true"><use href="#i-occhio"/></svg></button>
     </div>
+    <div class="campo-neon hidden" id="master2Box">
+      <input id="master2" type="password" autocomplete="new-password" placeholder="Ripeti la master password" aria-label="Ripeti la master password" />
+    </div>
+    <button id="unlockBtn" class="btn" disabled>Sblocca</button>
+    <button id="restoreBtn" class="link-btn">Ripristina da backup…</button>
+    <input id="restoreFile" type="file" accept="application/json,.json" class="hidden" />
+    <div id="lockErr" class="err"></div>
+    <p class="hint" id="lockHint">La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.</p>
   </div>
 </div>
 
 <!-- APP -->
 <div id="app" class="hidden">
-  <header>
-    <div style="display:flex;align-items:center;gap:10px">
-      <button class="iconbtn" id="menuBtn" title="Menu" aria-label="Menu"><svg class="ic ic-20" aria-hidden="true"><use href="#i-menu"/></svg></button>
-      <div class="hbrand" style="display:flex;align-items:center;gap:8px"><img class="logo" src="/static/logo.png" alt="" width="22" height="22">VaultMind</div>
+  <!-- Il binario: le sezioni sempre in vista. Sincronizza e Impostazioni
+       stavano dentro un menu a scomparsa, e chi non lo apriva non sapeva
+       che esistessero. -->
+  <nav class="binario" aria-label="Sezioni">
+    <img class="bin-logo" src="/static/logo-tondo.png" alt="" width="38" height="38">
+    <button class="voce-bin" data-tab="chat" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg><span>Chat</span></button>
+    <button class="voce-bin" data-tab="db"><svg class="ic" aria-hidden="true"><use href="#i-database"/></svg><span>Database</span></button>
+    <button class="voce-bin" data-tab="cat"><svg class="ic" aria-hidden="true"><use href="#i-cartella"/></svg><span>Categorie</span></button>
+    <button class="voce-bin" id="binSync"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg><span>Sincronizza</span><span id="syncBadge" class="conta hidden"></span></button>
+    <div class="bin-vuoto"></div>
+    <button class="voce-bin" id="binSettings"><svg class="ic" aria-hidden="true"><use href="#i-impostazioni"/></svg><span>Impostazioni</span></button>
+    <button class="voce-bin" id="lockAgain" title="Blocca il vault"><svg class="ic" aria-hidden="true"><use href="#i-lucchetto"/></svg><span>Blocca</span></button>
+  </nav>
+
+  <div class="area">
+    <section class="vista-chat" id="vistaChat">
+      <div class="centro">
+        <div class="barra-alta">
+          <span class="chip" id="pillDb"><svg class="ic" aria-hidden="true"><use href="#i-database"/></svg><span>0 voci</span></span>
+          <span class="chip hidden" id="pillLlm"><i class="punto-vivo"></i>mind locale</span>
+          <span class="chip"><svg class="ic" aria-hidden="true"><use href="#i-scudo-ok"/></svg>Cerca solo in locale</span>
+          <!-- Compare solo quando c'è almeno un dispositivo abbinato: un pulsante
+               che non ha con chi parlare è solo una domanda in più. -->
+          <button class="chip solo hidden" id="syncNow" title="Sincronizza ora" aria-label="Sincronizza ora"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg></button>
+          <button class="chip solo" id="themeBtn" title="Tema" aria-label="Cambia tema"><svg class="ic" aria-hidden="true"><use href="#i-tema"/></svg></button>
+          <button class="chip solo" id="backupBtn" title="Backup del vault (file cifrato)" aria-label="Backup del vault"><svg class="ic" aria-hidden="true"><use href="#i-backup"/></svg></button>
+          <div id="themeMenu" class="hidden">
+            <!-- I campioni hanno i colori scritti qui e non i token: i token
+                 cambiano col tema scelto, e ogni campione deve mostrare il suo. -->
+            <button data-theme="prisma" class="sel"><span class="campione" style="background:linear-gradient(135deg,#090B1E 0 46%,#8C7CFF 46% 73%,#3CE2FF 73%)"></span>Prisma</button>
+            <button data-theme="ghiaccio"><span class="campione" style="background:linear-gradient(135deg,#EEF1FA 0 46%,#5440E6 46% 73%,#006489 73%)"></span>Ghiaccio</button>
+            <button data-theme="oro"><span class="campione" style="background:linear-gradient(135deg,#080B1A 0 46%,#E9A93A 46% 73%,#FFD978 73%)"></span>Notte e oro</button>
+          </div>
+        </div>
+        <main id="chat"></main>
+        <div class="scrivi">
+          <button class="tondo" id="addBtn" title="Aggiungi credenziale" aria-label="Aggiungi credenziale"><svg class="ic" aria-hidden="true"><use href="#i-piu"/></svg></button>
+          <button class="tondo" id="importBtn" title="Import intelligente (incolla testo)" aria-label="Import intelligente"><svg class="ic" aria-hidden="true"><use href="#i-importa"/></svg></button>
+          <label class="scrivi-campo"><svg class="ic" aria-hidden="true"><use href="#i-cerca"/></svg><input id="q" placeholder="Chiedi una credenziale…" aria-label="Chiedi una credenziale" /></label>
+          <button class="tondo" id="micBtn" title="Detta la richiesta (vocale, in locale)" aria-label="Detta la richiesta"><svg class="ic" aria-hidden="true"><use href="#i-microfono"/></svg></button>
+          <button class="invia" id="sendBtn" aria-label="Invia"><svg class="ic" aria-hidden="true"><use href="#i-invia"/></svg></button>
+        </div>
+      </div>
+      <!-- Il contesto: cosa c'è intorno al vault (dispositivi, voci aperte
+           da poco, categorie, quanto manca al blocco). Solo lettura, e
+           sparisce per primo quando la finestra si stringe. -->
+      <aside class="contesto" id="contesto" aria-label="Contesto">
+        <h3>Dispositivi</h3>
+        <div id="ctxDisp"></div>
+        <h3>Aperte di recente</h3>
+        <div id="ctxRecenti"></div>
+        <h3>Categorie</h3>
+        <div id="ctxCat"></div>
+        <div class="autoblocco">
+          <div><span>Blocco automatico</span><b id="ctxBloccoTra">—</b></div>
+          <div class="barretta"><i id="ctxBloccoBar"></i></div>
+        </div>
+      </aside>
+    </section>
+
+    <!-- DATABASE: l'elenco e la voce aperta, una accanto all'altra. -->
+    <div id="dbPanel" class="vista-db hidden">
+      <section class="elenco" aria-label="Voci del vault">
+        <div class="cerca">
+          <svg class="ic" aria-hidden="true"><use href="#i-cerca"/></svg>
+          <input id="dbFilter" placeholder="Filtra per nome, utente o tag" aria-label="Filtra le voci" />
+          <button id="dbRefreshBtn" class="azione" title="Aggiorna l'elenco" aria-label="Aggiorna l'elenco"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
+          <button id="dbClearBtn" class="azione pericolo" title="Svuota tutto il database" aria-label="Svuota tutto il database"><svg class="ic" aria-hidden="true"><use href="#i-cestino"/></svg></button>
+        </div>
+        <div id="dbFiltri" class="filtri" role="group" aria-label="Categorie"></div>
+        <div id="dbGrid" class="righe" role="listbox" aria-label="Voci"></div>
+        <p id="dbEmpty" class="vuoto-lista hidden">Nessuna voce nel vault.</p>
+      </section>
+      <article class="dettaglio" id="dettaglio" aria-live="polite"></article>
     </div>
-    <div class="pills">
-      <span class="pill db" id="pillDb"><svg class="ic ic-14" aria-hidden="true"><use href="#i-database"/></svg> 0 voci</span>
-      <span class="pill llm hidden" id="pillLlm"><svg class="ic ic-14" aria-hidden="true"><use href="#i-scintilla"/></svg> LLM locale</span>
-      <!-- Compare solo quando c'è almeno un dispositivo abbinato: un pulsante
-           che non ha con chi parlare è solo una domanda in più. -->
-      <button class="iconbtn hidden" id="syncNow" title="Sincronizza ora" aria-label="Sincronizza ora"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg></button>
-      <button class="iconbtn" id="themeBtn" title="Tema" aria-label="Cambia tema"><svg class="ic" aria-hidden="true"><use href="#i-tema"/></svg></button>
-      <button class="iconbtn" id="backupBtn" title="Backup del vault (file cifrato)" aria-label="Backup del vault"><svg class="ic" aria-hidden="true"><use href="#i-backup"/></svg></button>
-      <button class="iconbtn" id="lockAgain" title="Blocca" aria-label="Blocca il vault"><svg class="ic" aria-hidden="true"><use href="#i-lucchetto"/></svg></button>
+
+    <!-- CATEGORIE — raggruppamenti scelti a mano. Niente viene mai assegnato in
+         automatico: i tag di un import sono spesso parole ricavate dal titolo, e
+         raggrupparci sopra darebbe centinaia di sezioni da una voce sola. -->
+    <div id="catPanel" class="hidden">
+      <div class="db-head">
+        <div style="flex:1"></div>
+        <div style="display:flex;gap:8px">
+          <button id="catNewBtn" class="iconbtn" title="Crea una categoria"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cartella-piu"/></svg>Nuova categoria</button>
+          <button id="catRefreshBtn" class="iconbtn" title="Aggiorna" aria-label="Aggiorna"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
+        </div>
+      </div>
+      <div id="catList"></div>
     </div>
-  </header>
-
-  <!-- TAB NAV -->
-  <div id="tabNav" style="display:flex;border-bottom:1px solid var(--brd);background:var(--gl-bg-2);backdrop-filter:blur(var(--gl-blur)) saturate(180%);-webkit-backdrop-filter:blur(var(--gl-blur)) saturate(180%)">
-    <button class="tab-btn" data-tab="chat"><svg class="ic ic-16" aria-hidden="true"><use href="#i-chat"/></svg>Chat</button>
-    <button class="tab-btn" data-tab="db"><svg class="ic ic-16" aria-hidden="true"><use href="#i-database"/></svg>Database</button>
-    <button class="tab-btn" data-tab="cat"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cartella"/></svg>Categorie</button>
-  </div>
-
-  <!-- MENU TEMA -->
-  <div id="themeMenu" class="hidden">
-    <!-- I campioni hanno i colori scritti qui e non i token: i token
-         cambiano col tema scelto, e ogni campione deve mostrare il suo. -->
-    <button data-theme="prisma" class="sel"><span class="campione" style="background:linear-gradient(135deg,#090B1E 0 46%,#8C7CFF 46% 73%,#3CE2FF 73%)"></span>Prisma</button>
-    <button data-theme="ghiaccio"><span class="campione" style="background:linear-gradient(135deg,#EEF1FA 0 46%,#5440E6 46% 73%,#006489 73%)"></span>Ghiaccio</button>
-    <button data-theme="oro"><span class="campione" style="background:linear-gradient(135deg,#080B1A 0 46%,#E9A93A 46% 73%,#FFD978 73%)"></span>Notte e oro</button>
-  </div>
-
-  <!-- MENU HAMBURGER -->
-  <div id="mainMenu" class="hidden">
-    <button data-act="chat"><svg class="ic ic-16" aria-hidden="true"><use href="#i-chat"/></svg>Chat</button>
-    <button data-act="db"><svg class="ic ic-16" aria-hidden="true"><use href="#i-database"/></svg>Database</button>
-    <div class="sep"></div>
-    <button data-act="import"><svg class="ic ic-16" aria-hidden="true"><use href="#i-importa"/></svg>Importa credenziali</button>
-    <button data-act="backup"><svg class="ic ic-16" aria-hidden="true"><use href="#i-backup"/></svg>Backup del vault</button>
-    <button data-act="sync"><svg class="ic ic-16" aria-hidden="true"><use href="#i-sync"/></svg>Sincronizza <span id="syncBadge" class="hidden"></span></button>
-    <div class="sep"></div>
-    <button data-act="settings"><svg class="ic ic-16" aria-hidden="true"><use href="#i-impostazioni"/></svg>Impostazioni</button>
-    <button data-act="lock"><svg class="ic ic-16" aria-hidden="true"><use href="#i-lucchetto"/></svg>Blocca vault</button>
   </div>
 
   <!-- MODALE IMPOSTAZIONI -->
@@ -997,51 +1266,6 @@
     </div>
   </div>
 
-  <main id="chat"></main>
-
-  <!-- DATABASE TAB -->
-  <div id="dbPanel" class="hidden">
-    <div class="db-head">
-      <div class="db-filter">
-        <span class="lente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg></span>
-        <input id="dbFilter" placeholder="Filtra per titolo o tag…" />
-      </div>
-      <div style="display:flex;gap:8px">
-        <button id="dbClearBtn" class="iconbtn pericolo" title="Svuota tutto il database"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cestino"/></svg>Svuota</button>
-        <button id="dbRefreshBtn" class="iconbtn" title="Aggiorna lista" aria-label="Aggiorna lista"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
-      </div>
-    </div>
-    <div id="dbGrid"></div>
-    <div id="dbEmpty" class="hidden">Nessuna voce nel vault.</div>
-  </div>
-
-  <!-- CATEGORIE — raggruppamenti scelti a mano. Niente viene mai assegnato in
-       automatico: i tag di un import sono spesso parole ricavate dal titolo, e
-       raggrupparci sopra darebbe centinaia di sezioni da una voce sola. -->
-  <div id="catPanel" class="hidden">
-    <div class="db-head">
-      <div style="flex:1"></div>
-      <div style="display:flex;gap:8px">
-        <button id="catNewBtn" class="iconbtn" title="Crea una categoria"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cartella-piu"/></svg>Nuova categoria</button>
-        <button id="catRefreshBtn" class="iconbtn" title="Aggiorna" aria-label="Aggiorna"><svg class="ic" aria-hidden="true"><use href="#i-aggiorna"/></svg></button>
-      </div>
-    </div>
-    <div id="catList"></div>
-  </div>
-
-
-  <div class="composer">
-    <div class="inner">
-      <button class="iconbtn" id="addBtn" title="Aggiungi credenziale" aria-label="Aggiungi credenziale" style="border-color:var(--acc);color:var(--acc)"><svg class="ic" aria-hidden="true"><use href="#i-piu"/></svg></button>
-      <button class="iconbtn" id="importBtn" title="Import intelligente (incolla testo)" aria-label="Import intelligente"><svg class="ic" aria-hidden="true"><use href="#i-importa"/></svg></button>
-      <div class="searchbox">
-        <span class="lente"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg></span>
-        <input id="q" placeholder="Chiedi una credenziale…" />
-      </div>
-      <button class="iconbtn" id="micBtn" title="Detta la richiesta (vocale, in locale)" aria-label="Detta la richiesta"><svg class="ic" aria-hidden="true"><use href="#i-microfono"/></svg></button>
-      <button class="send" id="sendBtn" aria-label="Invia"><svg class="ic" aria-hidden="true"><use href="#i-invia"/></svg></button>
-    </div>
-  </div>
 </div>
 
 <!-- IMPORT MODAL -->
@@ -1075,7 +1299,7 @@
 
     <div id="syncCodice" class="hidden" style="margin-top:14px;padding:14px;border-radius:12px;
          background:color-mix(in srgb,var(--acc) 7%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);text-align:center">
-      <div style="font-size:11px;letter-spacing:1.4px;color:var(--t3);text-transform:uppercase">Codice di abbinamento</div>
+      <div style="font-size:13px;color:var(--t3)">Codice di abbinamento</div>
       <div id="syncCodiceVal" style="font-family:var(--mono);font-size:34px;letter-spacing:8px;color:var(--acc);margin:8px 0"></div>
       <div style="font-size:12px;color:var(--t2);line-height:1.55">
         Scrivilo sull'altro dispositivo entro <b id="syncSecondi">120</b> secondi.<br>
@@ -1087,7 +1311,7 @@
     <div id="syncTrovati" style="margin-top:14px"></div>
 
     <div style="margin-top:18px">
-      <div style="font-size:11px;letter-spacing:1.4px;color:var(--t3);text-transform:uppercase;margin-bottom:8px">Dispositivi fidati</div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:8px">Dispositivi fidati</div>
       <div id="syncFidati"></div>
     </div>
 
@@ -1198,7 +1422,39 @@ function ic(nome, cls){ return `<svg class="ic${cls?" "+cls:""}" aria-hidden="tr
 
 /* La pill del conteggio si scriveva in sette punti diversi, ognuno con la sua
    emoji ripetuta a mano. */
-function scriviConteggio(n){ $("#pillDb").innerHTML = ic("database","ic-14")+" "+n+" voci"; }
+function scriviConteggio(n){ $("#pillDb").innerHTML = ic("database")+"<span>"+n+" voci</span>"; }
+
+/* ---- Il monogramma di una voce ----
+   L'iniziale del titolo su due neon del tema. Quali due li decide la
+   categoria (stessa somma su PC e telefono: `tinta()` in voce.dart), cosi'
+   le voci di una categoria si riconoscono a colpo d'occhio. Niente icone
+   dei servizi: andrebbero scaricate, e direbbero a chi le serve cosa c'e'
+   nel vault. */
+function tinta(cat){
+  let h=0;
+  for(const ch of (cat||"")) h=(h*31+ch.codePointAt(0))%1000003;
+  return h%3;
+}
+function iniziale(t){
+  const m=(t||"").match(/[\p{L}\p{N}]/u);
+  return m ? m[0].toLocaleUpperCase("it") : "·";
+}
+function monoEl(c, cls){
+  const m=document.createElement("span");
+  m.className="mono"+(cls?" "+cls:""); m.setAttribute("aria-hidden","true");
+  m.dataset.tinta=tinta(c.category); m.textContent=iniziale(c.title);
+  return m;
+}
+/* La somiglianza si mostra com'e', con la virgola, fra 0 e 1: la ricerca ci
+   somma un bonus per le parole esatte, e «1,24» non vorrebbe dire niente. */
+function fmtSomiglianza(s){ return Math.min(1,Math.max(0,+s||0)).toFixed(2).replace(".",","); }
+function somiglianzaEl(s){
+  const d=document.createElement("div"); d.className="somiglianza";
+  const v=Math.min(1,Math.max(0,+s||0));
+  d.innerHTML=`Somiglianza<b>${fmtSomiglianza(v)}</b><i style="--v:${v}"></i>`;
+  d.title="Quanto questa voce somiglia a quello che hai chiesto";
+  return d;
+}
 
 /* ---- TOKEN DI SESSIONE ----
    Iniettato dal server dentro questa pagina, che nessun altro sito può leggere
@@ -1234,10 +1490,11 @@ async function initLock(){
 }
 function applyLockMode(){
   $("#firstRunNote").classList.toggle("hidden", !FIRST_RUN);
-  $("#master2").classList.toggle("hidden", !FIRST_RUN);
+  $("#master2Box").classList.toggle("hidden", !FIRST_RUN);
   $("#masterLbl").textContent = FIRST_RUN ? "Imposta la master password" : "Master password";
-  $("#master").placeholder = FIRST_RUN ? "almeno 8 caratteri" : "••••••••••••";
-  $("#unlockBtn").textContent = FIRST_RUN ? "Crea il vault" : "Sblocca vault";
+  $("#master").placeholder = FIRST_RUN ? "almeno 8 caratteri" : "";
+  $("#master").autocomplete = FIRST_RUN ? "new-password" : "current-password";
+  $("#unlockBtn").textContent = FIRST_RUN ? "Crea il vault" : "Sblocca";
   $("#lockHint").innerHTML = FIRST_RUN
     ? "Da questa password si deriva la chiave di cifratura del vault (Argon2 + AES-256). Non viene salvata da nessuna parte e non lascia il dispositivo: <b>se la dimentichi, il vault non è recuperabile.</b>"
     : "La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.";
@@ -1258,16 +1515,28 @@ $("#master").addEventListener("keydown", e=>{
 });
 $("#master2").addEventListener("keydown", e=>{ if(e.key==="Enter" && !$("#unlockBtn").disabled) doUnlock(); });
 $("#unlockBtn").addEventListener("click", doUnlock);
+/* L'occhio nel campo: chi scrive una password lunga vuole poterla rileggere
+   prima di premere Invio. Vale per entrambi i campi del primo avvio. */
+$("#masterOcchio").addEventListener("click", ()=>{
+  const vedi = $("#master").type==="password";
+  ["#master","#master2"].forEach(s=>{ $(s).type = vedi ? "text" : "password"; });
+  const b=$("#masterOcchio");
+  b.innerHTML = ic(vedi ? "occhio-barrato" : "occhio");
+  b.title = vedi ? "Nascondi la password" : "Mostra la password";
+  b.setAttribute("aria-label", b.title);
+  $("#master").focus();
+});
 initLock();
 
 async function doUnlock(){
   $("#lockErr").textContent=""; $("#lockErr").style.color="";
-  const idle = FIRST_RUN ? "Crea il vault" : "Sblocca vault";
+  const idle = FIRST_RUN ? "Crea il vault" : "Sblocca";
   $("#unlockBtn").disabled=true; $("#unlockBtn").textContent = FIRST_RUN ? "Creo il vault…" : "Sblocco…";
   const {ok,j} = await api("/api/unlock",{master:$("#master").value});
   $("#unlockBtn").textContent = idle;
   if(!ok){ $("#lockErr").textContent = j.detail||"Errore"; $("#unlockBtn").disabled=false; return; }
   $("#lock").classList.add("hidden"); $("#app").classList.remove("hidden");
+  ["#master","#master2"].forEach(s=>{ $(s).value=""; $(s).type="password"; });
   scriviConteggio(j.count);
   window.AUDIO_READY = !!j.audio_ready;
   if(!j.audio_ready){ $("#micBtn").style.opacity=".5"; }
@@ -1280,6 +1549,10 @@ async function doUnlock(){
     if(s.mic_enabled===false && $("#micBtn")) $("#micBtn").style.display="none";
     resetAutolock();
   }catch(e){}
+  // Il pannello di contesto vuole l'elenco (recenti, categorie) e lo stato
+  // del sync: nessuno dei due blocca la chat, che e' gia' pronta.
+  loadDb();
+  caricaDispositivi();
   // Da qui la pagina tiene d'occhio quello che arriva dagli altri dispositivi.
   vigilaSync();
   aggiornaTastoSync();
@@ -1293,41 +1566,98 @@ async function doUnlock(){
     addAI("Vault creato. Configuriamo subito i tuoi dati principali.");
     openOnboarding();
   } else {
-    addAI("Vault sbloccato. Scrivimi cosa ti serve, anche in modo informale.");
+    mostraBenvenuto();
   }
 }
 
 /* ---- CHAT ---- */
 function rowEl(cls){ const r=document.createElement("div"); r.className="row "+cls+" rise"; return r; }
+/* Ogni messaggio passa di qui: il saluto iniziale sparisce al primo, e la
+   conversazione scorre in fondo. */
+function inChat(r){ togliBenvenuto(); $("#chat").appendChild(r); scroll(); }
+function togliBenvenuto(){ const b=$("#chat .benvenuto"); if(b) b.remove(); }
+/* Il saluto al posto di «Vault sbloccato»: dice cosa si puo' fare, con
+   quattro richieste vere da provare. Cambia con l'ora, niente di piu'. */
+function mostraBenvenuto(){
+  const ora=new Date().getHours();
+  const quando = ora<6 ? "stanotte" : ora<13 ? "stamattina" : ora<18 ? "oggi pomeriggio" : "stasera";
+  const b=document.createElement("div"); b.className="benvenuto rise";
+  const h=document.createElement("h1"); h.className="saluto"; h.textContent="Cosa ti serve "+quando+"?";
+  const p=document.createElement("p");
+  p.textContent="Chiedilo come lo chiederesti a una persona. La risposta la trova il vault, nessuno la inventa.";
+  const s=document.createElement("div"); s.className="suggerimenti";
+  ["La password del wifi di casa","Il codice della banca","L'email di lavoro","Il PIN della SIM"].forEach(t=>{
+    const x=document.createElement("button"); x.textContent=t;
+    x.onclick=()=>{ $("#q").value=t; send(); };
+    s.appendChild(x);
+  });
+  b.append(h,p,s);
+  $("#chat").innerHTML=""; $("#chat").appendChild(b);
+}
 function addUser(text){
   const r=rowEl("user"); const b=document.createElement("div"); b.className="bubble b-user"; b.textContent=text;
-  r.appendChild(b); $("#chat").appendChild(r); scroll();
+  r.appendChild(b); inChat(r);
 }
-function addAI(text, results, ambiguous){
-  const r=rowEl(""); const wrap=document.createElement("div"); wrap.style.maxWidth="88%";
+function mindEl(text){
+  const wrap=document.createElement("div"); wrap.className="mente";
   const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="mind"; wrap.appendChild(tag);
   const b=document.createElement("div"); b.className="bubble b-ai"; b.textContent=text; wrap.appendChild(b);
-  (results||[]).forEach(c=> wrap.appendChild(credCard(c, ambiguous)));
-  r.appendChild(wrap); $("#chat").appendChild(r); scroll();
   return wrap;
+}
+function addAI(text, results, ambiguous){
+  const r=rowEl(""); const wrap=mindEl(text);
+  if(ambiguous && results && results.length) wrap.appendChild(sceltaEl(results));
+  else (results||[]).forEach(c=> wrap.appendChild(credCard(c)));
+  r.appendChild(wrap); inChat(r);
+  return wrap;
+}
+/* Due o piu' voci troppo vicine: l'app chiede, non sceglie. Un pulsante per
+   voce, con l'iniziale e la categoria per distinguerle. */
+function sceltaEl(results){
+  const box=document.createElement("div"); box.className="scegli";
+  results.forEach(c=>{
+    const b=document.createElement("button");
+    b.appendChild(monoEl(c));
+    const t=document.createElement("span");
+    const n=document.createElement("b"); n.textContent=c.title;
+    const k=document.createElement("small"); k.textContent=c.category || "Senza categoria";
+    t.append(n,k); b.appendChild(t);
+    b.onclick=async()=>{
+      const {ok,j}=await api("/api/reveal",{text:String(c.id)});
+      if(!ok){ addAI(j.detail||"Non riesco ad aprire questa voce."); return; }
+      if(c.score!=null) j.score=c.score;
+      const w=addAI(c.title+":", [j], false);
+      accendiTrovata(w);
+      pushRecente(j.id);
+    };
+    box.appendChild(b);
+  });
+  return box;
+}
+/* Il prisma va alla voce appena trovata, e a quella sola: le schede
+   trovate prima lo perdono, o non indicherebbe piu' niente. */
+function accendiTrovata(wrap){
+  document.querySelectorAll("#chat .trovata.prisma").forEach(c=> c.classList.remove("prisma","nuova"));
+  const card = wrap && wrap.querySelector(".trovata");
+  if(card){ card.classList.add("prisma","nuova"); CIELO.accendi((sx,sy)=>bordoVicino(card,sx,sy)); }
 }
 /* Messaggio di mind con un PERCORSO in evidenza: selezionabile col mouse e
    con il pulsante di copia. Un percorso che non si può copiare costringe a
    trascriverlo a mano. */
 function addAIPath(text, path){
-  const r=rowEl(""); const wrap=document.createElement("div"); wrap.style.maxWidth="88%";
+  const r=rowEl(""); const wrap=document.createElement("div"); wrap.className="mente";
   const tag=document.createElement("div"); tag.className="ai-tag"; tag.textContent="mind"; wrap.appendChild(tag);
   const b=document.createElement("div"); b.className="bubble b-ai"; b.textContent=text; wrap.appendChild(b);
 
   const box=document.createElement("div"); box.className="pathbox";
   const p=document.createElement("span"); p.className="pathval"; p.textContent=path;
-  const cp=document.createElement("button"); cp.className="iconbtn"; cp.textContent="⧉";
+  const cp=document.createElement("button"); cp.className="iconbtn"; cp.innerHTML=ic("copia");
   cp.title="Copia il percorso";
   cp.onclick=async()=>{ try{await navigator.clipboard.writeText(path);}catch(e){}
     cp.innerHTML=ic("spunta"); setTimeout(()=>{cp.innerHTML=ic("copia");},1200); };
   box.appendChild(p); box.appendChild(cp);
   wrap.appendChild(box);
-  r.appendChild(wrap); $("#chat").appendChild(r); scroll();
+  r.appendChild(wrap); inChat(r);
 }
 function scroll(){ const m=$("#chat"); m.scrollTop=m.scrollHeight; }
 
@@ -1344,41 +1674,71 @@ function labelLooksUrl(label){
 }
 function isHttpUrl(v){ return /^https?:\/\//i.test((v||"").trim()); }
 
-function credCard(c, picker){
-  const card=document.createElement("div"); card.className="cred rise";
-  card.innerHTML = `<div class="accent"></div><div class="title">${ic("chiave","ic-16")}<span>${esc(c.title)}</span>`
-    + (c.critical ? '<span class="badge-crit">critica</span>' : "") + `</div>`;
-  if(picker){
-    const btn=document.createElement("button"); btn.className="pickbtn"; btn.innerHTML="Mostra questa "+ic("avanti","ic-16");
-    btn.onclick=async()=>{ const {j}=await api("/api/reveal",{text:String(c.id)}); addAI(c.title+":", [j], false); };
-    card.appendChild(btn);
-  } else {
-    (c.fields||[]).forEach(f=>{ if(!labelLooksOtp(f.label)) card.appendChild(maskedLine(f.label, f.value)); });
-    if(c.id!=null && (c.fields||[]).some(f=>labelLooksOtp(f.label))) attachTotp(card, c.id);
-    if(c.id!=null && c.fields){
-      const edit=document.createElement("button"); edit.className="pickbtn";
-      edit.style.background="color-mix(in srgb,var(--vio) 8%,transparent)"; edit.style.borderColor="var(--vio)"; edit.style.color="var(--vio)";
-      edit.innerHTML=ic("matita","ic-16")+" Modifica / completa";
-      edit.onclick=()=>openEdit(c);
-      card.appendChild(edit);
-    }
+/* La voce trovata: monogramma, titolo e categoria, quanto somiglia alla
+   richiesta, i campi, il 2FA. Il testo che viene dal vault entra solo con
+   textContent: un titolo importato con dentro «<img onerror>» resta testo. */
+function credCard(c){
+  const card=document.createElement("article"); card.className="trovata rise";
+  const head=document.createElement("header");
+  head.appendChild(monoEl(c));
+  const t=document.createElement("div");
+  const h=document.createElement("h3"); h.textContent=c.title; t.appendChild(h);
+  if(c.category){ const g=document.createElement("span"); g.className="tag"; g.textContent=c.category; t.appendChild(g); }
+  if(c.critical){ const k=document.createElement("span"); k.className="badge-crit"; k.textContent="critica"; t.appendChild(k); }
+  head.appendChild(t);
+  if(c.score!=null) head.appendChild(somiglianzaEl(c.score));
+  card.appendChild(head);
+  const campi=(c.fields||[]).filter(f=>!labelLooksOtp(f.label));
+  if(campi.length){
+    const box=document.createElement("div"); box.className="campi";
+    campi.forEach(f=> box.appendChild(campoRiga(f.label, f.value)));
+    card.appendChild(box);
+  }
+  // Il 2FA arriva dopo (lo calcola il server): un posto tenuto qui fa si'
+  // che compaia sopra «Modifica» e non sotto.
+  if(c.id!=null && (c.fields||[]).some(f=>labelLooksOtp(f.label))){
+    const posto=document.createElement("div"); card.appendChild(posto); attachTotp(posto, c.id);
+  }
+  if(c.id!=null && c.fields){
+    const piede=document.createElement("div"); piede.className="piede";
+    const edit=document.createElement("button"); edit.className="fant-btn";
+    edit.innerHTML=ic("matita","ic-16")+"<span>Modifica</span>";
+    edit.onclick=()=>openEdit(c);
+    piede.appendChild(edit); card.appendChild(piede);
   }
   return card;
 }
 
-/* widget 2FA live: codice a 6 cifre + countdown, ricalcolato in locale */
-async function attachTotp(card, id){
+/* Il 2FA: il codice e un anello che si consuma, ricalcolati dal server a
+   ogni periodo. Arancione negli ultimi 5 secondi. */
+const ANELLO = 2*Math.PI*17;   // la circonferenza del cerchio, raggio 17
+function codiceSpezzato(c){ const m=Math.ceil(c.length/2); return c.slice(0,m)+" "+c.slice(m); }
+async function attachTotp(dove, id){
   const {ok,j}=await api("/api/totp",{cred_id:id});
   if(!ok || !j.otp || !j.otp.length) return;
   j.otp.forEach(o=>{
     const w=document.createElement("div"); w.className="totp";
-    if(o.error){ w.innerHTML=`<div class="k">${esc(o.label)} · 2FA</div><div class="terr">${esc(o.error)}</div>`; card.appendChild(w); return; }
-    w.innerHTML=`<div class="trow"><div><div class="k">${esc(o.label)} · 2FA</div><div class="tcode"></div></div><button class="iconbtn tcopy">⧉</button></div><div class="tbar"><i></i></div>`;
-    const codeEl=w.querySelector(".tcode"), bar=w.querySelector(".tbar i"), copy=w.querySelector(".tcopy");
+    const lab=document.createElement("span"); lab.className="lab"; lab.textContent=/2fa|otp|mfa/i.test(o.label||"") ? o.label : (o.label||"Codice")+" · 2FA";
+    const testo=document.createElement("div"); testo.appendChild(lab);
+    if(o.error){
+      const e=document.createElement("div"); e.className="terr"; e.textContent=o.error;
+      testo.appendChild(e); w.appendChild(testo); dove.appendChild(w); return;
+    }
+    w.innerHTML=`<svg class="anello" viewBox="0 0 40 40" aria-hidden="true"><circle class="anello-fondo" cx="20" cy="20" r="17"/><circle class="anello-arco" cx="20" cy="20" r="17" stroke-dasharray="${ANELLO.toFixed(2)}"/></svg>`;
+    const codeEl=document.createElement("b"); codeEl.className="totp-codice"; testo.appendChild(codeEl);
+    w.appendChild(testo);
+    const copy=document.createElement("button"); copy.className="azione"; copy.title="Copia il codice";
+    copy.setAttribute("aria-label","Copia il codice"); copy.innerHTML=ic("copia"); w.appendChild(copy);
+    const arco=w.querySelector(".anello-arco");
     let cur=o;
-    const paint=()=>{ codeEl.textContent=cur.code.slice(0,3)+" "+cur.code.slice(3); bar.style.width=Math.max(0,Math.round(cur.remaining/cur.period*100))+"%"; };
-    copy.onclick=async()=>{ try{await navigator.clipboard.writeText(cur.code);}catch(e){} copy.innerHTML=ic("spunta"); copy.style.color="var(--ok)"; setTimeout(()=>{copy.innerHTML=ic("copia");copy.style.color="";},8000); };
-    paint(); card.appendChild(w);
+    const paint=()=>{
+      codeEl.textContent=codiceSpezzato(cur.code);
+      const resto=Math.max(0,cur.remaining)/(cur.period||30);
+      arco.style.strokeDashoffset=(ANELLO*(1-resto)).toFixed(2);
+      w.classList.toggle("scade", cur.remaining<=5);
+    };
+    copy.onclick=()=>copiaValore(copy, cur.code, "Codice copiato.", false);
+    paint(); dove.appendChild(w);
     const tick=setInterval(async()=>{
       if(!document.body.contains(w)){ clearInterval(tick); return; }
       cur.remaining-=1;
@@ -1391,45 +1751,84 @@ async function attachTotp(card, id){
   });
 }
 
-function maskedLine(label, value){
-  const line=document.createElement("div"); line.className="credline";
-  const meta=document.createElement("div"); meta.className="meta";
+/* Copia con conferma: la spunta sul pulsante e una riga in basso. I segreti
+   spariscono dagli appunti dopo 12 secondi, e la riga lo dice. */
+/* Gli appunti: prima la via moderna, poi quella vecchia (una textarea
+   nascosta e execCommand), che regge dove la prima chiede permessi. Dice
+   se ce l'ha fatta: prima la spunta compariva anche quando non si era
+   copiato niente. */
+async function scriviAppunti(testo){
+  try{ await navigator.clipboard.writeText(testo); return true; }catch(e){}
+  const t=document.createElement("textarea");
+  t.value=testo; t.setAttribute("readonly",""); t.style.cssText="position:fixed;opacity:0;top:0;left:0";
+  document.body.appendChild(t); t.select();
+  let ok=false; try{ ok=document.execCommand("copy"); }catch(e){}
+  t.remove(); return ok;
+}
+async function copiaValore(btn, valore, messaggio, svuota){
+  if(!await scriviAppunti(valore)){ avviso("Gli appunti non hanno accettato il testo. Riprova.", true); return; }
+  btn.innerHTML=ic("spunta"); btn.classList.add("fatto");
+  avviso(messaggio || "Copiato negli appunti.");
+  clearTimeout(btn._rimetti);
+  btn._rimetti=setTimeout(()=>{ btn.innerHTML=ic("copia"); btn.classList.remove("fatto"); }, 2000);
+  if(svuota){ clearTimeout(btn._svuota); btn._svuota=setTimeout(()=>{ scriviAppunti(" "); }, 12000); }
+}
 
+/* Quali campi sono segreti: gli stessi del telefono (`segreto` in
+   scheda_voce.dart). Meglio un pallino di troppo che un CVV in chiaro. */
+const SEGRETO = /pass|pwd|pin|secret|segret|chiave|key|token|codice|code|puk|puc|cvv|cvc|seed|recovery|recupero/i;
+function isSegreto(label){ return SEGRETO.test(label||""); }
+
+/* Una riga di campo: etichetta, valore, azioni. I campi normali si leggono
+   (l'utente di un conto non e' un segreto), gli indirizzi si aprono, i
+   segreti restano a pallini finche' non li chiedi, e per 15 secondi. */
+function campoRiga(label, value){
+  value = value==null ? "" : String(value);
+  const riga=document.createElement("div"); riga.className="campo";
+  const lab=document.createElement("span"); lab.className="lab"; lab.textContent=label||"—"; lab.title=label||"";
+  const val=document.createElement("span"); val.className="val";
+  const az=document.createElement("div"); az.className="azioni";
+  riga.append(lab,val,az);
+  const bottone=(icona,titolo)=>{
+    const b=document.createElement("button"); b.className="azione"; b.innerHTML=ic(icona);
+    b.title=titolo; b.setAttribute("aria-label",titolo); az.appendChild(b); return b;
+  };
   // Gli URL si mostrano subito, con il pulsante per aprirli nel browser di
   // sistema (non nella finestra dell'app, che perderebbe il vault).
   if(labelLooksUrl(label)){
-    meta.innerHTML=`<div class="k">${esc(label)}</div><div class="v shown urlv"></div>`;
-    meta.querySelector(".v").textContent=value;
-    const acts=document.createElement("div"); acts.className="acts";
+    val.textContent=value; val.title=value;
     if(isHttpUrl(value)){
-      const open=document.createElement("button"); open.className="iconbtn"; open.setAttribute("aria-label","Apri nel browser"); open.innerHTML=ic("esterno");
-      open.title="Apri nel browser";
+      const open=bottone("esterno","Apri nel browser");
       open.onclick=async()=>{ const r=await api("/api/open_url",{url:value});
-        if(!r.ok){ open.innerHTML=ic("chiudi"); setTimeout(()=>open.innerHTML=ic("esterno"),3000); } };
-      acts.appendChild(open);
+        if(!r.ok) avviso((r.j && r.j.detail) || "Il browser non si è aperto.", true); };
     }
-    const copyU=document.createElement("button"); copyU.className="iconbtn"; copyU.textContent="⧉"; copyU.title="Copia l'indirizzo";
-    copyU.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){}
-      copyU.innerHTML=ic("spunta"); copyU.style.color="var(--ok)";
-      setTimeout(()=>{copyU.textContent="⧉";copyU.style.color="";},6000); };
-    acts.appendChild(copyU);
-    line.appendChild(meta); line.appendChild(acts);
-    return line;
+    const cp=bottone("copia","Copia l'indirizzo");
+    cp.onclick=()=>copiaValore(cp, value, "Indirizzo copiato.", false);
+    return riga;
   }
-
-  meta.innerHTML=`<div class="k">${label}</div><div class="v">${"•".repeat(Math.min(value.length,14))}</div>`;
-  const vEl=meta.querySelector(".v");
-  const acts=document.createElement("div"); acts.className="acts";
-  let shown=false, hideT=null;
-  const eye=document.createElement("button"); eye.className="iconbtn"; eye.setAttribute("aria-label","Mostra o nascondi"); eye.innerHTML=ic("occhio");
-  eye.onclick=()=>{ shown=!shown; vEl.textContent=shown?value:"•".repeat(Math.min(value.length,14)); vEl.classList.toggle("shown",shown);
-    clearTimeout(hideT); if(shown) hideT=setTimeout(()=>{shown=false;vEl.textContent="•".repeat(Math.min(value.length,14));vEl.classList.remove("shown");},15000); };
-  const copy=document.createElement("button"); copy.className="iconbtn"; copy.textContent="⧉";
-  copy.onclick=async()=>{ try{await navigator.clipboard.writeText(value);}catch(e){} copy.innerHTML=ic("spunta"); copy.style.color="var(--ok)";
-    setTimeout(()=>{ navigator.clipboard.writeText("").catch(()=>{}); copy.textContent="⧉"; copy.style.color=""; },12000); };
-  acts.appendChild(eye); acts.appendChild(copy);
-  line.appendChild(meta); line.appendChild(acts);
-  return line;
+  if(!isSegreto(label)){
+    val.textContent=value;
+    if(value.length>48 || value.includes("\n") || /^(nota|note|notes)$/i.test((label||"").trim())) val.classList.add("lunga");
+    else val.title=value;
+    const cp=bottone("copia","Copia "+(label||"il valore"));
+    cp.onclick=()=>copiaValore(cp, value, "Copiato negli appunti.", false);
+    return riga;
+  }
+  const pallini="•".repeat(Math.min(Math.max(value.length,6),14));
+  val.classList.add("seg"); val.textContent=pallini; val.dataset.vis="0";
+  const eye=bottone("occhio","Mostra "+label);
+  let hideT=null;
+  const nascondi=()=>{ clearTimeout(hideT); val.textContent=pallini; val.dataset.vis="0";
+    eye.innerHTML=ic("occhio"); eye.title="Mostra "+label; eye.setAttribute("aria-label",eye.title); };
+  eye.onclick=()=>{
+    if(val.dataset.vis==="1"){ nascondi(); return; }
+    val.textContent=value; val.dataset.vis="1";
+    eye.innerHTML=ic("occhio-barrato"); eye.title="Nascondi "+label; eye.setAttribute("aria-label",eye.title);
+    hideT=setTimeout(nascondi,15000);
+  };
+  const cp=bottone("copia","Copia "+label);
+  cp.onclick=()=>copiaValore(cp, value, "Copiata. Sparisce dagli appunti fra 12 secondi.", true);
+  return riga;
 }
 
 async function send(){
@@ -1448,11 +1847,8 @@ async function send(){
   if(!ok){ addAI(j.detail||"Errore."); return; }
   const wrap = addAI(j.reply, j.results, j.kind==="ambiguous");
   if(j.kind==="single"){
-    // Il prisma va alla voce appena trovata, e a quella sola: le schede
-    // trovate prima lo perdono, o non indicherebbe piu' niente.
-    document.querySelectorAll("#chat .cred.prisma").forEach(c=> c.classList.remove("prisma","nuova"));
-    const card = wrap.querySelector(".cred");
-    if(card){ card.classList.add("prisma","nuova"); CIELO.accendi((sx,sy)=>bordoVicino(card,sx,sy)); }
+    accendiTrovata(wrap);
+    if(j.results && j.results[0]) pushRecente(j.results[0].id);
   } else if(j.kind==="ambiguous"){
     // Due voci troppo vicine: l'app chiede e non sceglie, quindi nessuna
     // scheda ha il prisma. Il lampo dice solo che qualcosa c'e'.
@@ -1635,10 +2031,18 @@ $("#saveCred").onclick=async()=>{
   const {ok,j}=res;
   if(ok){
     scriviConteggio(j.count); $("#modal").classList.add("hidden");
-    addAI(editId!=null ? "Credenziale aggiornata. Rifai la ricerca per vederla completa."
-                       : "Salvata nel vault locale. Ora puoi chiederla in linguaggio naturale.");
+    // Dal database la voce si rivede subito aggiornata accanto all'elenco:
+    // una riga in chat, che li' non si vede, non direbbe niente.
+    if(!$("#dbPanel").classList.contains("hidden")){
+      avviso(editId!=null ? "Voce aggiornata." : "Voce salvata nel vault.");
+      if(editId==null && j.id!=null) DB_SEL=j.id;
+      loadDb();
+    } else {
+      addAI(editId!=null ? "Credenziale aggiornata. Rifai la ricerca per vederla completa."
+                         : "Salvata nel vault locale. Ora puoi chiederla in linguaggio naturale.");
+      loadDb();
+    }
     editId=null;
-    if(!$("#dbPanel").classList.contains("hidden")) loadDb();
   } else { alert(j.detail||"Errore"); }
 };
 
@@ -2113,37 +2517,24 @@ $("#qrFile").addEventListener("change", async (e)=>{
 function esc(s){ return (s||"").replace(/[&<>]/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[m])); }
 
 /* ================= TAB NAVIGATION ================= */
+/* Il binario: tre sezioni (chat, database, categorie) e due finestre
+   (sincronizza, impostazioni). Solo le sezioni prendono `aria-current`:
+   una finestra si apre sopra quello che c'era, non lo sostituisce. */
 function switchTab(tab){
-  document.querySelectorAll(".tab-btn").forEach(b=> b.classList.toggle("active", b.dataset.tab===tab));
-  const isChat = tab==="chat";
-  $("#chat").classList.toggle("hidden", !isChat);
-  document.querySelector(".composer").classList.toggle("hidden", !isChat);
+  document.querySelectorAll(".voce-bin[data-tab]").forEach(b=>{
+    if(b.dataset.tab===tab) b.setAttribute("aria-current","page"); else b.removeAttribute("aria-current");
+  });
+  $("#vistaChat").classList.toggle("hidden", tab!=="chat");
   $("#dbPanel").classList.toggle("hidden", tab!=="db");
   $("#catPanel").classList.toggle("hidden", tab!=="cat");
   if(tab==="db") loadDb();
   if(tab==="cat") loadCats();
+  if(tab==="chat") setTimeout(()=>$("#q").focus(), 0);
   sezioneSfondo(tab);
 }
-document.querySelectorAll(".tab-btn").forEach(b=> b.addEventListener("click", ()=> switchTab(b.dataset.tab)));
-
-/* ===== MENU HAMBURGER ===== */
-$("#menuBtn").addEventListener("click", (e)=>{ e.stopPropagation(); $("#mainMenu").classList.toggle("hidden"); $("#themeMenu").classList.add("hidden"); });
-document.querySelectorAll("#mainMenu button").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    const act=btn.dataset.act; $("#mainMenu").classList.add("hidden");
-    if(act==="chat") switchTab("chat");
-    else if(act==="db") switchTab("db");
-    else if(act==="import"){ resetImport(); $("#importModal").classList.remove("hidden"); }
-    else if(act==="backup") $("#backupBtn").click();
-    else if(act==="sync") openSync();
-    else if(act==="lock") $("#lockAgain").click();
-    else if(act==="settings") openSettings();
-  });
-});
-document.addEventListener("click",(e)=>{
-  if(!$("#mainMenu").classList.contains("hidden") && !e.target.closest("#mainMenu") && e.target.id!=="menuBtn")
-    $("#mainMenu").classList.add("hidden");
-});
+document.querySelectorAll(".voce-bin[data-tab]").forEach(b=> b.addEventListener("click", ()=> switchTab(b.dataset.tab)));
+$("#binSync").addEventListener("click", ()=> openSync());
+$("#binSettings").addEventListener("click", ()=> openSettings());
 
 /* ===== IMPOSTAZIONI ===== */
 let SETTINGS={};
@@ -2408,40 +2799,290 @@ function applyMicSetting(on){
 }
 
 /* ===== AUTO-LOCK per inattività ===== */
-let _autolockTimer=null;
+let _autolockTimer=null, AUTOLOCK_FINE=0, AUTOLOCK_DURATA=0;
 function resetAutolock(){
   if(_autolockTimer) clearTimeout(_autolockTimer);
   const mins=(SETTINGS.autolock_minutes ?? 10);
-  if(!mins || mins<=0) return;
-  _autolockTimer=setTimeout(async()=>{ await api("/api/lock"); location.reload(); }, mins*60*1000);
+  if(!mins || mins<=0){ AUTOLOCK_FINE=0; scriviAutoblocco(); return; }
+  AUTOLOCK_DURATA=mins*60*1000; AUTOLOCK_FINE=Date.now()+AUTOLOCK_DURATA;
+  _autolockTimer=setTimeout(async()=>{ await api("/api/lock"); location.reload(); }, AUTOLOCK_DURATA);
+  scriviAutoblocco();
 }
+/* Il conto alla rovescia nel pannello di contesto. Il blocco lo decide il
+   timer qui sopra; questa e' solo la sua faccia, e si ridisegna una volta al
+   secondo (a finestra nascosta il browser la rallenta, e va bene cosi'). */
+function scriviAutoblocco(){
+  const tra=$("#ctxBloccoTra"), bar=$("#ctxBloccoBar");
+  if(!tra) return;
+  if(!AUTOLOCK_FINE){ tra.textContent="Mai"; bar.style.width="0"; return; }
+  const resto=Math.max(0, AUTOLOCK_FINE-Date.now()), sec=Math.ceil(resto/1000);
+  tra.textContent = sec>90 ? `tra ${Math.ceil(sec/60)} minuti` : (sec===1 ? "tra 1 secondo" : `tra ${sec} secondi`);
+  bar.style.width=(100*resto/AUTOLOCK_DURATA).toFixed(1)+"%";
+}
+setInterval(()=>{ if(!$("#app").classList.contains("hidden")) scriviAutoblocco(); }, 1000);
 ["click","keydown","mousemove","touchstart"].forEach(ev=>
   document.addEventListener(ev, ()=>{ if(!$("#app").classList.contains("hidden")) resetAutolock(); }, {passive:true}));
 
 
 /* ================= DATABASE GUI ================= */
-let DB_ENTRIES=[];
+/* L'elenco a sinistra, la voce aperta a destra. DB_SEL e' la voce aperta,
+   DB_CAT il filtro di categoria ("" = tutte). Il dettaglio si ridisegna solo
+   se la voce e' cambiata davvero (DB_FIRMA): il sync ricarica l'elenco ogni
+   volta che arriva qualcosa, e un 2FA che riparte da capo a ogni giro, o un
+   occhio aperto che si richiude da solo, sembrerebbero un guasto. */
+let DB_ENTRIES=[], DB_SEL=null, DB_CAT="", DB_FIRMA="";
+const dbVoce = id => DB_ENTRIES.find(c=>c.id===id) || null;
 async function loadDb(){
-  const {ok,j} = await fetch("/api/list").then(r=>r.json().then(d=>({ok:r.ok,j:d})));
-  if(!ok) return;
+  let r; try{ r=await fetch("/api/list"); }catch(e){ return; }
+  if(!r.ok) return;
+  const j=await r.json();
   DB_ENTRIES = j.entries || [];
   CAT_LIST = j.categories || [];   // arrivano nella stessa risposta: un giro solo
-  renderDb();
+  if(DB_SEL!=null && !dbVoce(DB_SEL)) DB_SEL=null;
+  if(DB_CAT && !CAT_LIST.includes(DB_CAT)) DB_CAT="";
+  renderDb(); renderContesto();
+  const c=dbVoce(DB_SEL);
+  if(JSON.stringify(c)!==DB_FIRMA) renderDettaglio(c, false);
+}
+
+/* Il sottotitolo di una riga: l'utente, se la voce ne ha uno leggibile, o
+   la categoria. Mai un campo segreto, nemmeno se si chiama «account». */
+function utenteDi(c){
+  const f=(c.fields||[]).find(f=> f.value && /utente|user|e-?mail|login|account/i.test(f.label||"") && !isSegreto(f.label));
+  return f ? String(f.value) : "";
+}
+function renderFiltri(){
+  const box=$("#dbFiltri"); box.innerHTML="";
+  const usate=new Set(DB_ENTRIES.map(c=>c.category||"").filter(Boolean));
+  const cats=CAT_LIST.filter(n=>usate.has(n));
+  // Con nessuna categoria resterebbe solo «Tutte», che non filtra niente.
+  box.classList.toggle("hidden", !cats.length);
+  [""].concat(cats).forEach(n=>{
+    const b=document.createElement("button"); b.textContent=n||"Tutte";
+    b.setAttribute("aria-pressed", String(n===DB_CAT));
+    b.onclick=()=>{ DB_CAT=n; renderDb(); };
+    box.appendChild(b);
+  });
 }
 function renderDb(){
-  const filter=($("#dbFilter").value||"").trim().toLowerCase();
-  const list = filter
-    ? DB_ENTRIES.filter(c =>
-        (c.title||"").toLowerCase().includes(filter) ||
-        (c.tags||[]).some(t=>t.toLowerCase().includes(filter)))
-    : DB_ENTRIES;
-  const grid = $("#dbGrid"); grid.innerHTML="";
+  renderFiltri();
+  const f=($("#dbFilter").value||"").trim().toLowerCase();
+  const list=DB_ENTRIES.filter(c=>{
+    if(DB_CAT && (c.category||"")!==DB_CAT) return false;
+    if(!f) return true;
+    return (c.title||"").toLowerCase().includes(f) || (c.tags||[]).some(t=>t.toLowerCase().includes(f))
+      || utenteDi(c).toLowerCase().includes(f) || (c.category||"").toLowerCase().includes(f);
+  });
+  // In ordine di nome: con centinaia di voci si cerca a colpo d'occhio, e
+  // l'ordine di inserimento non dice niente a nessuno.
+  list.sort((a,b)=> (a.title||"").localeCompare(b.title||"", "it", {sensitivity:"base", numeric:true}));
+  const grid=$("#dbGrid"); grid.innerHTML="";
   if(!list.length){
-    $("#dbEmpty").textContent = filter ? "Nessuna voce corrisponde al filtro." : "Nessuna voce nel vault.";
+    $("#dbEmpty").textContent = DB_ENTRIES.length ? "Nessuna voce corrisponde al filtro."
+      : "Il vault è vuoto. Aggiungi la prima voce dalla chat, col pulsante +.";
     $("#dbEmpty").classList.remove("hidden"); return;
   }
   $("#dbEmpty").classList.add("hidden");
-  list.forEach(c => grid.appendChild(dbCard(c)));
+  // 800 righe in un frammento solo: la pagina si ricalcola una volta.
+  const frag=document.createDocumentFragment();
+  list.forEach(c=>frag.appendChild(rigaDb(c)));
+  grid.appendChild(frag);
+}
+function rigaDb(c){
+  const b=document.createElement("button"); b.className="riga"; b.setAttribute("role","option");
+  b.setAttribute("aria-selected", String(c.id===DB_SEL)); b.dataset.id=c.id;
+  b.appendChild(monoEl(c));
+  const t=document.createElement("span");
+  const n=document.createElement("b"); n.textContent=c.title; t.appendChild(n);
+  const sotto=utenteDi(c) || c.category || "";
+  if(sotto){ const s=document.createElement("small"); s.textContent=sotto; t.appendChild(s); }
+  b.appendChild(t);
+  if(c.critical){ const k=document.createElement("span"); k.className="badge-crit"; k.textContent="critica"; b.appendChild(k); }
+  if((c.fields||[]).some(f=>labelLooksOtp(f.label))){ const k=document.createElement("span"); k.className="segno-2fa"; k.textContent="2FA"; b.appendChild(k); }
+  b.onclick=()=>apriVoceDb(c.id);
+  return b;
+}
+function apriVoceDb(id){
+  DB_SEL=id;
+  document.querySelectorAll("#dbGrid .riga").forEach(r=> r.setAttribute("aria-selected", String(+r.dataset.id===id)));
+  const r=document.querySelector(`#dbGrid .riga[data-id="${id}"]`); if(r) r.scrollIntoView({block:"nearest"});
+  renderDettaglio(dbVoce(id), true);
+  pushRecente(id);
+}
+
+/* La voce aperta: monogramma grande, i campi (gli stessi della chat), il
+   2FA, le voci vicine e, in fondo e lontano da tutto il resto, Elimina. */
+function renderDettaglio(c, nuova){
+  const d=$("#dettaglio"); d.innerHTML=""; d.classList.remove("nuova");
+  DB_FIRMA=JSON.stringify(c);
+  if(!c){
+    const v=document.createElement("div"); v.className="det-vuoto";
+    v.textContent = DB_ENTRIES.length ? "Scegli una voce dall'elenco: la leggi qui." : "Quando aggiungi una voce, la leggi qui.";
+    d.appendChild(v); $("#dbPanel").classList.remove("aperta"); return;
+  }
+  $("#dbPanel").classList.add("aperta");
+  if(nuova){ void d.offsetWidth; d.classList.add("nuova"); d.scrollTop=0; }
+  const testa=document.createElement("div"); testa.className="det-testa";
+  testa.appendChild(monoEl(c,"xl"));
+  const t=document.createElement("div");
+  const h=document.createElement("h2"); h.textContent=c.title; t.appendChild(h);
+  const meta=document.createElement("div"); meta.className="det-meta";
+  if(c.category){ const g=document.createElement("span"); g.className="tag"; g.textContent=c.category; meta.appendChild(g); }
+  if(c.critical){ const k=document.createElement("span"); k.className="badge-crit"; k.textContent="critica"; meta.appendChild(k); }
+  if(c.mod){ const m=document.createElement("span");
+    m.textContent="Modificata il "+new Date(c.mod).toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"});
+    meta.appendChild(m); }
+  t.appendChild(meta); testa.appendChild(t);
+  const az=document.createElement("div"); az.className="det-azioni";
+  const indietro=document.createElement("button"); indietro.className="fant-btn det-indietro";
+  indietro.innerHTML=ic("indietro","ic-16")+"<span>Elenco</span>";
+  indietro.onclick=()=> $("#dbPanel").classList.remove("aperta");
+  const edit=document.createElement("button"); edit.className="fant-btn";
+  edit.innerHTML=ic("matita","ic-16")+"<span>Modifica</span>";
+  edit.onclick=()=>openEdit(c);
+  az.append(indietro, edit); testa.appendChild(az);
+  d.appendChild(testa);
+
+  const box=document.createElement("div"); box.className="campi det";
+  (c.fields||[]).filter(f=>!labelLooksOtp(f.label)).forEach(f=> box.appendChild(campoRiga(f.label, f.value)));
+  if(c.tags && c.tags.length){
+    const riga=document.createElement("div"); riga.className="campo";
+    const lab=document.createElement("span"); lab.className="lab"; lab.textContent="Tag";
+    const val=document.createElement("span"); val.className="val det-tag";
+    c.tags.forEach(x=>{ const s=document.createElement("span"); s.className="tag"; s.textContent=x; val.appendChild(s); });
+    const vuoto=document.createElement("div"); vuoto.className="azioni";
+    riga.append(lab,val,vuoto); box.appendChild(riga);
+  }
+  if(box.children.length) d.appendChild(box);
+  if((c.fields||[]).some(f=>labelLooksOtp(f.label))){ const posto=document.createElement("div"); d.appendChild(posto); attachTotp(posto, c.id); }
+
+  const vic=document.createElement("section"); vic.className="vicine hidden"; d.appendChild(vic);
+  caricaVicine(vic, c.id);
+
+  const piede=document.createElement("div"); piede.className="det-piede";
+  const del=document.createElement("button"); del.className="fant-btn rosso";
+  del.innerHTML=ic("cestino","ic-16")+"<span>Elimina</span>";
+  del.onclick=()=>confermaElimina(piede, del, c);
+  piede.appendChild(del); d.appendChild(piede);
+}
+
+/* Le vicine si chiedono al server: sono il coseno fra i vettori delle
+   voci, lo stesso spazio in cui cerca la chat. Se nel frattempo e' stata
+   aperta un'altra voce, la risposta arrivata tardi si butta. */
+async function caricaVicine(box, id){
+  const {ok,j}=await api("/api/vicine",{cred_id:id});
+  if(!ok || !j.vicine || !j.vicine.length || DB_SEL!==id || !box.isConnected) return;
+  const h=document.createElement("h3"); h.textContent="Vicine nel vault";
+  const p=document.createElement("p"); p.textContent="Le voci che la ricerca considera più simili a questa.";
+  const el=document.createElement("div"); el.className="vicine-el";
+  j.vicine.forEach(v=>{
+    const b=document.createElement("button"); b.className="vicina";
+    b.appendChild(monoEl(v));
+    const s=document.createElement("span");
+    const n=document.createElement("b"); n.textContent=v.title;
+    const k=document.createElement("small"); k.textContent="Somiglianza "+fmtSomiglianza(v.score);
+    s.append(n,k); b.appendChild(s);
+    b.onclick=()=>apriVoceDb(v.id);
+    el.appendChild(b);
+  });
+  box.append(h,p,el); box.classList.remove("hidden");
+}
+
+function confermaElimina(piede, del, c){
+  if(piede.querySelector(".del-confirm")) return;
+  del.classList.add("hidden");
+  const box=document.createElement("div"); box.className="del-confirm";
+  const msg=document.createElement("span"); msg.className="msg"; msg.textContent="Eliminare questa voce? Si recupera solo da un backup.";
+  const btns=document.createElement("div"); btns.style.cssText="display:flex;gap:8px";
+  const si=document.createElement("button"); si.className="fant-btn rosso"; si.textContent="Sì, elimina";
+  const no=document.createElement("button"); no.className="fant-btn"; no.textContent="Annulla";
+  no.onclick=()=>{ box.remove(); del.classList.remove("hidden"); del.focus(); };
+  si.onclick=async()=>{
+    si.disabled=true; no.disabled=true;
+    let r, j={};
+    try{ r=await fetch("/api/delete/"+c.id,{method:"DELETE"}); j=await r.json(); }catch(e){}
+    if(!r || !r.ok){ si.disabled=false; no.disabled=false; avviso((j && j.detail) || "La voce non è stata eliminata.", true); return; }
+    scriviConteggio(j.count);
+    DB_SEL=null;
+    if(RECENTI.includes(c.id)){ RECENTI=RECENTI.filter(x=>x!==c.id); salvaRecenti(); }
+    avviso("Voce eliminata.");
+    await loadDb();
+  };
+  btns.append(si,no); box.append(msg,btns); piede.appendChild(box); no.focus();
+}
+
+/* ================= IL CONTESTO =================
+   La colonna a destra della chat: chi altro legge il vault, le voci aperte
+   da poco, le categorie piu' piene. Solo lettura: ogni riga porta altrove. */
+let RECENTI=[];
+try{ RECENTI=(JSON.parse(localStorage.getItem("vaultmind_recenti")||"[]")||[]).map(Number).filter(Number.isInteger).slice(0,5); }catch(e){}
+function salvaRecenti(){
+  try{ localStorage.setItem("vaultmind_recenti", JSON.stringify(RECENTI)); }catch(e){}
+  api("/api/settings",{recenti:RECENTI});
+}
+function pushRecente(id){
+  if(id==null) return;
+  id=+id;
+  if(RECENTI[0]===id) return;
+  RECENTI=[id].concat(RECENTI.filter(x=>x!==id)).slice(0,5);
+  salvaRecenti(); renderContesto();
+}
+function vuotoCtx(box, testo){ const p=document.createElement("p"); p.className="vuoto"; p.textContent=testo; box.appendChild(p); }
+function renderContesto(){
+  const rec=$("#ctxRecenti"); if(!rec) return;
+  rec.innerHTML="";
+  const voci=RECENTI.map(dbVoce).filter(Boolean);
+  if(!voci.length) vuotoCtx(rec, "Le voci che apri compaiono qui.");
+  voci.forEach(c=>{
+    const b=document.createElement("button"); b.className="recente";
+    b.appendChild(monoEl(c));
+    const n=document.createElement("b"); n.textContent=c.title; b.appendChild(n);
+    b.onclick=()=>{ DB_SEL=c.id; switchTab("db"); apriVoceDb(c.id); };
+    rec.appendChild(b);
+  });
+  const cat=$("#ctxCat"); cat.innerHTML="";
+  const conta={};
+  DB_ENTRIES.forEach(c=>{ if(c.category) conta[c.category]=(conta[c.category]||0)+1; });
+  const top=Object.entries(conta).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(!top.length) vuotoCtx(cat, "Nessuna categoria. Le crei nella sezione Categorie.");
+  const max=top.length ? top[0][1] : 1;
+  top.forEach(([n,k])=>{
+    const r=document.createElement("div"); r.className="cat-riga"; r.dataset.tinta=tinta(n);
+    r.style.setProperty("--w", Math.max(4, Math.round(100*k/max))+"%");
+    const s=document.createElement("span"); s.textContent=n;
+    const b=document.createElement("b"); b.textContent=k;
+    r.append(s, b, document.createElement("i")); cat.appendChild(r);
+  });
+}
+function quandoFa(sec){
+  const d=new Date(sec*1000), fa=(Date.now()-d.getTime())/1000;
+  if(fa<90) return "adesso";
+  if(fa<3600) return `${Math.round(fa/60)} minuti fa`;
+  if(d.toDateString()===new Date().toDateString())
+    return "oggi alle "+d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
+  if(d.toDateString()===new Date(Date.now()-86400000).toDateString()) return "ieri";
+  return "il "+d.toLocaleDateString("it-IT",{day:"numeric",month:"long"});
+}
+/* I nomi dei dispositivi arrivano dalla rete, quelli delle estensioni da
+   chi le ha abbinate: solo textContent. */
+async function caricaDispositivi(){
+  const box=$("#ctxDisp"); if(!box) return;
+  let stato={}, est={};
+  try{ const r=await fetch("/api/sync/stato"); if(r.ok) stato=await r.json(); }catch(e){}
+  try{ const r=await fetch("/api/pair/list"); if(r.ok) est=await r.json(); }catch(e){}
+  box.innerHTML="";
+  const righe=[];
+  (stato.dispositivi||[]).forEach(d=> righe.push(["dispositivo", d.nome||"Dispositivo",
+    d.quando ? "Sincronizzato "+quandoFa(d.quando) : "Abbinato, non ancora sincronizzato"]));
+  (est.extensions||[]).forEach(e=> righe.push(["estensione", e.name||"Estensione del browser", "Legge soltanto, non scrive"]));
+  if(!righe.length){ vuotoCtx(box, "Solo questo computer. Telefono ed estensione si abbinano da Sincronizza e Impostazioni."); return; }
+  righe.forEach(([icona,nome,sotto])=>{
+    const r=document.createElement("div"); r.className="disp"; r.innerHTML=ic(icona);
+    const t=document.createElement("div");
+    const b=document.createElement("b"); b.textContent=nome;
+    const s=document.createElement("small"); s.textContent=sotto;
+    t.append(b,s); r.appendChild(t); box.appendChild(r);
+  });
 }
 
 /* ================= SINCRONIZZAZIONE =================
@@ -2456,23 +3097,21 @@ let SYNC_TIMER = null;
    sempre. Le cose importanti (i conflitti) restano più a lungo. */
 let _avvisoTimer = null;
 function avviso(testo, importante){
-  let box = $("#avvisoSync");
+  let box = $("#avviso");
   if(!box){
     box = document.createElement("div");
-    box.id = "avvisoSync";
-    box.style.cssText = "position:fixed;left:50%;transform:translateX(-50%);"
-      + "bottom:22px;z-index:60;max-width:70vw;padding:9px 16px;border-radius:9px;"
-      + "font-size:12.5px;line-height:1.5;border:1px solid var(--brd);"
-      + "background:var(--gl-bg);box-shadow:0 6px 24px rgba(0,0,0,.28);cursor:pointer";
-    box.addEventListener("click", ()=>box.classList.add("hidden"));
+    box.id = "avviso"; box.className = "avviso";
+    box.setAttribute("role","status");
+    box.addEventListener("click", ()=>box.classList.remove("su"));
     document.body.appendChild(box);
   }
-  box.textContent = testo;
-  box.style.borderColor = importante ? "var(--warn)" : "var(--brd)";
-  box.style.color = importante ? "var(--warn)" : "var(--t1)";
-  box.classList.remove("hidden");
+  box.innerHTML = ic(importante ? "avviso" : "spunta");
+  const t = document.createElement("span"); t.textContent = testo; box.appendChild(t);
+  box.classList.toggle("importante", !!importante);
+  void box.offsetWidth;                  // riparte la comparsa anche se era gia' su
+  box.classList.add("su");
   clearTimeout(_avvisoTimer);
-  _avvisoTimer = setTimeout(()=>box.classList.add("hidden"), importante ? 9000 : 4000);
+  _avvisoTimer = setTimeout(()=>box.classList.remove("su"), importante ? 9000 : 4000);
 }
 
 /* ---- accorgersi di quello che ARRIVA ----
@@ -2572,14 +3211,15 @@ async function caricaSync(){
   renderFidati(j.dispositivi || []);
   aggiornaBadge(j.conflitti || 0);
   mostraTastoSync(j.acceso && (j.dispositivi || []).length > 0);
+  caricaDispositivi();                   // il contesto mostra gli stessi dispositivi
   if(j.conflitti) await caricaConflitti(); else $("#syncConflitti").classList.add("hidden");
 }
 
 function aggiornaBadge(n){
   const b = $("#syncBadge");
-  b.textContent = n ? `(${n})` : "";
+  b.textContent = n || "";
   b.classList.toggle("hidden", !n);
-  b.style.color = "var(--warn)";
+  $("#binSync").setAttribute("aria-label", n ? `Sincronizza, ${n} da decidere` : "Sincronizza");
 }
 
 function renderFidati(lista){
@@ -3119,55 +3759,6 @@ $("#pickConfirm").addEventListener("click", async ()=>{
 });
 $("#dbFilter").addEventListener("input", renderDb);
 
-function dbCard(c){
-  const card=document.createElement("div"); card.className="cred dbcard rise"; card.id="dbcard-"+c.id;
-  card.innerHTML=`<div class="accent"></div>`;
-
-  const head=document.createElement("div");
-  head.style.cssText="display:flex;align-items:flex-start;justify-content:space-between;gap:8px";
-  const titleEl=document.createElement("div"); titleEl.className="dbtitle";
-  titleEl.innerHTML=ic("chiave","ic-16")+" "+esc(c.title)
-    + (c.critical ? ' <span class="badge-crit">critica</span>' : "");
-  const acts=document.createElement("div"); acts.style.cssText="display:flex;gap:4px;flex-shrink:0";
-  const editBtn=document.createElement("button"); editBtn.className="iconbtn"; editBtn.title="Modifica"; editBtn.setAttribute("aria-label","Modifica"); editBtn.innerHTML=ic("matita");
-  editBtn.style.cssText="border-color:var(--vio);color:var(--vio)"; editBtn.onclick=()=>openEdit(c);
-  const delBtn=document.createElement("button"); delBtn.className="iconbtn"; delBtn.title="Elimina"; delBtn.setAttribute("aria-label","Elimina"); delBtn.innerHTML=ic("cestino");
-  delBtn.style.cssText="border-color:var(--err);color:var(--err)"; delBtn.onclick=()=>showDeleteConfirm(card,c);
-  acts.appendChild(editBtn); acts.appendChild(delBtn);
-  head.appendChild(titleEl); head.appendChild(acts); card.appendChild(head);
-
-  if(c.tags && c.tags.length){
-    const tr=document.createElement("div"); tr.className="dbtags";
-    c.tags.forEach(t=>{ const s=document.createElement("span"); s.className="dbtag"; s.textContent=t; tr.appendChild(s); });
-    card.appendChild(tr);
-  }
-
-  const fb=document.createElement("div"); fb.style.cssText="display:flex;flex-direction:column;gap:4px;margin-top:4px";
-  (c.fields||[]).forEach(f=>{ if(!labelLooksOtp(f.label)) fb.appendChild(maskedLine(f.label, f.value)); });
-  card.appendChild(fb);
-  if((c.fields||[]).some(f=>labelLooksOtp(f.label))) attachTotp(card, c.id);
-  return card;
-}
-
-function showDeleteConfirm(card, c){
-  const ex=card.querySelector(".del-confirm"); if(ex){ ex.remove(); return; }
-  const box=document.createElement("div"); box.className="del-confirm";
-  const msg=document.createElement("span"); msg.className="msg"; msg.textContent="Eliminare questa voce?";
-  const btns=document.createElement("div"); btns.style.cssText="display:flex;gap:6px";
-  const yes=document.createElement("button"); yes.className="iconbtn"; yes.textContent="Sì, elimina";
-  yes.style.cssText="border-color:var(--err);color:var(--err);font-size:12px;padding:4px 10px";
-  yes.onclick=async()=>{
-    const r=await fetch("/api/delete/"+c.id,{method:"DELETE"}); const j=await r.json();
-    if(r.ok){ scriviConteggio(j.count);
-      DB_ENTRIES = DB_ENTRIES.filter(x=>x.id!==c.id); card.remove();
-      if(!$("#dbGrid").children.length) $("#dbEmpty").classList.remove("hidden"); }
-    else alert(j.detail||"Errore");
-  };
-  const no=document.createElement("button"); no.className="iconbtn"; no.textContent="Annulla";
-  no.style.cssText="font-size:12px;padding:4px 10px"; no.onclick=()=>box.remove();
-  btns.appendChild(yes); btns.appendChild(no);
-  box.appendChild(msg); box.appendChild(btns); card.appendChild(box);
-}
 $("#dbRefreshBtn").addEventListener("click", loadDb);
 
 /* ================= /clear (svuota tutto) ================= */
@@ -3193,7 +3784,7 @@ function promptClearAll(){
   };
   no.onclick=()=>{ btns.remove(); addAI("Annullato. Nessuna voce è stata toccata."); };
   btns.appendChild(yes); btns.appendChild(no); wrap.appendChild(btns);
-  r.appendChild(wrap); $("#chat").appendChild(r); scroll();
+  r.appendChild(wrap); inChat(r);
 }
 $("#dbClearBtn").addEventListener("click", ()=>{ switchTab("chat"); promptClearAll(); });
 
@@ -3388,7 +3979,8 @@ try{
 // Dove sta la nuvola in ogni sezione: al centro dietro la porta e dietro la
 // chat (abbastanza larga da uscire dalla colonna, dove si accende il lampo),
 // a destra nel database, dove l'elenco lascia spazio.
-const POSE = {sblocco:{cx:.5,cy:.52,raggio:.40,intensita:1}, chat:{cx:.5,cy:.46,raggio:.40,intensita:.8}, db:{cx:.67,cy:.5,raggio:.44,intensita:.72}};
+// La chat sta un po' a sinistra del centro: a destra c'e' il contesto.
+const POSE = {sblocco:{cx:.5,cy:.52,raggio:.40,intensita:1}, chat:{cx:.46,cy:.46,raggio:.37,intensita:.8}, db:{cx:.67,cy:.5,raggio:.44,intensita:.72}};
 let SEZIONE = "sblocco";
 const CIELO = new Costellazione($("#cielo"), {...POSE.sblocco, seme:3});
 
@@ -3410,6 +4002,7 @@ function segnaSfondi(){
 function scegliSfondo(sezione, valore){
   SFONDI[sezione]=valore;
   try{ localStorage.setItem("vaultmind_sfondi", JSON.stringify(SFONDI)); }catch(e){}
+  api("/api/settings",{sfondi:SFONDI});
   segnaSfondi();
   // La sezione aperta cambia subito, dietro le impostazioni: si vede
   // l'effetto senza chiuderle.
@@ -3428,10 +4021,13 @@ function bordoVicino(el,sx,sy){
   return [Math.max(r.left,Math.min(r.right,sx)), Math.max(r.top,Math.min(r.bottom,sy))];
 }
 // Dove comparira' la risposta: in basso, appena a destra della colonna della
-// chat (680 px), dove le schede non arrivano.
+// chat (720 px al centro di #chat), dove le schede non arrivano. Si misura
+// la chat e non la finestra: il binario e il contesto la spostano.
 function puntoRisposta(){
-  const W=innerWidth||1;
-  return {x:Math.min(.92,((W+680)/2+80)/W), y:.66};
+  const W=innerWidth||1, H=innerHeight||1, r=$("#chat").getBoundingClientRect();
+  if(!r.width) return {x:.6, y:.66};
+  const x=Math.min(r.right-24, r.left+r.width/2+360+60);
+  return {x:Math.max(0,Math.min(1,x/W)), y:Math.max(0,Math.min(1,(r.top+r.height*.7)/H))};
 }
 
 /* ================= TEMA =================
@@ -3440,7 +4036,8 @@ function puntoRisposta(){
    corrispondente invece del predefinito. */
 const TEMI = ["prisma","ghiaccio","oro"];
 const TEMI_VECCHI = {dark:"prisma", light:"ghiaccio", night:"oro"};
-function applyTheme(name){
+// `utente`: scelto adesso a mano, quindi da ricordare anche sul server.
+function applyTheme(name, utente){
   name=TEMI_VECCHI[name]||name;
   if(!TEMI.includes(name)) name="prisma";
   // Scritto anche per Prisma, che vive in :root: cosi' l'attributo dice
@@ -3450,20 +4047,44 @@ function applyTheme(name){
   document.querySelectorAll("#themeMenu button").forEach(btn=> btn.classList.toggle("sel", btn.dataset.theme===name));
   document.querySelectorAll("#segTema button").forEach(b=> b.setAttribute("aria-pressed", b.dataset.valore===name));
   CIELO.colori();
+  if(utente) api("/api/settings",{theme:name});
 }
 let salvato=null;
 try{ salvato=localStorage.getItem("vaultmind_theme"); }catch(e){}
 applyTheme(salvato);
-document.querySelectorAll("#segTema button").forEach(b=> b.addEventListener("click", ()=> applyTheme(b.dataset.valore)));
+document.querySelectorAll("#segTema button").forEach(b=> b.addEventListener("click", ()=> applyTheme(b.dataset.valore, true)));
 sezioneSfondo("sblocco");
 $("#themeBtn").addEventListener("click", (e)=>{ e.stopPropagation(); $("#themeMenu").classList.toggle("hidden"); });
 document.querySelectorAll("#themeMenu button").forEach(btn=>{
-  btn.addEventListener("click", ()=>{ applyTheme(btn.dataset.theme); $("#themeMenu").classList.add("hidden"); });
+  btn.addEventListener("click", ()=>{ applyTheme(btn.dataset.theme, true); $("#themeMenu").classList.add("hidden"); });
 });
+// closest e non e.target.id: il clic cade quasi sempre sull'icona dentro.
 document.addEventListener("click", (e)=>{
-  if(!$("#themeMenu").classList.contains("hidden") && !e.target.closest("#themeMenu") && e.target.id!=="themeBtn")
+  if(!$("#themeMenu").classList.contains("hidden") && !e.target.closest("#themeMenu") && !e.target.closest("#themeBtn"))
     $("#themeMenu").classList.add("hidden");
 });
+
+/* Tema, sfondi e voci recenti stanno anche sul server. Il localStorage da
+   solo non basta: pywebview apre WebView2 in modalita' privata, e alla
+   chiusura della finestra si perde tutto (ogni avvio tornava a Prisma). Il
+   localStorage resta per il primo disegno, senza aspettare la risposta;
+   poi vince il server. Le impostazioni si leggono anche a vault chiuso:
+   non c'e' niente di segreto. */
+(async function PREF_SERVER(){
+  let s;
+  try{ const r=await fetch("/api/settings"); if(!r.ok) return; s=await r.json(); }catch(e){ return; }
+  if(!s || typeof s!=="object") return;
+  if(typeof s.theme==="string" && (TEMI.includes(s.theme) || TEMI_VECCHI[s.theme])) applyTheme(s.theme);
+  if(s.sfondi && typeof s.sfondi==="object"){
+    for(const k in SFONDI) if(SFONDI_VALIDI.includes(s.sfondi[k])) SFONDI[k]=s.sfondi[k];
+    try{ localStorage.setItem("vaultmind_sfondi", JSON.stringify(SFONDI)); }catch(e){}
+    segnaSfondi(); document.body.dataset.sfondo=SFONDI[SEZIONE];
+  }
+  if(Array.isArray(s.recenti)){
+    RECENTI=s.recenti.map(Number).filter(Number.isInteger).slice(0,5);
+    renderContesto();
+  }
+})();
 </script>
 </body>
 </html>

@@ -156,7 +156,10 @@ _DEFAULT_SETTINGS = {
     "mic_enabled": True,         # input vocale
     "gen_length": 20,            # default generatore password
     "gen_symbols": True,
-    "theme": "dark",
+    # Vuoto e non "dark": prima di ogni salvataggio il default finiva nel file
+    # come se fosse una scelta, e dal 7.1 la pagina si fida di quello che
+    # trova qui (vedi `PREF_SERVER` in index.html).
+    "theme": "",
     # L'unica connessione in uscita dell'app. Acceso: una GET anonima a GitHub
     # ogni 12 ore per sapere se c'è una versione nuova. Spento: nessuna.
     "aggiornamenti": True,
@@ -393,6 +396,11 @@ class SettingsIn(BaseModel):
     gen_symbols: bool | None = None
     theme: str | None = None
     aggiornamenti: bool | None = None
+    # Lo sfondo di ogni sezione e le voci aperte di recente (solo gli id: senza
+    # il vault non dicono niente). Stavano nel localStorage, che la finestra
+    # perde a ogni chiusura: pywebview apre WebView2 in modalita' privata.
+    sfondi: dict[str, str] | None = None
+    recenti: list[int] | None = None
 
 @app.post("/api/settings")
 def set_settings(body: SettingsIn):
@@ -401,7 +409,10 @@ def set_settings(body: SettingsIn):
         if v is not None:
             s[k] = v
     _save_settings(s)
-    return {"ok": True, "settings": s}
+    # come la GET: gli hash dei token delle estensioni non escono
+    fuori = dict(s)
+    fuori.pop("extensions", None)
+    return {"ok": True, "settings": fuori}
 
 
 class ChangeMasterIn(BaseModel):
@@ -491,7 +502,7 @@ def query(body: QueryIn):
                                             "sample_titles": titles})
             if reply:
                 return {"kind": "chat", "reply": reply, "results": []}
-        return {"kind": "none", "reply": "Nessuna corrispondenza nel vault. Prova un altro termine o aggiungi la voce col pulsante +.", "results": []}
+        return {"kind": "none", "reply": "Non trovo niente che somigli abbastanza. Prova con il nome del servizio, o con una parola che hai messo nei tag.", "results": []}
 
     titles = [r.cred.title for r in picks]
     if kind == "ambiguous":
@@ -505,6 +516,7 @@ def query(body: QueryIn):
             "results": [{"id": cred.id, "title": cred.title,
                          "fields": [{"label": f.label, "value": f.value} for f in cred.fields],
                          "tags": cred.tags, "critical": cred.critical,
+                         "category": cred.category, "mod": cred.mod,
                          "score": round(picks[0].score, 3)}]}
 
 
@@ -521,7 +533,8 @@ def reveal(body: QueryIn):
         raise HTTPException(status_code=404, detail="voce non trovata")
     return {"id": cred.id, "title": cred.title,
             "fields": [{"label": f.label, "value": f.value} for f in cred.fields],
-            "tags": cred.tags, "critical": cred.critical}
+            "tags": cred.tags, "critical": cred.critical,
+            "category": cred.category, "mod": cred.mod}
 
 
 @app.post("/api/add")
@@ -709,6 +722,20 @@ def totp_codes(body: TotpIn):
     return {"id": cred.id, "otp": totp.codes_for(cred)}
 
 
+@app.post("/api/vicine")
+def vicine(body: TotpIn):
+    """Le tre voci piu' simili a questa, per il dettaglio nel database: lo
+    stesso spazio vettoriale della chat, cosi' si vede cosa la ricerca
+    considera vicino. Solo titoli e categoria, mai i valori. Non e' in
+    EXT_ALLOWED: all'estensione non serve."""
+    _require_unlocked()
+    _require_index()
+    return {"vicine": [{"id": r.cred.id, "title": r.cred.title,
+                        "category": r.cred.category,
+                        "score": round(max(0.0, r.score), 3)}
+                       for r in S.index.vicine(body.cred_id)]}
+
+
 @app.post("/api/transcribe")
 async def transcribe_audio(file: UploadFile = File(...)):
     """Trascrive audio (microfono) in locale con Whisper, se installato."""
@@ -740,6 +767,7 @@ def list_entries():
             "tags": c.tags,
             "critical": c.critical,
             "category": c.category,
+            "mod": c.mod,
             "fields": [{"label": f.label, "value": f.value} for f in c.fields],
         })
     return {"entries": result, "count": len(result),

@@ -340,6 +340,9 @@ def main() -> int:
     # Sblocco: tessera opaca, la arrotonda Flutter (ClipRRect). Opaca perche'
     # col tema chiaro una luce su trasparente sbiadirebbe.
     med.save(RADICE / "mobile" / "assets" / "logo.png", optimize=True)
+    # Lo stesso medaglione per il PC dal 7.1 (binario e sblocco, ritagliato a
+    # cerchio dal CSS): il logo.png del PC ha ancora la toppa, e a 92 px si vede.
+    med.save(RADICE / "VaultMind_Windows" / "app" / "web" / "logo-tondo.png", optimize=True)
     for nome, d in DENSITA.items():
         cartella = RES / f"mipmap-{nome}"
         foreground(med, round(108 * d)).save(cartella / "ic_launcher_foreground.png", optimize=True)

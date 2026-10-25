@@ -268,16 +268,26 @@ class _SchermataCasaState extends State<SchermataCasa>
       builder: (context, vault, _) => Scaffold(
         backgroundColor: Colors.transparent,
         appBar: AppBar(
+          // Dalla 7.1 la barra non è più una fascia piena col filo sotto: sta
+          // sul cielo, come la testata del PC. Il numero delle voci è sceso
+          // nel filtro «Tutte» del database, dove serve.
+          backgroundColor: Colors.transparent,
+          shape: const Border(),
+          titleSpacing: 0,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 14),
+            child: Center(
+              child: Image.asset('assets/logo.png',
+                  width: 28, height: 28, excludeFromSemantics: true),
+            ),
+          ),
+          leadingWidth: 52,
           title: const Text('VaultMind',
               style: TextStyle(
                   fontFamily: 'Space Grotesk',
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.2)),
           actions: [
-            Center(
-              child: Text('${vault.credenziali.length} voci',
-                  style: TextStyle(fontSize: 12, color: context.cTenue)),
-            ),
             // Toccarlo SINCRONIZZA, non apre una schermata: è quello che
             // vuol dire un'icona così in una barra, ed è la cosa che si fa
             // spesso. L'abbinamento e i dispositivi fidati stanno nelle
@@ -347,26 +357,93 @@ class _SchermataCasaState extends State<SchermataCasa>
               const SizedBox.shrink(),
           ],
         ),
-        bottomNavigationBar: NavigationBar(
-          selectedIndex: _sezione,
-          onDestinationSelected: (i) => setState(() {
+        bottomNavigationBar: _NavFluttuante(
+          scelta: _sezione,
+          onScelta: (i) => setState(() {
             _sezione = i;
             _visitate.add(i);
           }),
-          destinations: const [
-            NavigationDestination(
-                icon: IconaVM(Icone.chat),
-                selectedIcon: IconaVM(Icone.chat),
-                label: 'Chat'),
-            NavigationDestination(
-                icon: IconaVM(Icone.elenco),
-                selectedIcon: IconaVM(Icone.elenco),
-                label: 'Database'),
-            NavigationDestination(
-                icon: IconaVM(Icone.cartella),
-                selectedIcon: IconaVM(Icone.cartella),
-                label: 'Categorie'),
-          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Le tre sezioni, in un'isola staccata dal bordo, come il binario del PC:
+/// la sezione accesa ha il neon pieno. La `NavigationBar` di Material
+/// metteva una fascia piena da bordo a bordo e una pillola chiara sotto
+/// l'icona, che con i temi nuovi era l'unica cosa di un altro stile.
+class _NavFluttuante extends StatelessWidget {
+  final int scelta;
+  final void Function(int) onScelta;
+  const _NavFluttuante({required this.scelta, required this.onScelta});
+
+  static const _voci = [
+    (Icone.chat, 'Chat'),
+    (Icone.elenco, 'Database'),
+    (Icone.cartella, 'Categorie'),
+  ];
+
+  @override
+  Widget build(BuildContext context) {
+    final k = context.cristallo;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+        child: Container(
+          height: 66,
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: context.cPannello,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: context.cBordo),
+            boxShadow: const [
+              BoxShadow(
+                  color: Color(0x40000000), blurRadius: 24, offset: Offset(0, 8)),
+            ],
+          ),
+          child: Row(
+            children: [
+              for (var i = 0; i < _voci.length; i++)
+                Expanded(
+                  child: Semantics(
+                    selected: i == scelta,
+                    button: true,
+                    label: _voci[i].$2,
+                    excludeSemantics: true,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => onScelta(i),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(18),
+                          gradient: i == scelta
+                              ? LinearGradient(colors: [k.neon1, k.neon2])
+                              : null,
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconaVM(_voci[i].$1,
+                                size: 21,
+                                color: i == scelta ? k.suNeon : context.cTenue),
+                            const SizedBox(height: 3),
+                            Text(_voci[i].$2,
+                                style: TextStyle(
+                                    fontSize: 11.5,
+                                    fontWeight:
+                                        i == scelta ? FontWeight.w600 : FontWeight.w500,
+                                    color: i == scelta ? k.suNeon : context.cTenue)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );

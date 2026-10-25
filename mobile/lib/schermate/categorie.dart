@@ -272,18 +272,19 @@ class _Gruppo extends StatelessWidget {
                 child: Column(
                   children: [
                     for (final c in voci)
-                      Row(
-                        children: [
-                          Expanded(child: SchedaVoce(key: ValueKey(c.id), credenziale: c)),
-                          if (onTogli != null)
-                            IconButton(
-                              iconSize: 18,
-                              tooltip: 'Togli dalla categoria',
-                              icon: IconaVM(Icone.menoCerchio,
-                                  color: context.cTenue),
-                              onPressed: () => onTogli!(c),
-                            ),
-                        ],
+                      RigaVoce(
+                        key: ValueKey(c.id),
+                        credenziale: c,
+                        sessione: sessione,
+                        coda: onTogli == null
+                            ? null
+                            : IconButton(
+                                iconSize: 18,
+                                tooltip: 'Togli dalla categoria',
+                                icon: IconaVM(Icone.menoCerchio,
+                                    color: context.cTenue),
+                                onPressed: () => onTogli!(c),
+                              ),
                       ),
                   ],
                 ),

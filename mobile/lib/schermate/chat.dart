@@ -44,8 +44,9 @@ class _Battuta {
   final bool mia;
   final String testo;
 
-  /// Le voci da mostrare sotto la frase, se ce ne sono.
-  final List<Credenziale> voci;
+  /// Le voci da mostrare sotto la frase, se ce ne sono, col punteggio che le
+  /// ha portate qui: è la «Somiglianza» della scheda.
+  final List<Risultato> voci;
 
   /// Vero quando le voci sono una domanda ("quale intendi?") e non una
   /// risposta: si mostrano chiuse e toccabili.
@@ -55,18 +56,22 @@ class _Battuta {
       {this.voci = const [], this.daScegliere = false});
 }
 
+/// Le stesse quattro richieste del PC: provarne una insegna come si chiede
+/// meglio di qualunque spiegazione.
+const _suggerimenti = [
+  'La password del wifi di casa',
+  'Il codice della banca',
+  "L'email di lavoro",
+  'Il PIN della SIM',
+];
+
 class _SezioneChatState extends State<SezioneChat> {
   final _domanda = TextEditingController();
   final _scorrimento = ScrollController();
-  final _battute = <_Battuta>[];
 
-  @override
-  void initState() {
-    super.initState();
-    _battute.add(const _Battuta(false,
-        'Chiedimi una credenziale: "la password di Amazon", "il conto in banca". '
-        'Cerco fra le voci del vault — non invento niente.'));
-  }
+  /// Vuota all'inizio: al suo posto c'è il saluto, che sparisce alla prima
+  /// domanda come sul PC.
+  final _battute = <_Battuta>[];
 
   @override
   void dispose() {
@@ -96,40 +101,45 @@ class _SezioneChatState extends State<SezioneChat> {
     final risposta = interpreta(widget.indice.cerca(testo, quanti: 8));
     setState(() {
       _battute.add(_Battuta(true, testo));
-      _battute.add(_rispondi(testo, risposta));
+      _battute.add(_rispondi(risposta));
     });
     _inFondo();
   }
 
-  _Battuta _rispondi(String domanda, RispostaRicerca r) {
+  _Battuta _rispondi(RispostaRicerca r) {
     switch (r.esito) {
       case Esito.nessuna:
         return _Battuta(
           false,
           widget.sessione.vault.credenziali.isEmpty
-              ? 'Il vault è vuoto: non c\'è ancora niente da cercare.'
-              : 'Non ho trovato niente per «$domanda». Prova col nome del '
-                  'servizio, o guarda nel Database.',
+              ? "Il vault è vuoto: non c'è ancora niente da cercare."
+              : 'Non trovo niente che somigli abbastanza. Prova con il nome '
+                  'del servizio, o con una parola che hai messo nei tag.',
         );
       case Esito.una:
-        final v = r.voci.first.voce;
-        return _Battuta(false, 'Ecco "${v.title}".', voci: [v]);
+        final v = r.voci.first;
+        return _Battuta(false, 'Ecco "${v.voce.title}".', voci: [v]);
       case Esito.ambigua:
         return _Battuta(
           false,
-          'Ne ho trovate ${r.voci.length} che corrispondono allo stesso modo. Quale intendi?',
-          voci: r.voci.map((x) => x.voce).toList(),
+          'Ho trovato ${r.voci.length} voci simili. Quale intendevi?',
+          voci: r.voci,
           daScegliere: true,
         );
     }
   }
 
-  void _scegli(Credenziale c) {
+  void _scegli(Risultato r) {
     setState(() {
-      _battute.add(_Battuta(true, c.title));
-      _battute.add(_Battuta(false, 'Ecco "${c.title}".', voci: [c]));
+      _battute.add(_Battuta(true, r.voce.title));
+      _battute.add(_Battuta(false, 'Ecco "${r.voce.title}".', voci: [r]));
     });
     _inFondo();
+  }
+
+  void _prova(String richiesta) {
+    _domanda.text = richiesta;
+    _chiedi();
   }
 
   @override
@@ -137,15 +147,18 @@ class _SezioneChatState extends State<SezioneChat> {
     return Column(
       children: [
         Expanded(
-          child: ListView.builder(
-            controller: _scorrimento,
-            padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
-            itemCount: _battute.length,
-            itemBuilder: (_, i) => _Bolla(
-              battuta: _battute[i],
-              onScelta: _scegli,
-            ),
-          ),
+          child: _battute.isEmpty
+              ? _Benvenuto(onProva: _prova)
+              : ListView.builder(
+                  controller: _scorrimento,
+                  padding: const EdgeInsets.fromLTRB(14, 14, 14, 8),
+                  itemCount: _battute.length,
+                  itemBuilder: (_, i) => _Bolla(
+                    battuta: _battute[i],
+                    onScelta: _scegli,
+                    onApri: (c) => apriVoce(context, widget.sessione, c.id),
+                  ),
+                ),
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
@@ -190,10 +203,79 @@ class _SezioneChatState extends State<SezioneChat> {
   }
 }
 
+/// Il saluto al posto della conversazione vuota: dice cosa si può fare, con
+/// quattro richieste vere da provare. Cambia con l'ora, niente di più.
+class _Benvenuto extends StatelessWidget {
+  final void Function(String) onProva;
+  const _Benvenuto({required this.onProva});
+
+  @override
+  Widget build(BuildContext context) {
+    final ora = DateTime.now().hour;
+    final quando = ora < 6
+        ? 'stanotte'
+        : ora < 13
+            ? 'stamattina'
+            : ora < 18
+                ? 'oggi pomeriggio'
+                : 'stasera';
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('Cosa ti serve $quando?',
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                    fontFamily: 'Space Grotesk',
+                    fontSize: 27,
+                    fontWeight: FontWeight.w600,
+                    height: 1.15)),
+            const SizedBox(height: 10),
+            Text(
+              'Chiedilo come lo chiederesti a una persona. La risposta la '
+              'trova il vault, nessuno la inventa.',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, height: 1.45, color: context.cTenue),
+            ),
+            const SizedBox(height: 22),
+            Wrap(
+              alignment: WrapAlignment.center,
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final t in _suggerimenti)
+                  Material(
+                    color: context.cPannello.withValues(alpha: .8),
+                    shape: StadiumBorder(
+                        side: BorderSide(color: context.cristallo.bordoForte)),
+                    child: InkWell(
+                      customBorder: const StadiumBorder(),
+                      onTap: () => onProva(t),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 15, vertical: 10),
+                        child: Text(t,
+                            style: TextStyle(fontSize: 13.5, color: context.cTesto)),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _Bolla extends StatelessWidget {
   final _Battuta battuta;
-  final void Function(Credenziale) onScelta;
-  const _Bolla({required this.battuta, required this.onScelta});
+  final void Function(Risultato) onScelta;
+  final void Function(Credenziale) onApri;
+  const _Bolla(
+      {required this.battuta, required this.onScelta, required this.onApri});
 
   @override
   Widget build(BuildContext context) {
@@ -252,13 +334,14 @@ class _Bolla extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 10),
             child: Column(
               children: [
-                for (final c in battuta.voci)
+                for (final r in battuta.voci)
                   battuta.daScegliere
-                      ? _Scelta(credenziale: c, onTocco: () => onScelta(c))
-                      : SchedaVoce(
-                          key: ValueKey('chat-${c.id}'),
-                          credenziale: c,
-                          aperta: true,
+                      ? _Scelta(risultato: r, onTocco: () => onScelta(r))
+                      : SchedaTrovata(
+                          key: ValueKey('chat-${r.voce.id}'),
+                          credenziale: r.voce,
+                          somiglianza: r.punteggio,
+                          onApri: () => onApri(r.voce),
                         ),
               ],
             ),
@@ -273,37 +356,70 @@ class _Bolla extends StatelessWidget {
 /// e stampare le password di tutte le candidate sarebbe il contrario di quello
 /// che serve.
 class _Scelta extends StatelessWidget {
-  final Credenziale credenziale;
+  final Risultato risultato;
   final VoidCallback onTocco;
-  const _Scelta({required this.credenziale, required this.onTocco});
+  const _Scelta({required this.risultato, required this.onTocco});
 
   @override
   Widget build(BuildContext context) {
+    final c = risultato.voce;
     final descrizione = <String>[
-      if (credenziale.categoria.isNotEmpty) credenziale.categoria,
-      ...credenziale.tags,
-      ...credenziale.fields.map((f) => f.label).take(2),
+      if (c.categoria.isNotEmpty) c.categoria,
+      ...c.tags,
+      ...c.fields.map((f) => f.label).take(2),
     ];
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
-        onTap: onTocco,
-        leading: Container(
-          width: 10,
-          height: 10,
-          decoration:
-              BoxDecoration(color: context.cAccento, shape: BoxShape.circle),
+      decoration: BoxDecoration(
+        color: context.cPannello,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.cBordo),
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: Material(
+        type: MaterialType.transparency,
+        child: InkWell(
+          onTap: onTocco,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
+            child: Row(
+              children: [
+                Monogramma.voce(c, lato: 36),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(c.title,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600)),
+                      if (descrizione.isNotEmpty)
+                        Text(descrizione.take(4).join(' · '),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(fontSize: 11.5, color: context.cTenue)),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Semantics(
+                  label: 'Somiglianza ${formatoSomiglianza(risultato.punteggio)}',
+                  excludeSemantics: true,
+                  child: Text(formatoSomiglianza(risultato.punteggio),
+                      style: TextStyle(
+                          fontFamily: 'JetBrains Mono',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: context.cristallo.neon2)),
+                ),
+                IconaVM(Icone.chevronDestra, color: context.cTenue),
+              ],
+            ),
+          ),
         ),
-        title: Text(credenziale.title,
-            style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-        subtitle: descrizione.isEmpty
-            ? null
-            : Text(descrizione.take(4).join(' · '),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(fontSize: 11, color: context.cTenue)),
-        trailing: IconaVM(Icone.chevronDestra, color: context.cTenue),
       ),
     );
   }
