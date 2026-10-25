@@ -41,8 +41,21 @@ if (-not (Test-Path "C:\src\flutter\bin\flutter.bat")) {
   Info "git clone --depth 1 -b stable https://github.com/flutter/flutter.git C:\src\flutter"
   exit 1
 }
-$env:Path = "C:\src\flutter\bin;$env:JAVA_HOME\bin;C:\Android\Sdk\platform-tools;$env:Path"
-$env:ANDROID_HOME = "C:\Android\Sdk"
+# L'SDK sta in C:\Android\Sdk (scelto per la TRAPPOLA 2 qui sotto) oppure
+# dove lo mette Android Studio. Cercarlo in due posti costa cinque righe e
+# risparmia 2 GB di download a chi ce l'ha gia' nella cartella predefinita:
+# il 25/10/2026 lo script si e' fermato dicendo "SDK assente" mentre l'SDK
+# c'era, completo, sotto il profilo utente.
+$sdk = @("C:\Android\Sdk", "$env:LOCALAPPDATA\Android\Sdk") |
+       Where-Object { Test-Path (Join-Path $_ "platform-tools\adb.exe") } |
+       Select-Object -First 1
+if (-not $sdk) {
+  Err "Android SDK non trovato in C:\Android\Sdk ne' in $env:LOCALAPPDATA\Android\Sdk"
+  Info "Installa Android Studio, oppure le command-line tools in C:\Android\Sdk"
+  exit 1
+}
+$env:Path = "C:\src\flutter\bin;$env:JAVA_HOME\bin;$sdk\platform-tools;$env:Path"
+$env:ANDROID_HOME = $sdk
 
 # TRAPPOLA 1 - la cartella temporanea.
 # Java crea le sue pipe interne con socket di dominio Unix, e mette il file
@@ -64,7 +77,7 @@ $env:TMP  = $tmp
 if ($PSScriptRoot -match " ") {
   Info "Nota: il progetto sta in un percorso con spazi. Finora non da' problemi."
 }
-Ok "Java, Flutter e Android SDK pronti"
+Ok "Java, Flutter e Android SDK pronti ($sdk)"
 
 # ---------------------------------------------------------------- 2) TEST
 # I test Dart aprono il vettore di prova vero (tests\vettore\): se non passano,

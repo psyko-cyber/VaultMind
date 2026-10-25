@@ -11,11 +11,14 @@
 
          Niente permessi di rete oltre a questo. Con la rete l'app fa due sole
          cose: parla con l'altro dispositivo in casa, e (dal 25/10/2026) chiede
-         a GitHub se c'e' una versione nuova -- una GET anonima ogni 12 ore,
+         a GitHub se c'e' una versione nuova: una GET anonima ogni 12 ore,
          spegnibile da Impostazioni. Il vault non esce da qui in nessun caso.
 
-         (Nel testo di questo commento niente doppi trattini: l'XML li vieta,
-         e il manifest smette di essere leggibile. Gia' pagata.) -->
+         (In questo commento niente doppi trattini: l'XML li vieta, e il
+         manifest smette di essere leggibile. Pagata due volte, la seconda
+         il 25/10/2026 scrivendo un doppio trattino proprio qui dentro: la
+         build muore con "Error parsing AndroidManifest.xml", che non dice
+         ne' quale riga ne' perche'.) -->
     <uses-permission android:name="android.permission.INTERNET"/>
 
     <!-- Serve a installare l'APK dell'aggiornamento scaricato dall'app.
