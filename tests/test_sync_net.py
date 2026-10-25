@@ -1,14 +1,13 @@
 r"""
-Test sul trasporto del sync (`app/sync_net.py`).
+Test sul trasporto del sync, lato PC (`app/sync_net.py`).
 
-Non sono finti: fanno partire un ascoltatore vero su 127.0.0.1 e ci collegano
-un client vero. Quello che si verifica e' quello che succedera' fra il PC e il
-telefono, meno il cavo.
+Non sono finti: dall'altra parte c'e' un socket vero su 127.0.0.1 che fa da
+telefono e risponde come vuole il singolo test. Contano soprattutto i casi in
+cui qualcosa va storto, perche' sono quelli che decidono cosa leggera' Luca:
+«il telefono non riconosce questo PC» e «non risponde» chiedono azioni diverse.
 
-I casi che contano sono quelli in cui il collegamento **deve fallire**: un
-dispositivo mai abbinato, un codice sbagliato, un vault con un'altra master
-password. Se uno solo di questi passasse, basterebbe stare sulla stessa WiFi
-per farsi mandare il vault.
+Il protocollo intero (ciao, stato, vault, prendi) lo provano `test_sync_app.py`
+col telefono finto e la suite Dart col telefono vero.
 
     tests\run.ps1
 """
@@ -16,6 +15,7 @@ per farsi mandare il vault.
 from __future__ import annotations
 import json
 import os
+import socket
 import sys
 import threading
 import unittest
@@ -30,179 +30,111 @@ CHIAVE = bytes(range(32))
 ALTRA_CHIAVE = bytes(range(1, 33))
 
 
-def contesto(nome, chiave=CHIAVE, fidati=None, codice=None, blob="il-mio-vault"):
-    ricevuti = []
-    ctx = rete.ContestoSync(
-        id_dispositivo=sp.id_dispositivo(),
-        nome=nome,
-        chiave_vault=chiave,
-        fidati=dict(fidati or {}),
-        leggi_vault_cifrato=lambda: blob,
-        ricevi_vault=lambda b, i: (ricevuti.append((b, i)), {"ricevuto": True})[1],
-        salt_vault=b"\x01" * 16,
-        codice_attivo=lambda: codice,
-    )
-    ctx.abbina = lambda id_peer, n: ctx.fidati.__setitem__(id_peer, {"nome": n})
-    return ctx, ricevuti
+class Ascolto:
+    """Un «telefono» da una riga: accetta un collegamento, passa la prima
+    riga ricevuta a `risponde`, manda indietro i byte che restituisce."""
+
+    def __init__(self, risponde):
+        self._s = socket.socket()
+        self._s.bind(("127.0.0.1", 0))
+        self._s.listen(1)
+        self.porta = self._s.getsockname()[1]
+        self.ricevuto = b""
+        self._risponde = risponde
+        self._t = threading.Thread(target=self._uno, daemon=True)
+        self._t.start()
+
+    def _uno(self):
+        try:
+            conn, _ = self._s.accept()
+        except OSError:
+            return
+        with conn:
+            f = conn.makefile("rb")
+            self.ricevuto = f.readline()
+            uscita = self._risponde(self.ricevuto)
+            if uscita:
+                conn.sendall(uscita)
+
+    def chiudi(self):
+        self._s.close()
+        self._t.join(2)
 
 
-class BaseRete(unittest.TestCase):
-    def avvia(self, ctx):
-        a = rete.Ascoltatore(ctx, porta=0)
-        a.start()
-        self.assertTrue(a.pronto.wait(5), "l'ascoltatore non si e' aperto")
-        self.addCleanup(a.ferma)
-        return a
+def _cifrata(dati: dict, chiave: bytes = CHIAVE) -> bytes:
+    return json.dumps({"m": sp.cifra(chiave, dati)}).encode() + b"\n"
 
 
-class TestStrettaDiMano(BaseRete):
+class TestCollegamento(unittest.TestCase):
 
-    def test_abbinamento_col_codice_giusto_e_scambio(self):
-        """Il giro completo: due dispositivi che non si conoscono, il codice
-        letto sull'altro schermo, e i due vault che si incrociano."""
-        srv, ricevuti_srv = contesto("PC", codice="123456", blob="vault-del-pc")
-        cli, ricevuti_cli = contesto("Telefono", blob="vault-del-telefono")
-        a = self.avvia(srv)
+    def _prova(self, risponde):
+        a = Ascolto(risponde)
+        self.addCleanup(a.chiudi)
+        c = rete.Collegamento.apri("127.0.0.1", a.porta, CHIAVE)
+        self.addCleanup(c.chiudi)
+        c.manda({"t": "ciao", "nome": "PC di prova"}, {"v": 1, "pc": "ab" * 8})
+        return a, c
 
-        esito = rete.sincronizza(cli, "127.0.0.1", a.porta_vera, codice="123456")
+    def test_una_riga_cifrata_per_parte(self):
+        def risponde(riga):
+            dati = sp.decifra(CHIAVE, json.loads(riga)["m"])
+            return _cifrata({"t": "eco", "nome": dati["nome"]})
+        a, c = self._prova(risponde)
+        self.assertEqual({"t": "eco", "nome": "PC di prova"}, c.ricevi())
+        riga = json.loads(a.ricevuto)
+        self.assertEqual({"v", "pc", "m"}, set(riga), "in chiaro solo chi chiama")
+        self.assertNotIn(b"PC di prova", a.ricevuto, "il contenuto non viaggia in chiaro")
 
-        self.assertTrue(esito["ok"])
-        self.assertEqual("PC", esito["con"])
-        self.assertEqual([("vault-del-pc", srv.id_dispositivo)], ricevuti_cli)
-        # il server riceve nel suo thread: si aspetta che finisca
-        for _ in range(50):
-            if ricevuti_srv:
-                break
-            threading.Event().wait(0.05)
-        self.assertEqual([("vault-del-telefono", cli.id_dispositivo)], ricevuti_srv)
-        # e da adesso si conoscono, senza codice
-        self.assertIn(cli.id_dispositivo, srv.fidati)
+    def test_il_telefono_che_non_conosce_il_pc_lo_dice(self):
+        _, c = self._prova(lambda _r: b'{"no":"pc"}\n')
+        with self.assertRaises(rete.Rifiutato) as e:
+            c.ricevi()
+        self.assertEqual("pc", e.exception.motivo)
 
-    def test_il_codice_sbagliato_non_passa(self):
-        srv, _ = contesto("PC", codice="123456")
-        cli, _ = contesto("Telefono")
-        a = self.avvia(srv)
-        with self.assertRaises(rete.RifiutoSync) as e:
-            rete.sincronizza(cli, "127.0.0.1", a.porta_vera, codice="000000")
-        self.assertIn("odice", str(e.exception))
-        self.assertEqual({}, srv.fidati)
+    def test_una_risposta_con_un_altra_chiave(self):
+        _, c = self._prova(lambda _r: _cifrata({"t": "x"}, ALTRA_CHIAVE))
+        with self.assertRaises(rete.Rifiutato) as e:
+            c.ricevi()
+        self.assertEqual("chiave", e.exception.motivo)
 
-    def test_un_dispositivo_mai_abbinato_viene_respinto(self):
-        """Senza codice attivo, chi non e' nell'elenco non entra — anche se
-        conosce la master password. E' il senso stesso dell'elenco."""
-        srv, _ = contesto("PC", codice=None)
-        cli, _ = contesto("Telefono")
-        a = self.avvia(srv)
-        with self.assertRaises(rete.RifiutoSync):
-            rete.sincronizza(cli, "127.0.0.1", a.porta_vera)
+    def test_chiuso_senza_rispondere(self):
+        _, c = self._prova(lambda _r: b"")
+        with self.assertRaises(rete.Rifiutato) as e:
+            c.ricevi()
+        self.assertEqual("chiuso", e.exception.motivo)
 
-    def test_un_dispositivo_gia_abbinato_non_richiede_il_codice(self):
-        cli, _ = contesto("Telefono")
-        srv, _ = contesto("PC", fidati={cli.id_dispositivo: {"nome": "Telefono"}})
-        a = self.avvia(srv)
-        esito = rete.sincronizza(cli, "127.0.0.1", a.porta_vera)
-        self.assertTrue(esito["ok"])
+    def test_spazzatura(self):
+        for byte in (b"non json\n", b"[1,2]\n", b'{"m": 5}\n'):
+            with self.subTest(byte=byte):
+                _, c = self._prova(lambda _r, b=byte: b)
+                with self.assertRaises(rete.Rifiutato):
+                    c.ricevi()
 
-    def test_una_master_password_diversa_viene_detta_chiaramente(self):
-        """Non e' un errore di rete e riprovare non serve: il messaggio deve
-        dire cosa fare davvero, cioe' rimandare il vault."""
-        cli, _ = contesto("Telefono", chiave=ALTRA_CHIAVE)
-        srv, _ = contesto("PC", fidati={cli.id_dispositivo: {"nome": "Telefono"}})
-        a = self.avvia(srv)
-        with self.assertRaises(rete.RifiutoSync) as e:
-            rete.sincronizza(cli, "127.0.0.1", a.porta_vera)
-        self.assertIn("chiave", str(e.exception).lower())
-
-    def test_chi_non_ha_la_chiave_non_ottiene_il_vault(self):
-        """La prova che conta: uno sulla stessa WiFi, con l'elenco a suo
-        favore, ma senza la chiave del vault. Non deve ricevere niente."""
-        cli, ricevuti = contesto("Intruso", chiave=ALTRA_CHIAVE)
-        srv, _ = contesto("PC", fidati={cli.id_dispositivo: {"nome": "Intruso"}},
-                          blob="SEGRETO")
-        a = self.avvia(srv)
-        with self.assertRaises(rete.RifiutoSync):
-            rete.sincronizza(cli, "127.0.0.1", a.porta_vera)
-        self.assertEqual([], ricevuti)
-
-    def test_una_versione_diversa_si_ferma_subito(self):
-        """Meglio un rifiuto netto che due app che si capiscono a meta'."""
-        import socket
-        srv, _ = contesto("PC", codice="123456")
-        a = self.avvia(srv)
-        s = socket.create_connection(("127.0.0.1", a.porta_vera), timeout=5)
-        self.addCleanup(s.close)
-        s.sendall(json.dumps({"vm": 99, "tipo": "ciao", "id": "x",
-                              "sfida": "00" * 16}).encode() + b"\n")
-        r = json.loads(s.recv(4096).decode().splitlines()[0])
-        self.assertEqual("no", r["tipo"])
-        self.assertEqual("versione diversa", r["perche"])
-
-    def test_spazzatura_non_fa_cadere_l_ascoltatore(self):
-        import socket
-        srv, _ = contesto("PC", codice="123456")
-        a = self.avvia(srv)
-        s = socket.create_connection(("127.0.0.1", a.porta_vera), timeout=5)
-        s.sendall(b"non sono json\n")
-        s.close()
-        # e subito dopo un collegamento buono deve funzionare lo stesso
-        cli, _ = contesto("Telefono")
-        self.assertTrue(rete.sincronizza(cli, "127.0.0.1", a.porta_vera,
-                                         codice="123456")["ok"])
+    def test_nessuno_in_ascolto(self):
+        s = socket.socket()
+        s.bind(("127.0.0.1", 0))
+        porta = s.getsockname()[1]
+        s.close()   # porta libera: nessuno risponde
+        with self.assertRaises(rete.NonRaggiungibile):
+            rete.Collegamento.apri("127.0.0.1", porta, CHIAVE, attesa=0.5)
 
 
-class TestScoperta(unittest.TestCase):
-    """La decisione di rispondere o no, senza tirare in ballo la rete: e' la
-    parte che riguarda la privacy, e va provata in modo deterministico."""
+class TestDoveCercare(unittest.TestCase):
 
-    def sonda(self, chiave, nonce_hex="aa" * 16, firmata=True):
-        d = {"vm": rete.VERSIONE, "tipo": "sonda", "n": nonce_hex}
-        if firmata:
-            d["f"] = rete._firma_sonda(chiave, nonce_hex)
-        return json.dumps(d).encode("utf-8")
+    def test_bussa_trova_solo_chi_ascolta(self):
+        a = Ascolto(lambda _r: b"")
+        self.addCleanup(a.chiudi)
+        self.assertEqual(["127.0.0.1"],
+                         rete.bussa(["127.0.0.2", "127.0.0.1"], a.porta, attesa=0.5))
 
-    def test_risponde_a_chi_ha_lo_stesso_vault(self):
-        ctx, _ = contesto("PC")
-        r = rete.Annunciatore(ctx)._rispondi(self.sonda(CHIAVE))
-        self.assertIsNotNone(r)
-        self.assertEqual(ctx.id_dispositivo, r["id"])
-        self.assertEqual("PC", r["nome"])
-        # e firma a sua volta, perche' nessuno possa fingersi un nostro dispositivo
-        self.assertEqual(rete._firma_eccomi(CHIAVE, "aa" * 16, ctx.id_dispositivo), r["f"])
-
-    def test_non_risponde_a_un_estraneo(self):
-        """Per chi sta sulla stessa WiFi ma non ha il vault, qui non c'e'
-        niente: nessuna risposta, nessun nome, nessuna traccia."""
-        ctx, _ = contesto("PC")
-        self.assertIsNone(rete.Annunciatore(ctx)._rispondi(self.sonda(ALTRA_CHIAVE)))
-        self.assertIsNone(rete.Annunciatore(ctx)._rispondi(
-            self.sonda(CHIAVE, firmata=False)))
-
-    def test_durante_l_abbinamento_risponde_anche_a_chi_non_firma(self):
-        """Finestra voluta di 120 secondi: il dispositivo nuovo il vault non
-        ce l'ha, quindi non puo' firmare. Riceve il salt, che non e' segreto."""
-        ctx, _ = contesto("PC", codice="123456")
-        r = rete.Annunciatore(ctx)._rispondi(self.sonda(CHIAVE, firmata=False))
-        self.assertIsNotNone(r)
-        self.assertTrue(r["abbinabile"])
-        self.assertEqual((b"\x01" * 16).hex(), r["salt"])
-
-    def test_finito_l_abbinamento_torna_invisibile(self):
-        ctx, _ = contesto("PC", codice=None)
-        self.assertIsNone(rete.Annunciatore(ctx)._rispondi(
-            self.sonda(CHIAVE, firmata=False)))
-
-    def test_il_salt_non_esce_fuori_dall_abbinamento(self):
-        ctx, _ = contesto("PC")
-        r = rete.Annunciatore(ctx)._rispondi(self.sonda(CHIAVE))
-        self.assertNotIn("salt", r)
-
-    def test_messaggi_malformati_non_ottengono_risposta(self):
-        ctx, _ = contesto("PC", codice="123456")
-        ann = rete.Annunciatore(ctx)
-        for cattivo in [b"", b"{", b"[]", b'{"tipo":"altro"}',
-                        json.dumps({"vm": 99, "tipo": "sonda", "n": "aa"}).encode(),
-                        json.dumps({"vm": 1, "tipo": "sonda", "n": "zz"}).encode()]:
-            self.assertIsNone(ann._rispondi(cattivo), cattivo)
+    def test_le_reti_da_provare(self):
+        reti = rete.reti_locali()
+        for indirizzi in reti:
+            self.assertEqual(254, len(indirizzi))
+            self.assertFalse(indirizzi[0].startswith(("127.", "169.254.")))
+        principale = rete._principale()
+        if principale and reti:
+            self.assertIn(principale, reti[0], "la scheda principale per prima")
 
 
 if __name__ == "__main__":

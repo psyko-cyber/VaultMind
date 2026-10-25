@@ -128,10 +128,10 @@ cui è facile fare danni silenziosi.
    prima. Altrimenti il formato cambia per tutti senza che nessuno l'abbia
    deciso.
 3. **Conservare le chiavi che non conosci.** Se leggi un vault con un campo che
-   la tua versione non prevede, riscrivilo tale e quale. È il caso concreto dei
-   timestamp che arriveranno col sync (TODO §2): senza questa regola, un
-   telefono con l'app vecchia li cancellerebbe tutti al primo salvataggio, in
-   silenzio, e il sync non se ne accorgerebbe.
+   la tua versione non prevede, riscrivilo tale e quale. È il caso concreto
+   delle chiavi del sync nella radice (`sync_telefoni`, `sync_pc`, più sotto):
+   senza questa regola, un'app vecchia le cancellerebbe al primo salvataggio,
+   e il PC e il telefono smetterebbero di riconoscersi.
 
 Scrittura atomica (file temporaneo + rename) come fa `crypto_store.py`: se il
 processo muore a metà, il vault vecchio deve restare leggibile.
@@ -153,13 +153,18 @@ telefono ne inventassero uno casuale per la stessa identica voce, al primo
 allineamento quella voce diventerebbe due voci. Solo le voci **nuove** ricevono
 un uid casuale (32 caratteri esadecimali).
 
-**`rev` — chi è più avanti.** Un contatore che cresce di uno a ogni modifica
-della voce. Qualunque cambiamento va contato, compreso lo spostamento di
-categoria: altrimenti un riordino di 800 voci risulterebbe "niente è cambiato".
+**`mod` — quando, in millisecondi, ed è lui a decidere.** Dal 25/10/2026, fra
+due versioni della stessa voce **vince l'ultima modifica**: la regola scelta da
+Luca al posto dei conflitti da risolvere a mano. Chi scrive una voce (o una
+lapide) mette `mod = max(adesso, mod di prima + 1)` — `dopo()` in
+`crypto_store.py` e in `vault.dart` — così una correzione fatta *dopo* aver
+visto la voce batte quella di prima anche se l'altro dispositivo ha l'orologio
+avanti. Assente vale `0`: perde contro qualunque voce datata.
 
-**`mod` — quando, in millisecondi.** Serve a *mostrarlo* all'utente e come
-spareggio estremo, **non** a decidere chi vince: due dispositivi con l'orologio
-sfasato deciderebbero male. Per quello c'è `rev`.
+**`rev` — lo spareggio.** Un contatore che cresce di uno a ogni modifica della
+voce, compreso lo spostamento di categoria. Decide solo a parità di `mod`; poi
+la lapide batte la voce viva, poi il contenuto, solo per essere deterministici.
+La regola completa sta nel docstring di `merge.py`.
 
 **`deleted` — le lapidi.** Senza, una voce cancellata su un dispositivo
 resuscita al primo allineamento, perché l'altro — che ce l'ha ancora — la
@@ -168,6 +173,21 @@ la cancellazione è essa stessa una modifica, e deve battere la copia viva.
 Le lapidi più vecchie di 180 giorni si scartano; una lapide senza `mod` si
 tiene comunque, perché nel dubbio è meglio una lapide di troppo che una voce
 che torna in vita.
+
+**`sync_telefoni` e `sync_pc` — chi si conosce.** Dal 25/10/2026 i dispositivi
+collegati stanno nella radice del contenuto cifrato, accanto a `credentials`:
+cifrati come le password, e sopravvivono al cambio della master password.
+
+```jsonc
+// sul PC
+"sync_telefoni": {"<id telefono, 16 hex>": {"nome": "Telefono di Luca", "chiave": "<64 hex>"}},
+// sul telefono
+"sync_pc":       {"<id PC, 16 hex>":       {"nome": "PC di casa",       "chiave": "<64 hex>"}}
+```
+
+La chiave è quella del QR: 32 byte casuali, gli stessi sui due lati. Chi non
+implementa il sync non deve toccarle (regola 3); chi le cancella scollega i
+dispositivi, e per ricollegarli serve un QR nuovo.
 
 ## Verifica anche il 2FA
 
@@ -192,20 +212,25 @@ Due suite aprono questo file a ogni esecuzione, una per piattaforma:
 - **Dart** — `mobile\costruisci.ps1 -Test`, che si rifiuta di costruire l'APK
   se falliscono
 
-## Gli altri due vettori
+## Gli altri vettori
 
-In questa cartella ci sono tre contratti, non tre copie della stessa cosa:
+In questa cartella ci sono quattro contratti, non quattro copie della stessa
+cosa:
 
-| File | Cosa fissa |
-|---|---|
-| `vault-esempio.json` + `atteso.json` | il **formato** del vault |
-| `fusione.json` | il **comportamento** del merge |
-| `sync.json` | i **byte** del protocollo di abbinamento |
+| File | Cosa fissa | Chi lo esegue |
+|---|---|---|
+| `vault-esempio.json` + `atteso.json` | il **formato** del vault | Python e Dart |
+| `fusione.json` | il **comportamento** del merge | Python |
+| `sync.json` | i **byte** dei messaggi del sync e del QR | Python e Dart |
+| `versioni.json` | il **confronto** fra numeri di versione | Python e Dart |
 
-`sync.json` contiene ingressi fissi (una chiave, due nonce, un codice) e i
-valori che devono uscirne. Se il PC e il telefono calcolassero prove diverse
-l'abbinamento fallirebbe **sempre**, e senza questo file lo si scoprirebbe con
-due dispositivi veri in mano — il momento peggiore per accorgersene.
+`sync.json` contiene ingressi fissi (una chiave, un nonce, un messaggio, il
+testo di un QR) e quello che deve uscirne: il messaggio cifrato al byte, e cosa
+si legge dal QR. Se il PC e il telefono cifrassero in modo diverso il primo
+collegamento fallirebbe **sempre**, e senza questo file lo si scoprirebbe con
+due dispositivi veri in mano — il momento peggiore per accorgersene. Che poi i
+due si capiscano davvero sul filo lo prova `mobile/test/sync_ponte_test.dart`,
+che fa parlare il telefono in Dart col PC in Python (`tests/ponte_sync.py`).
 
 ## Il secondo vettore: `fusione.json`
 
@@ -214,10 +239,13 @@ coppie di vault in ingresso e il risultato che ci si aspetta. Non è una copia
 del vettore del formato — è un contratto diverso, e sta qui perché ha la stessa
 natura: qualcosa che due implementazioni devono interpretare allo stesso modo.
 
-Lo eseguono `TestVettoreFusione` (Python) e `fusione_test.dart` (Dart) a ogni
-esecuzione. Se il PC e il telefono decidessero diversamente su cosa è successo
-fra due copie, si allineerebbero su due verità diverse — e nessuno se ne
-accorgerebbe finché non manca una password.
+Lo esegue `TestVettoreFusione` (Python). Dal 25/10/2026 la fusione la fa
+**solo il PC**: il telefono manda le sue voci e adotta il risultato così
+com'è, quindi non c'è più una seconda implementazione da tenere allineata. Il
+contratto resta qui perché ne ha la natura: se un giorno qualcun altro
+fondesse, dovrebbe dare questi risultati, o i dispositivi si allineerebbero su
+due verità diverse — e nessuno se ne accorgerebbe finché non manca una
+password.
 
 Ogni caso porta con sé il *perché* esiste: leggerlo è il modo più veloce di
 capire cosa fa il merge e, soprattutto, cosa si rifiuta di fare da solo.

@@ -34,29 +34,51 @@ class ModificaRifiutata implements Exception {
 class Sessione extends ValueNotifier<Vault> {
   final Uint8List chiave;
 
-  Sessione(super.vault, this.chiave);
+  /// Dove finisce il vault cifrato. A parametro solo per i test: in
+  /// `flutter test` la cartella dell'app non c'è, e il sync va provato con la
+  /// sessione vera, non con una finta.
+  final Future<void> Function(String cifrato) _scrivi;
+
+  Sessione(super.vault, this.chiave, {Future<void> Function(String cifrato)? scrivi})
+      : _scrivi = scrivi ?? salvaVaultCifrato;
 
   Vault get vault => value;
 
   // ------------------------------------------------------------ salvataggio
 
   Future<void> _salva(Vault nuovo) async {
-    await salvaVaultCifrato(await cifraVault(nuovo, chiave));
+    await _scrivi(await cifraVault(nuovo, chiave));
     value = nuovo; // solo a disco a posto
   }
 
-  /// Il testo cifrato del vault, per il backup da condividere e per il sync.
+  /// Il testo cifrato del vault, per il backup da condividere.
   /// Non tocca il file: è la stessa cifratura, con un nonce suo.
   Future<String> testoCifrato() => cifraVault(value, chiave);
 
-  /// Sostituisce il contenuto col risultato di una fusione, in **una sola
-  /// scrittura**: non deve esistere un momento in cui il vault è mezzo fuso.
+  /// Sostituisce il contenuto con quello arrivato dal PC, in **una sola
+  /// scrittura**: non deve esistere un momento in cui il vault è mezzo
+  /// aggiornato. Le chiavi sconosciute della radice restano dove sono.
   Future<void> applicaFusione(
     List<Credenziale> voci,
     List<Lapide> lapidi,
     List<String> categorie,
   ) =>
       _salva(value.con(credenziali: voci, lapidi: lapidi, categorie: categorie));
+
+  /// Scrive (o toglie, con `null`) una chiave della radice del vault che non è
+  /// una voce: è dove il sync tiene i PC collegati, cifrati come le password.
+  Future<void> impostaRadice(String nome, Object? valore) {
+    if (const {'credentials', 'categories', 'deleted'}.contains(nome)) {
+      throw ArgumentError('«$nome» non è una chiave libera della radice.');
+    }
+    final r = Map<String, dynamic>.from(value.extraRadice);
+    if (valore == null) {
+      r.remove(nome);
+    } else {
+      r[nome] = valore;
+    }
+    return _salva(value.con(extraRadice: r));
+  }
 
   // -------------------------------------------------------------- categorie
 

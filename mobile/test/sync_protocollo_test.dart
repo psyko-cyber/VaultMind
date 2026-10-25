@@ -1,16 +1,12 @@
-/// Il protocollo di abbinamento, provato sugli **stessi ingressi** della suite
-/// Python.
+/// I messaggi del sync, provati sugli **stessi byte** della suite Python.
 ///
-/// `tests/vettore/sync.json` è l'unica cosa che impedisce alle due
-/// implementazioni di calcolare prove diverse. Se divergessero, l'abbinamento
-/// fallirebbe sempre — e senza questo file lo si scoprirebbe con due
-/// dispositivi veri in mano, che è il momento peggiore.
+/// `tests/vettore/sync.json` fissa chiave, nonce e testo: il messaggio cifrato
+/// che esce qui deve essere identico a quello di `sync_protocol.py`, e il QR
+/// del PC deve leggersi uguale. Se divergessero, il primo collegamento
+/// fallirebbe sempre — e senza questo file lo si scoprirebbe col telefono in
+/// mano.
 ///
 ///     ..\costruisci.ps1 -Test
-// `flutter test` esegue i file in parallelo e Argon2 (time 3, 64 MB) non
-// lascia molta CPU agli altri: il limite di 30 secondi qui non c'entra niente
-// col codice in prova, scade e basta. Stessa difesa di vault_test.dart.
-@Timeout(Duration(minutes: 3))
 library;
 
 import 'dart:convert';
@@ -21,138 +17,88 @@ import 'package:vaultmind/sync_protocollo.dart';
 
 void main() {
   late Map<String, dynamic> v;
-  late Map<String, dynamic> atteso;
-  late List<int> chiave, na, nb, sfida;
+  late List<int> chiave;
 
   setUpAll(() {
     final f = File('${Directory.current.parent.path}/tests/vettore/sync.json');
     expect(f.existsSync(), isTrue, reason: 'vettore del sync non trovato');
     v = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
-    atteso = v['atteso'] as Map<String, dynamic>;
-    chiave = daEsa(v['chiave_vault'] as String);
-    na = daEsa(v['nonce_a'] as String);
-    nb = daEsa(v['nonce_b'] as String);
-    sfida = daEsa(v['sfida'] as String);
+    chiave = daEsa(v['chiave_hex'] as String);
   });
-
-  List<int> sessione() => chiaveSessione(chiave, na, nb);
-  String esa(List<int> b) =>
-      b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
 
   group('vettore condiviso con Python', () {
-    test('chiave di sessione', () {
-      expect(esa(sessione()), atteso['chiave_sessione']);
+    test('il JSON compatto è quello di Python', () {
+      expect(jsonEncode(v['dati']), v['chiaro']);
     });
 
-    test('le due prove', () {
-      final s = sessione();
-      expect(prova(s, 'A', v['codice'] as String), atteso['prova_a']);
-      expect(prova(s, 'B', v['codice'] as String), atteso['prova_b']);
+    test('cifrare dà esattamente m', () async {
+      final nonce = daEsa(v['nonce_hex'] as String);
+      expect(await cifra(chiave, v['dati'] as Map<String, dynamic>, nonce: nonce), v['m']);
     });
 
-    test('impronta di sessione', () {
-      expect(improntaSessione(sessione()), atteso['impronta_sessione']);
+    test('decifrare m ridà i dati', () async {
+      expect(await decifra(chiave, v['m'] as String), v['dati']);
     });
 
-    test('chiave verso un dispositivo', () {
-      expect(esa(chiaveVerso(chiave, v['id_peer'] as String)),
-          atteso['chiave_verso_peer']);
+    test('la stessa AAD', () {
+      expect(utf8.decode(aadSync), v['aad']);
     });
 
-    test('risposta alla sfida', () {
-      expect(rispostaSfida(chiave, v['id_peer'] as String, sfida),
-          atteso['risposta_sfida']);
+    test('il QR del PC', () {
+      final qr = v['qr'] as Map<String, dynamic>;
+      final letto = leggiQr(qr['uri'] as String);
+      expect(letto.versione, qr['v']);
+      expect(letto.idPc, qr['pc']);
+      expect(letto.nome, qr['nome']);
+      expect(esa(letto.chiave), qr['chiave_hex']);
     });
 
-    test('impronta del vault', () {
-      expect(improntaVault(chiave), atteso['impronta_vault']);
+    test('i QR che non sono del PC si rifiutano, dicendo cosa c\'era', () {
+      for (final uri in (v['qr_non_validi'] as List).cast<String>()) {
+        expect(() => leggiQr(uri), throwsFormatException, reason: uri);
+      }
+      expect(
+          () => leggiQr('https://example.com'),
+          throwsA(isA<FormatException>()
+              .having((e) => e.message, 'messaggio', contains('example.com'))));
     });
   });
 
-  group('proprietà del protocollo', () {
+  group('proprietà', () {
     final k = List<int>.generate(32, (i) => i);
-    final altra = List<int>.generate(32, (i) => i + 1);
-    final s = chiaveSessione(k, List.filled(16, 97), List.filled(16, 98));
 
-    test('i due ruoli hanno prove diverse', () {
-      // Se fossero uguali, chi riceve la prova di A potrebbe rimandarla
-      // indietro spacciandosi per B.
-      expect(prova(s, 'A', '123456'), isNot(prova(s, 'B', '123456')));
-      expect(verificaProva(s, 'B', '123456', prova(s, 'A', '123456')), isFalse);
+    test('un\'altra chiave non legge', () async {
+      final m = await cifra(k, {'t': 'ciao'});
+      expect(() => decifra(List<int>.generate(32, (i) => i + 1), m),
+          throwsA(isA<MessaggioRifiutato>()));
     });
 
-    test('il codice sbagliato non passa', () {
-      final buona = prova(s, 'A', '123456');
-      expect(verificaProva(s, 'A', '123456', buona), isTrue);
-      expect(verificaProva(s, 'A', '654321', buona), isFalse);
-    });
-
-    test('una chiave diversa non passa', () {
-      final s2 = chiaveSessione(altra, List.filled(16, 97), List.filled(16, 98));
-      expect(verificaProva(s2, 'A', '123456', prova(s, 'A', '123456')), isFalse);
-    });
-
-    test('nonce diversi danno sessioni diverse', () {
-      final a = chiaveSessione(k, List.filled(16, 97), List.filled(16, 98));
-      final b = chiaveSessione(k, List.filled(16, 97), List.filled(16, 99));
-      expect(esa(a), isNot(esa(b)));
-    });
-
-    test('i nonce non si ripetono', () {
-      final visti = <String>{};
-      for (var i = 0; i < 50; i++) {
-        visti.add(esa(nonce()));
+    test('un byte cambiato non passa', () async {
+      final grezzo = base64.decode(await cifra(k, {'t': 'ciao'}));
+      for (final i in [0, 12, grezzo.length - 1]) {
+        final rotto = [...grezzo];
+        rotto[i] ^= 1;
+        expect(() => decifra(k, base64.encode(rotto)), throwsA(isA<MessaggioRifiutato>()),
+            reason: 'posizione $i');
       }
-      expect(visti.length, 50);
     });
 
-    test('il codice ha sei cifre e varia', () {
-      final codici = <String>{};
-      for (var i = 0; i < 200; i++) {
-        final c = codiceAbbinamento();
-        expect(c.length, 6);
-        expect(RegExp(r'^\d{6}$').hasMatch(c), isTrue);
-        codici.add(c);
+    test('spazzatura dalla rete non passa', () async {
+      for (final t in ['', 'non-base64!!', base64.encode(utf8.encode('corto'))]) {
+        expect(() => decifra(k, t), throwsA(isA<MessaggioRifiutato>()), reason: t);
       }
-      expect(codici.length, greaterThan(150), reason: 'codice poco variabile');
     });
 
-    test('l\'impronta è leggibile ad alta voce', () {
-      expect(RegExp(r'^\d{3} \d{3}$').hasMatch(improntaSessione(s)), isTrue);
+    test('il nonce cambia ogni volta', () async {
+      final a = base64.decode(await cifra(k, {'t': 'ciao'}));
+      final b = base64.decode(await cifra(k, {'t': 'ciao'}));
+      expect(a.sublist(0, 12), isNot(b.sublist(0, 12)));
     });
 
-    test('l\'impronta cambia con la sessione', () {
-      final altra = chiaveSessione(k, List.filled(16, 122), List.filled(16, 98));
-      expect(improntaSessione(s), isNot(improntaSessione(altra)));
-    });
-
-    test('chiavi diverse verso dispositivi diversi', () {
-      expect(esa(chiaveVerso(k, 'aaaa')), isNot(esa(chiaveVerso(k, 'bbbb'))));
-      expect(chiaveVerso(k, 'aaaa').length, 32);
-    });
-
-    test('la sfida non si riusa fra dispositivi', () {
-      final sf = List.filled(16, 115);
-      final r = rispostaSfida(k, 'aaaa', sf);
-      expect(verificaSfida(k, 'aaaa', sf, r), isTrue);
-      expect(verificaSfida(k, 'bbbb', sf, r), isFalse);
-    });
-
-    test('l\'id del dispositivo è casuale', () {
-      final visti = <String>{};
-      for (var i = 0; i < 30; i++) {
-        visti.add(idDispositivo());
-      }
-      expect(visti.length, 30);
-    });
-
-    test('impronte vault diverse per chiavi diverse', () {
-      expect(improntaVault(k), isNot(improntaVault(altra)));
-    });
-
-    test('niente prove vuote', () {
-      expect(verificaProva(s, 'A', '123456', ''), isFalse);
-      expect(verificaProva(s, 'A', '123456', null), isFalse);
+    test('identificativi e gettoni', () {
+      expect(RegExp(r'^[0-9a-f]{16}$').hasMatch(idDispositivo()), isTrue);
+      expect(nuovaMetaSessione().length, 16);
+      expect(nuovoGettone(), isNot(nuovoGettone()));
     });
   });
 }

@@ -28,7 +28,7 @@ from .import_parse import heuristic_extract
 from .import_csv import parse_csv
 from .sync_app import SyncApp
 from .sync_net import RifiutoSync
-from . import firewall, sync_net
+from . import sync_net
 from . import __version__
 from . import aggiornamenti
 from . import llm
@@ -462,14 +462,10 @@ def unlock(body: UnlockIn):
         created = True
     S.store = store
     _rebuild_index()
-    # Il sync si apre INSIEME al vault e si chiude con lui: senza chiave non
-    # c'è niente da sincronizzare, e restare in ascolto sarebbe solo una porta
-    # aperta che non serve a nessuno.
+    # Il sync gira INSIEME al vault e si ferma con lui: senza chiave non c'è
+    # niente da sincronizzare. Il primo giro parte subito, in sottofondo: lo
+    # sblocco non deve aspettare la rete.
     SYNC.avvia()
-    # Un giro di recupero: mentre l'app era chiusa il telefono può aver
-    # aggiunto delle voci, e nessuno gliele verrebbe a chiedere. In sottofondo,
-    # perché lo sblocco non deve aspettare la rete.
-    SYNC.programma_sync(ritardo=1.5)
     return {
         "ok": True,
         "created": created,
@@ -793,25 +789,26 @@ class SetCategoryIn(BaseModel):
 
 
 # -------------------------------------------------------- sincronizzazione
-# Il motore sta in sync_app/sync_net/merge: qui ci sono solo gli endpoint.
-# L'ascoltatore vive insieme al vault (vedi /api/unlock e /api/lock) e non ha
-# niente a che vedere col server FastAPI, che resta su 127.0.0.1.
+# Il motore sta in sync_app/sync_net/merge: qui ci sono solo gli endpoint. Il
+# PC non ascolta sulla rete: chiama lui i telefoni collegati (vedi sync_net),
+# e FastAPI resta su 127.0.0.1.
 
-# Le porte si possono spostare con due variabili d'ambiente. Servono a due
-# cose: far convivere due istanze sullo stesso computer (cioè poter PROVARE il
-# sync senza avere due macchine), e cavarsela se quelle porte sono già occupate
-# da qualcos'altro. Chi non le tocca non se ne accorge.
+# Porta e indirizzi del telefono si spostano solo per provare l'app contro un
+# telefono finto sullo stesso PC (`tests/telefono_finto.py`): su 127.0.0.1,
+# perché un programma che ascolta su tutte le schede fa comparire l'avviso
+# del firewall. Chi non tocca le variabili non se ne accorge.
 _PORTA_SYNC = int(os.environ.get("VAULTMIND_SYNC_PORT", sync_net.PORTA_SYNC))
-_PORTA_SCOPERTA = int(os.environ.get("VAULTMIND_SYNC_SCOPERTA", sync_net.PORTA_SCOPERTA))
+_INDIRIZZI_PROVA = [h.strip() for h in
+                    os.environ.get("VAULTMIND_SYNC_INDIRIZZI", "").split(",") if h.strip()]
+
 
 def _vault_cambiato_da_fuori() -> None:
-    """Una fusione ha cambiato il vault mentre l'app era aperta.
+    """Il sync ha cambiato il vault mentre l'app era aperta.
 
     L'indice va rifatto, altrimenti la voce arrivata dal telefono sta nel vault
     ma la chat non la trova, e sembra che il sync non sia arrivato. Si segna e
-    basta: `_ensure_index()` lo rifà prima della prossima ricerca, e rifarlo qui
-    vorrebbe dire tenere occupato il thread dell'ascoltatore. La pagina aperta
-    se ne accorge da sola con `/api/sync/novita`.
+    basta: `_ensure_index()` lo rifà prima della prossima ricerca. La pagina
+    aperta se ne accorge da sola con `/api/sync/novita`.
     """
     S.index_dirty = True
 
@@ -820,25 +817,16 @@ SYNC = SyncApp(store_di=lambda: S.store,
                leggi_impostazioni=_load_settings,
                salva_impostazioni=_save_settings,
                porta=_PORTA_SYNC,
-               porta_scoperta=_PORTA_SCOPERTA,
-               dopo_fusione=_vault_cambiato_da_fuori)
+               dopo_fusione=_vault_cambiato_da_fuori,
+               reti=(lambda: [_INDIRIZZI_PROVA]) if _INDIRIZZI_PROVA else None)
 
 
 class SyncImpostaIn(BaseModel):
     nome: Optional[str] = None
     acceso: Optional[bool] = None
 
-class SyncOraIn(BaseModel):
-    indirizzo: str
-    porta: int = sync_net.PORTA_SYNC
-    codice: str = ""
-
-class SyncRevocaIn(BaseModel):
+class SyncScollegaIn(BaseModel):
     id: str
-
-class SyncRisolviIn(BaseModel):
-    uid: str
-    scelta: str   # "mia" | "sua"
 
 
 @app.get("/api/sync/stato")
@@ -846,150 +834,67 @@ def sync_stato():
     _require_unlocked()
     return {
         "acceso": SYNC.acceso,
-        "in_ascolto": SYNC.in_ascolto,
-        "id": SYNC.id_dispositivo,
         "nome": SYNC.nome,
-        "dispositivi": SYNC.dispositivi(),
-        "codice": SYNC.codice_attivo(),
-        "conflitti": len(SYNC.conflitti),
+        "telefoni": SYNC.telefoni(),
+        "collegamento": SYNC.stato_collegamento(),
         "ultimo": SYNC.ultimo,
     }
 
 
 @app.get("/api/sync/novita")
 def sync_novita():
-    """Com'è messo il vault, in quattro numeri. La pagina lo chiede in
-    continuazione: qui dentro non si legge il disco e non si tocca la rete.
+    """Com'è messo il sync, in pochi numeri. La pagina lo chiede in
+    continuazione: qui dentro non si tocca la rete.
 
-    Esiste perché un vault che arriva dal telefono lo applica un thread
-    dell'ascoltatore, e la pagina aperta non ha nessun modo di saperlo. Prima
-    la voce ricevuta si vedeva solo chiudendo e riaprendo l'app.
+    Esiste perché le voci che arrivano dal telefono le scrive il filo del
+    sync, e la pagina aperta non ha nessun altro modo di saperlo.
     """
     _require_unlocked()
     return {
         "revisione": SYNC.revisione,
-        "conflitti": len(SYNC.conflitti),
         "ultimo": SYNC.ultimo,
+        "telefoni": len(SYNC.telefoni()),
     }
 
 
 @app.post("/api/sync/adesso")
 def sync_adesso():
-    """Il sync subito, con tutti i dispositivi abbinati che rispondono.
-
-    È quello che fa il pulsante nella barra. Gli stessi passi del sync
-    automatico, chiamati a mano: quando uno dei due non è più sicuro di essere
-    allineato, deve poterlo verificare senza aprire nessuna sezione.
-    """
+    """Il sync subito con tutti i telefoni collegati, cercando anche chi non
+    risponde all'ultimo indirizzo. È il pulsante nella barra."""
     _require_unlocked()
-    return SYNC.sincronizza_tutti()
-
-
-@app.get("/api/sync/diagnosi")
-def sync_diagnosi():
-    """Perché non si trova nessuno. Chiesto quando la ricerca torna vuota.
-
-    Prima al suo posto c'era una riga sola — «Nessun dispositivo» — che copriva
-    cause opposte: il firewall, un router che isola i dispositivi, l'altro col
-    vault bloccato, un permesso mancante nell'APK. Il 04/08/2026 quella riga è
-    costata una serata a chi il codice ce l'aveva sotto mano.
-    """
-    _require_unlocked()
-    return firewall.diagnosi(
-        acceso=SYNC.acceso,
-        in_ascolto=SYNC.in_ascolto,
-        abbinati=len(SYNC.dispositivi()),
-        porta_sync=SYNC.porta_vera,
-        porta_scoperta=_PORTA_SCOPERTA,
-    )
-
-
-@app.post("/api/sync/firewall")
-def sync_firewall():
-    """Autorizza VaultMind nel firewall di Windows. Fa comparire l'UAC.
-
-    Non lo fa l'installer perché quello gira **senza** privilegi di proposito
-    (vedi il docstring di `firewall.py`): qui invece la conferma la si chiede
-    quando serve davvero, a chi ha già capito che qualcosa non va.
-    """
-    _require_unlocked()
-    esito = firewall.apri(SYNC.porta_vera, _PORTA_SCOPERTA)
-    if esito.get("ok"):
-        # Le regole nuove valgono per i socket già aperti, ma riaprirli costa
-        # niente e toglie di mezzo il dubbio.
-        SYNC.riavvia()
-    return esito
+    return SYNC.sincronizza_adesso()
 
 
 @app.post("/api/sync/imposta")
 def sync_imposta(body: SyncImpostaIn):
     _require_unlocked()
     SYNC.imposta(nome=body.nome, acceso=body.acceso)
-    return {"ok": True, "acceso": SYNC.acceso, "nome": SYNC.nome,
-            "in_ascolto": SYNC.in_ascolto}
+    return {"ok": True, "acceso": SYNC.acceso, "nome": SYNC.nome}
 
 
-@app.post("/api/sync/abbina_inizia")
-def sync_abbina_inizia():
-    """Apre la finestra di abbinamento e restituisce il codice da leggere
-    sull'altro dispositivo. Vale 120 secondi e 5 tentativi."""
+@app.post("/api/sync/collega")
+def sync_collega():
+    """Il QR per collegare un telefono: una chiave nuova, valida finché la
+    finestra resta aperta. Il testo del QR torna anche in chiaro, per chi
+    prova l'app con il telefono finto."""
     _require_unlocked()
-    if not SYNC.in_ascolto and not SYNC.avvia():
-        raise HTTPException(status_code=409,
-                            detail="Il sync è spento: accendilo per abbinare un dispositivo.")
-    return SYNC.apri_abbinamento()
+    try:
+        return SYNC.inizia_collegamento()
+    except RifiutoSync as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
-@app.post("/api/sync/abbina_ferma")
-def sync_abbina_ferma():
+@app.post("/api/sync/collega_ferma")
+def sync_collega_ferma():
     _require_unlocked()
-    SYNC.chiudi_abbinamento()
+    SYNC.ferma_collegamento()
     return {"ok": True}
 
 
-@app.post("/api/sync/cerca")
-def sync_cerca():
-    """Chiede sulla rete locale chi ha lo stesso vault. La domanda è firmata:
-    chi non ha la chiave non sa nemmeno riconoscerla, e non risponde."""
+@app.post("/api/sync/scollega")
+def sync_scollega(body: SyncScollegaIn):
     _require_unlocked()
-    return {"dispositivi": SYNC.cerca()}
-
-
-@app.post("/api/sync/ora")
-def sync_ora(body: SyncOraIn):
-    _require_unlocked()
-    try:
-        return SYNC.sincronizza_con(body.indirizzo, body.porta, body.codice)
-    except RifiutoSync as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-    except OSError:
-        raise HTTPException(status_code=502,
-                            detail="Non è stato possibile raggiungere quel dispositivo.")
-
-
-@app.post("/api/sync/revoca")
-def sync_revoca(body: SyncRevocaIn):
-    _require_unlocked()
-    return {"ok": SYNC.revoca(body.id)}
-
-
-@app.get("/api/sync/conflitti")
-def sync_conflitti():
-    _require_unlocked()
-    return {"conflitti": SYNC.elenco_conflitti()}
-
-
-@app.post("/api/sync/risolvi")
-def sync_risolvi(body: SyncRisolviIn):
-    _require_unlocked()
-    if body.scelta not in ("mia", "sua"):
-        raise HTTPException(status_code=400, detail="scelta non valida")
-    if not SYNC.risolvi(body.uid, body.scelta):
-        raise HTTPException(status_code=404, detail="conflitto non trovato")
-    _rebuild_index()
-    # La decisione va portata all'altro: è lui che ha la versione scartata.
-    SYNC.programma_sync()
-    return {"ok": True, "restanti": len(SYNC.conflitti)}
+    return {"ok": SYNC.scollega(body.id)}
 
 
 @app.get("/api/categories")
@@ -1241,7 +1146,7 @@ def aggiornamento_installa():
 
 @app.post("/api/lock")
 def lock():
-    SYNC.ferma()          # prima la porta, poi la chiave
+    SYNC.ferma()          # prima il sync, poi la chiave
     if S.store:
         S.store.lock()
     S.store = None

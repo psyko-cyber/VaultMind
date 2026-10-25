@@ -999,7 +999,7 @@
     <button class="voce-bin" data-tab="chat" aria-current="page"><svg class="ic" aria-hidden="true"><use href="#i-chat"/></svg><span>Chat</span></button>
     <button class="voce-bin" data-tab="db"><svg class="ic" aria-hidden="true"><use href="#i-database"/></svg><span>Database</span></button>
     <button class="voce-bin" data-tab="cat"><svg class="ic" aria-hidden="true"><use href="#i-cartella"/></svg><span>Categorie</span></button>
-    <button class="voce-bin" id="binSync"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg><span>Sincronizza</span><span id="syncBadge" class="conta hidden"></span></button>
+    <button class="voce-bin" id="binSync"><svg class="ic" aria-hidden="true"><use href="#i-sync"/></svg><span>Sincronizza</span></button>
     <div class="bin-vuoto"></div>
     <button class="voce-bin" id="binSettings"><svg class="ic" aria-hidden="true"><use href="#i-impostazioni"/></svg><span>Impostazioni</span></button>
     <button class="voce-bin" id="lockAgain" title="Blocca il vault"><svg class="ic" aria-hidden="true"><use href="#i-lucchetto"/></svg><span>Blocca</span></button>
@@ -1269,56 +1269,54 @@
 </div>
 
 <!-- IMPORT MODAL -->
-<!-- SINCRONIZZAZIONE — la porta si apre solo mentre il vault è sbloccato, e non
-     è quella del server: questo parla con la rete locale, quello resta sul
-     loopback. Chi non ha la chiave di questo vault non riceve nemmeno una
-     risposta: per lui, su questa rete, VaultMind non esiste. -->
+<!-- SINCRONIZZAZIONE col telefono. Il PC non ascolta sulla rete: chiama lui i
+     telefoni collegati, quindi il firewall di Windows non c'entra. Ci si
+     collega inquadrando un QR che porta una chiave a caso: da lì ogni
+     messaggio è cifrato con quella, e chi non l'ha inquadrato non legge
+     niente. Vedi sync_app.py. -->
 <div id="syncModal" class="modal hidden">
   <div class="card modalcard larga rise">
     <div class="mhead"><span><svg class="ic ic-20" aria-hidden="true"><use href="#i-sync"/></svg>Sincronizza</span><button id="closeSync" class="iconbtn" aria-label="Chiudi"><svg class="ic" aria-hidden="true"><use href="#i-chiudi"/></svg></button></div>
 
     <div class="crit-row" style="margin-top:0">
       <div class="txt">
-        <div class="t1">Sincronizzazione sulla rete locale</div>
+        <div class="t1">Sincronizzazione col telefono</div>
         <div class="t2" id="syncStato">…</div>
       </div>
-      <div class="sw" id="swSync"><i></i></div>
+      <div class="sw" id="swSync" role="switch" aria-label="Sincronizzazione col telefono"><i></i></div>
     </div>
 
     <div style="margin-top:12px">
-      <label class="lbl">Nome di questo dispositivo</label>
-      <input id="syncNome" class="field" style="font-family:var(--body)" placeholder="es. PC di casa">
+      <label class="lbl" for="syncNome">Nome di questo PC, come lo vedrà il telefono</label>
+      <input id="syncNome" class="field" style="font-family:var(--body)" placeholder="es. PC di casa" maxlength="40">
     </div>
-
-    <div id="syncConflitti" class="hidden" style="margin-top:16px"></div>
-
-    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
-      <button id="syncCerca" class="iconbtn"><svg class="ic ic-16" aria-hidden="true"><use href="#i-cerca"/></svg>Cerca dispositivi</button>
-      <button id="syncAbbina" class="iconbtn"><svg class="ic ic-16" aria-hidden="true"><use href="#i-piu"/></svg>Abbina un dispositivo</button>
-    </div>
-
-    <div id="syncCodice" class="hidden" style="margin-top:14px;padding:14px;border-radius:12px;
-         background:color-mix(in srgb,var(--acc) 7%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);text-align:center">
-      <div style="font-size:13px;color:var(--t3)">Codice di abbinamento</div>
-      <div id="syncCodiceVal" style="font-family:var(--mono);font-size:34px;letter-spacing:8px;color:var(--acc);margin:8px 0"></div>
-      <div style="font-size:12px;color:var(--t2);line-height:1.55">
-        Scrivilo sull'altro dispositivo entro <b id="syncSecondi">120</b> secondi.<br>
-        Poi <b>controlla che le sei cifre dell'impronta siano identiche</b> sui due schermi:
-        è la verifica che nessuno si sia messo in mezzo.
-      </div>
-    </div>
-
-    <div id="syncTrovati" style="margin-top:14px"></div>
 
     <div style="margin-top:18px">
-      <div style="font-size:13px;color:var(--t3);margin-bottom:8px">Dispositivi fidati</div>
-      <div id="syncFidati"></div>
+      <div style="font-size:13px;color:var(--t3);margin-bottom:8px">Telefoni collegati</div>
+      <div id="syncTelefoni"></div>
+    </div>
+
+    <div id="syncQr" class="hidden" style="margin-top:14px;padding:16px;border-radius:12px;text-align:center;
+         background:color-mix(in srgb,var(--acc) 7%,transparent);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent)">
+      <!-- Nero su bianco con qualunque tema: un QR chiaro su fondo scuro molte
+           fotocamere non lo leggono. -->
+      <div id="syncQrImg" style="width:232px;height:232px;margin:0 auto;background:#fff;border-radius:10px;padding:6px;box-sizing:border-box"></div>
+      <div id="syncQrIstruzioni" style="font-size:13px;color:var(--t1);line-height:1.6;margin-top:12px">
+        Sul telefono apri VaultMind e vai in<br>
+        <b>Impostazioni › Sincronizza › Collega al PC</b>, poi inquadra il QR.
+      </div>
+      <div id="syncQrStato" role="status" style="font-size:12.5px;color:var(--t3);margin-top:8px">In attesa del telefono…</div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:16px;flex-wrap:wrap">
+      <button id="syncCollega" class="iconbtn"><svg class="ic ic-16" aria-hidden="true"><use href="#i-qr"/></svg>Collega un telefono</button>
     </div>
 
     <p class="hint" style="margin-top:16px">
-      I due dispositivi devono essere <b>sulla stessa rete</b> e con il vault <b>aperto</b>.
-      Fuori casa, una VPN verso casa (WireGuard sul router) rimette il telefono
-      dentro la rete: per il sync è identico all'essere sul divano.
+      Telefono e PC devono essere <b>sulla stessa WiFi</b>, con VaultMind <b>aperto</b>
+      sul telefono: il PC lo trova da solo e si allineano ogni pochi secondi.
+      Se una voce cambia su tutti e due, vince l'ultima modifica.
+      I dati viaggiano cifrati con una chiave che hanno soltanto i dispositivi collegati.
     </p>
   </div>
 </div>
@@ -3072,8 +3070,8 @@ async function caricaDispositivi(){
   try{ const r=await fetch("/api/pair/list"); if(r.ok) est=await r.json(); }catch(e){}
   box.innerHTML="";
   const righe=[];
-  (stato.dispositivi||[]).forEach(d=> righe.push(["dispositivo", d.nome||"Dispositivo",
-    d.quando ? "Sincronizzato "+quandoFa(d.quando) : "Abbinato, non ancora sincronizzato"]));
+  (stato.telefoni||[]).forEach(d=> righe.push(["dispositivo", d.nome||"Telefono",
+    d.quando ? "Sincronizzato "+quandoFa(d.quando) : "Collegato, non ancora sincronizzato"]));
   (est.extensions||[]).forEach(e=> righe.push(["estensione", e.name||"Estensione del browser", "Legge soltanto, non scrive"]));
   if(!righe.length){ vuotoCtx(box, "Solo questo computer. Telefono ed estensione si abbinano da Sincronizza e Impostazioni."); return; }
   righe.forEach(([icona,nome,sotto])=>{
@@ -3086,15 +3084,15 @@ async function caricaDispositivi(){
 }
 
 /* ================= SINCRONIZZAZIONE =================
-   L'ascoltatore vive insieme al vault: si apre allo sblocco e si chiude al
-   blocco. I nomi dei dispositivi arrivano DALLA RETE, quindi si scrivono
-   sempre con textContent — mai con innerHTML. */
+   Il giro lo fa il server da solo (sync_app.py), ogni pochi secondi: qui ci
+   sono solo le parole per raccontarlo. I nomi dei telefoni arrivano DALLA
+   RETE, quindi si scrivono sempre con textContent — mai con innerHTML. */
 let SYNC_TIMER = null;
 
 /* Una riga che compare in basso e se ne va da sola.
    Serve al sync, che parla quando NON glielo hai chiesto: un alert fermerebbe
    quello che stai facendo, e addAI() lascerebbe nella chat una riga per
-   sempre. Le cose importanti (i conflitti) restano più a lungo. */
+   sempre. Le cose importanti restano più a lungo. */
 let _avvisoTimer = null;
 function avviso(testo, importante){
   let box = $("#avviso");
@@ -3115,9 +3113,8 @@ function avviso(testo, importante){
 }
 
 /* ---- accorgersi di quello che ARRIVA ----
-   Un vault che arriva dal telefono lo applica un thread dell'ascoltatore,
-   dentro il server: la pagina non ha nessun modo di saperlo, e prima la voce
-   ricevuta si vedeva solo chiudendo e riaprendo l'app. Si guarda un contatore,
+   Le voci che arrivano dal telefono le scrive il filo del sync, dentro il
+   server: la pagina non ha nessun modo di saperlo. Si guarda un contatore,
    non il vault: la risposta non legge il disco e non tocca la rete. */
 let SYNC_REV = null, SYNC_VIGILE = null;
 
@@ -3126,13 +3123,13 @@ function mostraTastoSync(vale){
 }
 
 /* Allo sblocco non si è ancora aperta la sezione Sincronizza, e il pulsante
-   deve sapere lo stesso se c'è qualcuno con cui parlare. */
+   deve sapere lo stesso se c'è un telefono con cui parlare. */
 async function aggiornaTastoSync(){
   try{
     const r = await fetch("/api/sync/stato");
     if(!r.ok) return;
     const j = await r.json();
-    mostraTastoSync(j.acceso && (j.dispositivi || []).length > 0);
+    mostraTastoSync(j.acceso && (j.telefoni || []).length > 0);
   }catch(e){}
 }
 
@@ -3140,6 +3137,14 @@ function vigilaSync(){
   clearInterval(SYNC_VIGILE);
   SYNC_REV = null;                       // il primo giro fa solo da riferimento
   SYNC_VIGILE = setInterval(controllaNovita, 5000);
+}
+
+function raccontaPezzi(u){
+  const pezzi = [];
+  if(u.aggiunte) pezzi.push(u.aggiunte === 1 ? "1 voce nuova" : `${u.aggiunte} voci nuove`);
+  if(u.aggiornate) pezzi.push(u.aggiornate === 1 ? "1 aggiornata" : `${u.aggiornate} aggiornate`);
+  if(u.cancellate) pezzi.push(u.cancellate === 1 ? "1 rimossa" : `${u.cancellate} rimosse`);
+  return pezzi;
 }
 
 async function controllaNovita(){
@@ -3151,26 +3156,21 @@ async function controllaNovita(){
     j = await r.json();
   }catch(e){ return; }                   // la pagina non deve fare rumore per questo
 
-  aggiornaBadge(j.conflitti || 0);
   if(SYNC_REV === null){ SYNC_REV = j.revisione; return; }
   if(j.revisione === SYNC_REV) return;
   SYNC_REV = j.revisione;
 
   await loadDb();                        // l'elenco aperto era già vecchio
+  scriviConteggio(DB_ENTRIES.length);    // e anche il numero in alto
   const u = j.ultimo || {};
-  const pezzi = [];
-  if(u.aggiunte) pezzi.push(`${u.aggiunte} in arrivo`);
-  if(u.aggiornate) pezzi.push(`${u.aggiornate} aggiornate`);
-  if(u.cancellate) pezzi.push(`${u.cancellate} rimosse`);
-  if(!pezzi.length && !j.conflitti) return;   // cambiato per mano nostra: zitti
-  const da = u.con ? `Da ${u.con}: ` : "";
-  if(j.conflitti) avviso(`${da}${pezzi.concat([`${j.conflitti} da decidere`]).join(" · ")}. Apri Sincronizza.`, true);
-  else avviso(`${da}${pezzi.join(" · ")}.`);
+  const pezzi = raccontaPezzi(u);
+  if(!pezzi.length) return;
+  avviso(`${u.con ? `Da ${u.con}: ` : ""}${pezzi.join(" · ")}.`);
 }
 
-/* Il pulsante in barra: lo stesso lavoro del sync automatico, chiesto a mano.
-   Serve quando uno dei due non è più sicuro di essere allineato e non vuole
-   aprire nessuna sezione per verificarlo. */
+/* Il pulsante in barra: un giro subito, cercando anche il telefono che non
+   risponde all'ultimo indirizzo. Serve quando non si è sicuri di essere
+   allineati e non si vuole aprire nessuna sezione per verificarlo. */
 $("#syncNow").addEventListener("click", async ()=>{
   const b = $("#syncNow");
   if(b.disabled) return;
@@ -3179,331 +3179,128 @@ $("#syncNow").addEventListener("click", async ()=>{
   b.disabled = false; b.innerHTML = ic("sync");
   if(!ok){ avviso(j.detail || "Sincronizzazione non riuscita.", true); return; }
   if(!j.ok){ avviso(j.motivo || "Sincronizzazione non riuscita.", true); return; }
-  if(!j.abbinati){
-    avviso("Nessun dispositivo abbinato in linea: accendi l'app sull'altro e sblocca il vault.", true);
-    return;
-  }
-  const errori = (j.esiti || []).filter(e=>e.errore);
-  if(errori.length){ avviso(errori[0].errore, true); return; }
+  const tel = j.telefoni || [];
+  if(!tel.length){ avviso("Nessun telefono collegato: si collega da Sincronizza.", true); return; }
+  const raggiunti = tel.filter(t=>t.esito === "allineato" || t.esito === "sincronizzato");
+  if(!raggiunti.length){ avviso(tel[0].messaggio || "Il telefono non risponde.", true); return; }
+  const prima = SYNC_REV;
   await controllaNovita();
-  const mosso = (j.esiti || []).some(e=>e.aggiunte||e.aggiornate||e.cancellate||e.conflitti);
-  if(!mosso) avviso("Era già tutto allineato.");
-  await caricaSync();
+  if(SYNC_REV === prima) avviso("Era già tutto allineato.");
+  if(!$("#syncModal").classList.contains("hidden")) caricaSync();
 });
 
 async function openSync(){
   $("#syncModal").classList.remove("hidden");
   await caricaSync();
+  /* Finché la finestra è aperta si guarda com'è messo: chi ha appena
+     inquadrato il QR deve vedere «collegato» senza toccare niente. */
+  clearInterval(SYNC_TIMER);
+  SYNC_TIMER = setInterval(caricaSync, 2000);
 }
 
+let SYNC_COLLEGATO_VISTO = null;
 async function caricaSync(){
   const r = await fetch("/api/sync/stato");
   if(!r.ok) return;
   const j = await r.json();
   setSw($("#swSync"), !!j.acceso);
-  $("#syncNome").value = j.nome || "";
+  if(document.activeElement !== $("#syncNome")) $("#syncNome").value = j.nome || "";
+  const tel = j.telefoni || [];
   $("#syncStato").textContent = !j.acceso
-    ? "Spenta. Nessuna porta aperta, questo dispositivo non risponde a nessuno."
-    : (j.in_ascolto
-        ? "Accesa: questo dispositivo risponde solo a chi ha la chiave di questo vault."
-        : "Accesa, ma la porta non si è aperta (forse è occupata). Il sync a mano funziona lo stesso.");
-  if(j.codice) mostraCodice(j.codice, 120); else nascondiCodice();
-  renderFidati(j.dispositivi || []);
-  aggiornaBadge(j.conflitti || 0);
-  mostraTastoSync(j.acceso && (j.dispositivi || []).length > 0);
-  caricaDispositivi();                   // il contesto mostra gli stessi dispositivi
-  if(j.conflitti) await caricaConflitti(); else $("#syncConflitti").classList.add("hidden");
+    ? "Spenta: il PC non cerca nessun telefono."
+    : (tel.length ? "Accesa: il PC si allinea da solo coi telefoni collegati."
+                  : "Accesa. Collega un telefono per cominciare.");
+  renderTelefoni(tel);
+  mostraTastoSync(j.acceso && tel.length > 0);
+  caricaDispositivi();                   // il contesto mostra gli stessi telefoni
+
+  const c = j.collegamento;
+  if(!c){ $("#syncQr").classList.add("hidden"); return; }
+  /* Visibile finché il server dice che il QR vale. Lo decide la risposta e
+     non il clic: una richiesta partita prima del clic e arrivata dopo lo
+     nascondeva appena comparso. */
+  $("#syncQr").classList.remove("hidden");
+  if(c.scaduto){
+    $("#syncQrImg").innerHTML = "";
+    $("#syncQrImg").style.display = "none";
+    $("#syncQrIstruzioni").classList.add("hidden");
+    $("#syncQrStato").textContent = "Il QR è scaduto: premi di nuovo «Collega un telefono».";
+    return;
+  }
+  if(c.collegato){
+    $("#syncQrImg").innerHTML = "";
+    $("#syncQrImg").style.display = "none";
+    $("#syncQrIstruzioni").classList.add("hidden");
+    const nome = c.collegato.nome || "Il telefono";
+    $("#syncQrStato").textContent = `Collegato: ${nome}. Da adesso le voci passano da sole.`;
+    $("#syncQrStato").style.color = "var(--ok)";
+    if(SYNC_COLLEGATO_VISTO !== c.collegato.id){
+      SYNC_COLLEGATO_VISTO = c.collegato.id;
+      avviso(`Collegato: ${nome}.`);
+    }
+  }
 }
 
-function aggiornaBadge(n){
-  const b = $("#syncBadge");
-  b.textContent = n || "";
-  b.classList.toggle("hidden", !n);
-  $("#binSync").setAttribute("aria-label", n ? `Sincronizza, ${n} da decidere` : "Sincronizza");
+function descriviTelefono(t){
+  if(t.esito === "sconosciuto" || t.esito === "assente") return t.messaggio;
+  if(t.esito === "attesa") return "Collegato. Lo cerco sulla rete…";
+  const quando = t.quando ? ` · ultimo scambio ${quandoFa(t.quando)}` : "";
+  if(t.esito === "sincronizzato"){
+    const qui = raccontaPezzi(t.sul_pc || {});
+    const la = raccontaPezzi(t.sul_telefono || {});
+    const pezzi = [];
+    if(qui.length) pezzi.push("qui: " + qui.join(", "));
+    if(la.length) pezzi.push("sul telefono: " + la.join(", "));
+    return `Sincronizzato${pezzi.length ? " (" + pezzi.join("; ") + ")" : ""}${quando}`;
+  }
+  return `Allineato${quando}`;
 }
 
-function renderFidati(lista){
-  const box = $("#syncFidati"); box.innerHTML = "";
+function renderTelefoni(lista){
+  const box = $("#syncTelefoni"); box.innerHTML = "";
   if(!lista.length){
     const p = document.createElement("div");
     p.style.cssText = "font-size:12.5px;color:var(--t3);line-height:1.55";
-    p.textContent = "Nessuno ancora. «Abbina un dispositivo» mostra un codice da scrivere sull'altro.";
+    p.textContent = "Nessuno ancora. «Collega un telefono» mostra un QR da inquadrare.";
     box.appendChild(p); return;
   }
   lista.forEach(d=>{
     const r = document.createElement("div"); r.className = "catvoce";
-    const t = document.createElement("span"); t.className = "t";
-    t.textContent = d.nome || "dispositivo";
-    const q = document.createElement("span");
-    q.style.cssText = "font-size:11px;color:var(--t3);margin-right:8px";
-    q.textContent = d.quando ? new Date(d.quando*1000).toLocaleDateString() : "";
+    r.style.alignItems = "flex-start";
+    const testo = document.createElement("span"); testo.className = "t";
+    testo.style.whiteSpace = "normal";   // il motivo di un «non risponde» va letto intero
+    const n = document.createElement("b"); n.textContent = d.nome || "Telefono";
+    const s = document.createElement("small");
+    s.style.cssText = "display:block;font-weight:400;font-size:11.5px;line-height:1.5;margin-top:2px;color:"
+      + (d.esito === "assente" || d.esito === "sconosciuto" ? "var(--warn)" : "var(--t3)");
+    s.textContent = descriviTelefono(d);
+    testo.append(n, s);
     const b = document.createElement("button");
-    b.className = "iconbtn"; b.textContent = "Revoca";
-    b.style.cssText = "padding:4px 10px;font-size:12px;border-color:var(--err);color:var(--err)";
+    b.className = "iconbtn"; b.textContent = "Scollega";
+    b.style.cssText = "padding:4px 10px;font-size:12px;border-color:var(--err);color:var(--err);flex:none";
     b.addEventListener("click", async ()=>{
-      if(!confirm(`Revocare "${d.nome}"?\n\nDa quel momento non potrà più sincronizzare senza essere abbinato di nuovo.`)) return;
-      await api("/api/sync/revoca", {id: d.id});
+      if(!confirm(`Scollegare "${d.nome}"?\n\nLe voci restano dove sono, su tutti e due. Per sincronizzare di nuovo servirà un QR nuovo.`)) return;
+      await api("/api/sync/scollega", {id: d.id});
       caricaSync();
     });
-    r.append(t, q, b);
+    r.append(testo, b);
     box.appendChild(r);
   });
 }
 
-function mostraCodice(codice, secondi){
-  $("#syncCodice").classList.remove("hidden");
-  $("#syncCodiceVal").textContent = codice;
-  clearInterval(SYNC_TIMER);
-  let s = secondi;
-  $("#syncSecondi").textContent = s;
-  SYNC_TIMER = setInterval(()=>{
-    s--; $("#syncSecondi").textContent = Math.max(0, s);
-    if(s <= 0) nascondiCodice();
-  }, 1000);
-}
-
-function nascondiCodice(){
-  clearInterval(SYNC_TIMER); SYNC_TIMER = null;
-  $("#syncCodice").classList.add("hidden");
-}
-
-$("#syncAbbina").addEventListener("click", async ()=>{
-  const {ok,j} = await api("/api/sync/abbina_inizia", {});
-  if(!ok){ alert(j.detail || "Non è stato possibile aprire l'abbinamento."); return; }
-  mostraCodice(j.codice, j.secondi);
-  cercaDispositivi();   // l'altro di solito è già lì che aspetta
+$("#syncCollega").addEventListener("click", async ()=>{
+  const {ok,j} = await api("/api/sync/collega", {});
+  if(!ok){ avviso(j.detail || "Non è stato possibile preparare il QR.", true); return; }
+  SYNC_COLLEGATO_VISTO = null;
+  const img = $("#syncQrImg");
+  img.style.display = "";
+  img.innerHTML = j.svg;                 // fatto dal server, nessun dato dalla rete
+  $("#syncQrIstruzioni").classList.remove("hidden");
+  $("#syncQrStato").textContent = "In attesa del telefono…";
+  $("#syncQrStato").style.color = "";
+  $("#syncQr").classList.remove("hidden");
+  caricaSync();
 });
-
-$("#syncCerca").addEventListener("click", cercaDispositivi);
-
-async function cercaDispositivi(){
-  const box = $("#syncTrovati");
-  box.innerHTML = "";
-  const att = document.createElement("div");
-  att.style.cssText = "font-size:12.5px;color:var(--t3)";
-  att.textContent = "Cerco sulla rete locale…";
-  box.appendChild(att);
-
-  const {ok,j} = await api("/api/sync/cerca", {});
-  box.innerHTML = "";
-  const lista = (ok && j.dispositivi) || [];
-  if(!lista.length){ await mostraDiagnosi(box); return; }
-  lista.forEach(d=>{
-    const r = document.createElement("div"); r.className = "catvoce";
-    const t = document.createElement("span"); t.className = "t";
-    t.textContent = d.nome || "dispositivo";
-    const w = document.createElement("span");
-    w.style.cssText = "font-size:11px;color:var(--t3);margin-right:8px";
-    w.textContent = d.conosciuto ? "già abbinato" : (d.abbinabile ? "pronto ad abbinarsi" : "da abbinare");
-    const b = document.createElement("button");
-    b.className = "iconbtn"; b.textContent = d.conosciuto ? "Sincronizza" : "Abbina";
-    b.style.cssText = "padding:4px 10px;font-size:12px";
-    b.addEventListener("click", ()=>{
-      if(d.conosciuto) sincronizzaCon(d, b, "");
-      else chiediCodice(r, d);
-    });
-    r.append(t, w, b);
-    box.appendChild(r);
-  });
-}
-
-/* ---- «Nessun dispositivo» non è una risposta ----
-   Quella riga sola copriva cause opposte — il firewall, un router che isola i
-   dispositivi, l'altro col vault bloccato, un permesso mancante nell'APK — e
-   il 04/08/2026 e' costata una serata a chi il codice ce l'aveva sotto mano.
-   Qui si separano i fatti che conosciamo (il sync spento, la porta occupata,
-   nessuno abbinato) dalle cose che possiamo solo suggerire di guardare. */
-async function mostraDiagnosi(box){
-  let d = {};
-  try{
-    const r = await fetch("/api/sync/diagnosi");
-    if(r.ok) d = await r.json();
-  }catch(e){}
-
-  const t = document.createElement("div");
-  t.style.cssText = "font-size:12.5px;color:var(--t1);margin-bottom:6px";
-  t.textContent = "Nessun dispositivo ha risposto.";
-  box.appendChild(t);
-
-  (d.certi || []).forEach(m=>{
-    const p = document.createElement("div");
-    p.style.cssText = "font-size:12.5px;color:var(--warn);line-height:1.55;margin-bottom:4px";
-    p.textContent = "• " + m;
-    box.appendChild(p);
-  });
-
-  (d.da_provare || []).forEach(m=>{
-    const p = document.createElement("div");
-    p.style.cssText = "font-size:12.5px;color:var(--t3);line-height:1.55;margin-bottom:4px";
-    p.textContent = "• " + m;
-    box.appendChild(p);
-  });
-
-  const b = document.createElement("button");
-  b.className = "iconbtn";
-  b.style.cssText = "margin-top:8px;padding:5px 12px;font-size:12px";
-  b.textContent = "Sistema il firewall di Windows";
-  b.addEventListener("click", ()=>sistemaFirewall(b));
-  box.appendChild(b);
-
-  /* L'indirizzo scritto a mano. Serve quando la domanda non può arrivare pur
-     essendoci la strada: attraverso una VPN i broadcast non passano — è un
-     collegamento punto-punto instradato — e lo stesso succede sulle reti che
-     isolano i dispositivi fra loro. Una volta collegati l'indirizzo se lo
-     ricorda l'app, quindi questo campo si usa una volta sola. */
-  const riga = document.createElement("div");
-  riga.style.cssText = "margin-top:12px;padding-top:10px;border-top:1px solid var(--brd)";
-  const et = document.createElement("div");
-  et.style.cssText = "font-size:12.5px;color:var(--t3);line-height:1.55;margin-bottom:6px";
-  et.textContent = "Sai già dov'è? Scrivi il suo indirizzo: da una VPN la domanda "
-                 + "non passa, ma il collegamento sì. Poi l'app se lo ricorda.";
-  const inp = document.createElement("input");
-  inp.className = "field";
-  inp.placeholder = "192.168.5.53";
-  inp.style.cssText = "width:150px;padding:6px 10px;font-family:var(--mono)";
-  const vai = document.createElement("button");
-  vai.className = "iconbtn";
-  vai.style.cssText = "padding:4px 10px;font-size:12px;margin-left:8px";
-  vai.textContent = "Sincronizza";
-  const parti = async ()=>{
-    const ind = inp.value.trim();
-    if(!ind) return;
-    vai.disabled = true; vai.textContent = "…";
-    const {ok,j} = await api("/api/sync/ora", {indirizzo: ind, porta: d.porta_sync || 8732});
-    vai.disabled = false; vai.textContent = "Sincronizza";
-    if(!ok){ avviso(j.detail || "Non è stato possibile raggiungerlo.", true); return; }
-    await controllaNovita();
-    avviso(`Sincronizzato con ${j.con || ind}.`);
-    caricaSync();
-  };
-  vai.addEventListener("click", parti);
-  inp.addEventListener("keydown", e=>{ if(e.key === "Enter") parti(); });
-  riga.append(et, inp, vai);
-  box.appendChild(riga);
-
-  if(d.ip){
-    const n = document.createElement("div");
-    n.style.cssText = "font-size:11px;color:var(--t3);margin-top:8px";
-    n.textContent = `Questo PC è ${d.ip}, in ascolto sulla porta ${d.porta_sync}.`;
-    box.appendChild(n);
-  }
-}
-
-/* Windows chiede conferma da solo la prima volta che un programma si mette in
-   ascolto — ma a chi ha chiuso quell'avviso non lo chiede mai piu', e il sync
-   resta muto per sempre. Questa e' la strada per tornare a chiederlo. */
-async function sistemaFirewall(bottone){
-  bottone.disabled = true; bottone.textContent = "Attendo la conferma di Windows…";
-  const {ok,j} = await api("/api/sync/firewall", {});
-  bottone.disabled = false; bottone.textContent = "Sistema il firewall di Windows";
-  if(!ok || !j.ok){
-    avviso((j && (j.motivo || j.detail)) || "Non è stato possibile scrivere la regola.", true);
-    return;
-  }
-  avviso("Fatto: VaultMind ora può ricevere sulla rete di casa.");
-  cercaDispositivi();
-}
-
-/* Il codice si chiede con un campo in linea, non con prompt(): la finestra
-   nativa non garantisce quel dialogo, e resterebbe un pulsante che non fa
-   niente su un'installazione e funziona sull'altra. Stessa scelta delle
-   categorie. */
-function chiediCodice(riga, d){
-  riga.innerHTML = "";
-  const t = document.createElement("span");
-  t.style.cssText = "font-size:12.5px;color:var(--t2);margin-right:8px";
-  t.textContent = "Codice mostrato su quel dispositivo:";
-  const inp = document.createElement("input");
-  inp.className = "field"; inp.inputMode = "numeric"; inp.maxLength = 6;
-  inp.placeholder = "000000";
-  inp.style.cssText = "width:110px;padding:6px 10px;font-family:var(--mono);letter-spacing:3px";
-  const ok = document.createElement("button");
-  ok.className = "iconbtn"; ok.textContent = "Abbina";
-  ok.style.cssText = "padding:4px 10px;font-size:12px;margin-left:8px";
-  const vai = ()=>{
-    const c = inp.value.trim();
-    if(c.length === 6) sincronizzaCon(d, ok, c);
-  };
-  ok.addEventListener("click", vai);
-  inp.addEventListener("keydown", (e)=>{ if(e.key === "Enter") vai(); });
-  riga.append(t, inp, ok);
-  inp.focus();
-}
-
-async function sincronizzaCon(d, bottone, codice){
-  bottone.disabled = true; bottone.textContent = "…";
-  const {ok,j} = await api("/api/sync/ora",
-                           {indirizzo: d.indirizzo, porta: d.porta, codice: codice || ""});
-  bottone.disabled = false; bottone.textContent = "Sincronizza";
-  if(!ok){ alert(j.detail || "Sincronizzazione non riuscita."); return; }
-  const pezzi = [];
-  if(j.aggiunte) pezzi.push(`${j.aggiunte} in arrivo`);
-  if(j.aggiornate) pezzi.push(`${j.aggiornate} aggiornate`);
-  if(j.cancellate) pezzi.push(`${j.cancellate} rimosse`);
-  if(j.conflitti) pezzi.push(`${j.conflitti} da decidere`);
-  addAI(pezzi.length ? `Sincronizzato con ${j.con}: ${pezzi.join(" · ")}.`
-                     : `Sincronizzato con ${j.con}: era già tutto allineato.`);
-  await loadDb();
-  await caricaSync();
-}
-
-async function caricaConflitti(){
-  const r = await fetch("/api/sync/conflitti");
-  if(!r.ok) return;
-  const {conflitti} = await r.json();
-  const box = $("#syncConflitti");
-  box.classList.toggle("hidden", !conflitti.length);
-  box.innerHTML = "";
-  if(!conflitti.length) return;
-
-  const testa = document.createElement("div");
-  testa.className = "crit-warn";
-  testa.innerHTML = "<b>Da decidere.</b> Queste voci sono state cambiate su tutti e due i "
-                  + "dispositivi. Finché non scegli, ognuno tiene la propria: niente è andato perso.";
-  box.appendChild(testa);
-
-  conflitti.forEach(c=>{
-    const card = document.createElement("div");
-    card.style.cssText = "border:1px solid var(--brd);border-radius:12px;padding:12px;margin-top:10px;background:var(--s1)";
-    const t = document.createElement("div");
-    t.style.cssText = "font-weight:600;color:var(--t1);font-size:14px";
-    t.textContent = c.titolo;
-    const m = document.createElement("div");
-    m.style.cssText = "font-size:11.5px;color:var(--t3);margin-top:2px";
-    m.textContent = {
-      "entrambi-modificata": "modificata su tutti e due",
-      "modificata-qui-cancellata-la": "modificata qui, cancellata sull'altro",
-      "cancellata-qui-modificata-la": "cancellata qui, modificata sull'altro",
-    }[c.motivo] || c.motivo;
-    card.append(t, m);
-
-    const riga = document.createElement("div");
-    riga.style.cssText = "display:flex;gap:8px;margin-top:10px;flex-wrap:wrap";
-    riga.append(bottoneScelta(c, "mia", "Tieni la mia", c.mia),
-                bottoneScelta(c, "sua", "Tieni la sua", c.sua));
-    card.appendChild(riga);
-    box.appendChild(card);
-  });
-}
-
-function bottoneScelta(c, quale, etichetta, versione){
-  const b = document.createElement("button");
-  b.className = "iconbtn";
-  b.style.cssText = "padding:8px 12px;font-size:12.5px;text-align:left;flex:1;min-width:180px";
-  // Si mostrano le ETICHETTE dei campi, mai i valori: scegliere fra due
-  // versioni non deve costringere a farsi stampare due password sullo schermo.
-  const dettaglio = versione
-    ? `${(versione.campi||[]).join(" · ") || "nessun campo"}`
-    : "cancellata";
-  b.textContent = `${etichetta} — ${dettaglio}`;
-  b.addEventListener("click", async ()=>{
-    const {ok,j} = await api("/api/sync/risolvi", {uid: c.uid, scelta: quale});
-    if(!ok){ alert(j.detail || "Non riuscito."); return; }
-    await loadDb();
-    await caricaSync();
-  });
-  return b;
-}
 
 $("#swSync").addEventListener("click", async ()=>{
   const acceso = !$("#swSync").classList.contains("on");
@@ -3518,8 +3315,11 @@ $("#syncNome").addEventListener("change", async ()=>{
 });
 
 $("#closeSync").addEventListener("click", ()=>{
-  nascondiCodice();
-  api("/api/sync/abbina_ferma", {});   // chiudendo, la finestra si chiude davvero
+  clearInterval(SYNC_TIMER); SYNC_TIMER = null;
+  // Chiudendo, il QR smette di valere: una chiave che resta valida senza
+  // che nessuno la guardi è una porta lasciata aperta.
+  api("/api/sync/collega_ferma", {});
+  $("#syncQr").classList.add("hidden");
   $("#syncModal").classList.add("hidden");
 });
 

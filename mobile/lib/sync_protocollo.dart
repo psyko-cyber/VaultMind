@@ -1,99 +1,52 @@
-/// Abbinamento e autenticazione fra dispositivi. Senza socket.
-///
-/// Qui c'è **solo il ragionamento**: come due dispositivi si dimostrano di
-/// essere tuoi, come si accorgono di qualcuno in mezzo, e come si riconoscono
-/// le volte successive. La rete sta altrove, la fusione dei dati in
-/// `fusione.dart`.
+/// Come parlano PC e telefono: la chiave del QR e i messaggi cifrati. Senza
+/// socket.
 ///
 /// Gemello di `VaultMind_Windows/app/sync_protocol.py`, legato a quello dal
-/// vettore `tests/vettore/sync.json`: se le due implementazioni calcolassero
-/// prove diverse, l'abbinamento fallirebbe **sempre** — e senza il vettore lo
-/// si scoprirebbe con due dispositivi veri in mano.
+/// vettore `tests/vettore/sync.json`: stessa chiave e stesso nonce devono dare
+/// gli stessi byte nelle due lingue, o il primo collegamento fallirebbe sempre.
 ///
-/// ## L'idea, in una riga
+/// ## Perché è così semplice (ottobre 2026)
 ///
-/// **Il segreto condiviso c'è già.** Due dispositivi che aprono lo stesso vault
-/// derivano la stessa chiave a 256 bit dalla master password. Non serve
-/// inventare uno scambio di chiavi: basta dimostrare di saperla, senza mai
-/// trasmetterla.
+/// Il sync di prima ricavava le chiavi dalla master password e chiedeva un
+/// codice di 6 cifre: un vault nato sul telefono, anche con la stessa
+/// password, non poteva abbinarsi al PC in nessun modo. Adesso la fiducia la
+/// decide **chi inquadra il QR**: il PC genera 32 byte a caso e li mostra, il
+/// telefono li legge, e da lì ogni messaggio è cifrato con AES-256-GCM con
+/// quella chiave. Chi non l'ha inquadrata non legge niente e non può scrivere
+/// niente che l'altro accetti.
 ///
-/// ## Cosa protegge, e cosa no
-///
-/// Il confine della sicurezza è **la master password**. Chi la conosce possiede
-/// il vault, e quindi può anche abbinare un dispositivo. L'elenco dei
-/// dispositivi fidati non difende da lui: serve a te, per decidere e revocare.
-///
-/// Da lì discende una scelta che evita un problema intero: le chiavi per
-/// parlare con ciascun dispositivo **non si generano e non si salvano**, si
-/// ricavano al volo dalla chiave del vault. Sul telefono resta un elenco di
-/// nomi e date, e chi lo legge non ci trova niente da usare.
+/// Un messaggio è una riga JSON; dentro `m` ci sono nonce (12 byte), testo
+/// cifrato e tag (16 byte) in coda, come nel vault. L'AAD è `vaultmind-sync`:
+/// un messaggio del sync non deve mai poter passare per un vault.
 library;
 
 import 'dart:convert';
 import 'dart:math';
 import 'dart:typed_data';
 
-import 'package:crypto/crypto.dart';
+import 'package:cryptography/cryptography.dart';
 
-/// Cifre del codice di abbinamento e dell'impronta.
-const int cifreCodice = 6;
-
-/// Quanto vive un codice di abbinamento, in secondi.
-const int validitaCodiceS = 120;
-
-/// Tentativi ammessi su uno stesso codice, poi si butta.
-const int tentativiMax = 5;
-
-// Etichette del protocollo. Cambiarne una rompe l'abbinamento fra versioni
-// diverse: è voluto, perché una versione che calcola prove diverse deve
-// fallire subito e non a metà di un trasferimento.
-final List<int> _infoSessione = utf8.encode('vaultmind-sync-v1');
-final List<int> _infoPeer = utf8.encode('vaultmind-peer-v1');
+const int versioneSync = 1;
+final Uint8List aadSync = Uint8List.fromList(utf8.encode('vaultmind-sync'));
+const int lunghezzaChiaveSync = 32;
 
 final _casuale = Random.secure();
 
-/// HKDF-SHA256 (RFC 5869), scritto a mano su `package:crypto`.
-///
-/// A mano e non con la versione di `package:cryptography` perché quella è
-/// asincrona e qui serve poter calcolare dentro un confronto. L'algoritmo è
-/// standard, quindi Python ottiene gli stessi identici byte.
-List<int> _hkdf(List<int> ikm, List<int> salt, List<int> info, [int lunghezza = 32]) {
-  final prk = Hmac(sha256, salt).convert(ikm).bytes;
-  final fuori = <int>[];
-  var blocco = <int>[];
-  var i = 1;
-  while (fuori.length < lunghezza) {
-    blocco = Hmac(sha256, prk).convert([...blocco, ...info, i]).bytes;
-    fuori.addAll(blocco);
-    i++;
-  }
-  return fuori.sublist(0, lunghezza);
+/// Un messaggio che non si apre: chiave sbagliata, manomesso o malformato.
+/// Per chi lo riceve la reazione è una sola: si chiude.
+class MessaggioRifiutato implements Exception {
+  final String motivo;
+  const MessaggioRifiutato([this.motivo = 'Messaggio non decifrabile.']);
+  @override
+  String toString() => motivo;
 }
 
-/// Byte in cifre decimali, per farle leggere a una persona.
-///
-/// **Sei byte, non otto**: gli interi di Dart sono a 64 bit con segno, quelli
-/// di Python non hanno limite. Con otto byte di là il numero resterebbe
-/// positivo e di qua diventerebbe negativo, e i due schermi mostrerebbero
-/// codici diversi senza che niente si rompa in modo evidente.
-String _cifre(List<int> dato, int quante) {
-  var n = 0;
-  for (var i = 0; i < 6 && i < dato.length; i++) {
-    // `* 256 +` e non `<< 8 |`: stesso numero, ma vale anche nel browser, dove
-    // gli shift si fermano a 32 bit e sei byte ne sono 48.
-    n = n * 256 + dato[i];
-  }
-  var limite = 1;
-  for (var i = 0; i < quante; i++) {
-    limite *= 10;
-  }
-  return (n % limite).toString().padLeft(quante, '0');
-}
-
-String _esa(List<int> b) =>
-    b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
+String esa(List<int> b) => b.map((x) => x.toRadixString(16).padLeft(2, '0')).join();
 
 Uint8List daEsa(String s) {
+  if (s.length.isOdd || !RegExp(r'^[0-9a-fA-F]*$').hasMatch(s)) {
+    throw const FormatException('esadecimale non valido');
+  }
   final fuori = Uint8List(s.length ~/ 2);
   for (var i = 0; i < fuori.length; i++) {
     fuori[i] = int.parse(s.substring(i * 2, i * 2 + 2), radix: 16);
@@ -101,87 +54,105 @@ Uint8List daEsa(String s) {
   return fuori;
 }
 
-// ------------------------------------------------------------------ sessione
-
-/// Numero usato una volta sola. Ogni abbinamento ne genera uno per parte: è ciò
-/// che impedisce di riusare una conversazione registrata ieri.
-Uint8List nonce() =>
-    Uint8List.fromList(List.generate(16, (_) => _casuale.nextInt(256)));
-
-/// Le sei cifre da mostrare. Da `Random.secure()`: un codice indovinabile
-/// vanificherebbe il fatto stesso di chiederlo.
-String codiceAbbinamento() =>
-    _cifre(List.generate(8, (_) => _casuale.nextInt(256)), cifreCodice);
-
-/// La chiave valida per QUESTO abbinamento: nasce dalla chiave del vault più i
-/// due nonce, quindi cambia a ogni sessione.
-List<int> chiaveSessione(List<int> chiaveVault, List<int> nonceA, List<int> nonceB) =>
-    _hkdf(chiaveVault, [...nonceA, ...nonceB], _infoSessione);
-
-/// La dimostrazione di conoscere la chiave del vault, senza mostrarla.
-///
-/// Il [ruolo] ("A" per chi mostra il codice, "B" per chi lo scrive) fa sì che
-/// le due prove siano diverse: senza, chi riceve la prova di A potrebbe
-/// rimandarla indietro spacciandosi per B. Il [codice] entra nel calcolo: è
-/// così che l'abbinamento resta legato alle sei cifre lette sull'altro schermo.
-String prova(List<int> sessione, String ruolo, String codice) => _esa(
-    Hmac(sha256, sessione).convert(utf8.encode('prova:$ruolo:$codice')).bytes);
-
-/// Confronto a tempo costante: `==` su una stringa esce al primo byte diverso,
-/// e il tempo che ci mette dice quanti ne aveva indovinati.
-bool verificaProva(List<int> sessione, String ruolo, String codice, String? ricevuta) =>
-    _confrontoCostante(prova(sessione, ruolo, codice), ricevuta ?? '');
-
-bool _confrontoCostante(String a, String b) {
-  if (a.length != b.length) return false;
-  var diff = 0;
-  for (var i = 0; i < a.length; i++) {
-    diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
-  }
-  return diff == 0;
-}
-
-/// Le sei cifre da confrontare a occhio sui due schermi, in due gruppi da tre
-/// perché si leggano ad alta voce senza sbagliare.
-String improntaSessione(List<int> sessione) {
-  final c = _cifre(
-      Hmac(sha256, sessione).convert(utf8.encode('impronta')).bytes, cifreCodice);
-  return '${c.substring(0, 3)} ${c.substring(3)}';
-}
-
-// ------------------------------------------- riconoscersi le volte successive
+Uint8List _byteCasuali(int quanti) =>
+    Uint8List.fromList(List.generate(quanti, (_) => _casuale.nextInt(256)));
 
 /// Un identificativo per questo dispositivo. Casuale e non ricavato
-/// dall'hardware: il MAC address si falsifica in un minuto e Android lo
-/// randomizza per rete, quindi come serratura non regge — e come etichetta un
-/// numero a caso va benissimo, senza dire niente su di te.
-String idDispositivo() =>
-    _esa(List.generate(8, (_) => _casuale.nextInt(256)));
+/// dall'hardware: come etichetta un numero a caso va benissimo, senza dire
+/// niente su di te.
+String idDispositivo() => esa(_byteCasuali(8));
 
-/// La chiave per parlare con un dispositivo già abbinato.
-///
-/// **Si ricava, non si salva.** È il motivo per cui sul telefono non finisce
-/// nessun segreto nuovo.
-List<int> chiaveVerso(List<int> chiaveVault, String idPeer) =>
-    _hkdf(chiaveVault, utf8.encode(idPeer), _infoPeer);
+/// Metà dell'identificativo di un collegamento: il PC ne manda 8 byte, il
+/// telefono ne aggiunge 8. Ogni messaggio lo ripete, così un messaggio
+/// registrato da un collegamento vecchio non vale in uno nuovo.
+String nuovaMetaSessione() => esa(_byteCasuali(8));
 
-/// Come ci si riconosce senza codice, dopo il primo abbinamento.
-String rispostaSfida(List<int> chiaveVault, String idPeer, List<int> sfida) =>
-    _esa(Hmac(sha256, chiaveVerso(chiaveVault, idPeer)).convert(sfida).bytes);
+/// Il gettone del telefono: cambia a ogni modifica del vault. Vedi
+/// `sync_gestore.dart`.
+String nuovoGettone() => esa(_byteCasuali(8));
 
-bool verificaSfida(
-        List<int> chiaveVault, String idPeer, List<int> sfida, String? ricevuta) =>
-    _confrontoCostante(rispostaSfida(chiaveVault, idPeer, sfida), ricevuta ?? '');
+/// Cifra [dati] col JSON compatto di `jsonEncode`, che è anche quello di
+/// Python con `separators=(",", ":")` e `ensure_ascii=False`. [nonce] a
+/// parametro solo per il vettore di prova: in uso è sempre nuovo, perché due
+/// messaggi con la stessa coppia chiave-nonce in GCM si smontano a vicenda.
+Future<String> cifra(List<int> chiave, Map<String, dynamic> dati, {List<int>? nonce}) =>
+    cifraTesto(chiave, jsonEncode(dati), nonce: nonce);
 
-// ------------------------------------------------------------------ il vault
+Future<String> cifraTesto(List<int> chiave, String chiaro, {List<int>? nonce}) async {
+  final n = nonce ?? _byteCasuali(12);
+  final scatola = await AesGcm.with256bits().encrypt(
+    utf8.encode(chiaro),
+    secretKey: SecretKey(chiave),
+    nonce: n,
+    aad: aadSync,
+  );
+  return base64.encode([...n, ...scatola.cipherText, ...scatola.mac.bytes]);
+}
 
-/// Un'etichetta che dice «questi due vault hanno la stessa chiave», senza
-/// rivelarla.
-///
-/// Serve a distinguere due fallimenti che si assomigliano e chiedono cose
-/// opposte: «non ci siamo capiti sulla rete» e «hai cambiato la master password
-/// su un dispositivo e non sull'altro». Il secondo non si risolve riprovando:
-/// va rimandato il vault.
-String improntaVault(List<int> chiaveVault) => _esa(
-        Hmac(sha256, chiaveVault).convert(utf8.encode('quale-vault')).bytes)
-    .substring(0, 16);
+Future<Map<String, dynamic>> decifra(List<int> chiave, String testo) async {
+  // Cattura larga: arriva dalla rete, e un messaggio storto può avere
+  // qualunque forma. La conclusione è sempre la stessa.
+  Object? dati;
+  try {
+    final grezzo = base64.decode(testo);
+    if (grezzo.length < 12 + 16) throw const FormatException('troppo corto');
+    final chiaro = await AesGcm.with256bits().decrypt(
+      SecretBox(grezzo.sublist(12, grezzo.length - 16),
+          nonce: grezzo.sublist(0, 12), mac: Mac(grezzo.sublist(grezzo.length - 16))),
+      secretKey: SecretKey(chiave),
+      aad: aadSync,
+    );
+    dati = jsonDecode(utf8.decode(chiaro));
+  } catch (_) {
+    throw const MessaggioRifiutato();
+  }
+  if (dati is! Map<String, dynamic>) {
+    throw const MessaggioRifiutato('Il messaggio non è un oggetto.');
+  }
+  return dati;
+}
+
+// ------------------------------------------------------------------- il QR
+
+/// Cosa c'è nel QR che mostra il PC.
+class QrPc {
+  final int versione;
+  final String idPc, nome;
+  final Uint8List chiave;
+  const QrPc(this.versione, this.idPc, this.nome, this.chiave);
+}
+
+/// Legge `vaultmind://abbina?v=1&pc=…&k=…&n=…`. Solleva [FormatException]
+/// con un messaggio che dice **cosa ha letto**: chi inquadra per sbaglio il
+/// QR di un sito deve sapere che non è quello giusto, non che «non va».
+QrPc leggiQr(String testo) {
+  final t = testo.trim();
+  Uri u;
+  try {
+    u = Uri.parse(t);
+  } catch (_) {
+    throw FormatException('Questo QR non è di VaultMind: dice «${_corto(t)}».');
+  }
+  if (u.scheme != 'vaultmind' || u.host != 'abbina') {
+    throw FormatException('Questo QR non è quello del PC: dice «${_corto(t)}».');
+  }
+  final q = u.queryParameters;
+  final v = int.tryParse(q['v'] ?? '');
+  if (v != versioneSync) {
+    throw const FormatException(
+        'Il QR viene da una versione diversa di VaultMind: aggiorna le due app.');
+  }
+  final pc = q['pc'] ?? '';
+  Uint8List chiave;
+  try {
+    chiave = daEsa(q['k'] ?? '');
+  } catch (_) {
+    chiave = Uint8List(0);
+  }
+  if (pc.isEmpty || chiave.length != lunghezzaChiaveSync) {
+    throw const FormatException('Il QR è incompleto: riprova inquadrandolo da più vicino.');
+  }
+  return QrPc(v!, pc, q['n'] ?? '', chiave);
+}
+
+String _corto(String t) => t.length <= 40 ? t : '${t.substring(0, 40)}…';

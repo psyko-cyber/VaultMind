@@ -1,101 +1,121 @@
 """
-sync_app.py — La colla fra il motore del sync e l'app.
+sync_app.py — Il sync del PC con i telefoni collegati: la colla fra
+`sync_protocol` (chiave e messaggi), `sync_net` (chi chiamare) e `merge`
+(chi vince). Gemello sul telefono: `mobile/lib/sync_gestore.dart`.
 
-`sync_protocol` decide di chi fidarsi, `sync_net` porta i byte, `merge` decide
-cosa vince. Qui si mettono insieme: si tiene l'identità del dispositivo, si
-apre e si chiude l'ascoltatore insieme al vault, e si trasforma un vault
-ricevuto in una fusione applicata.
+## Come si collega un telefono
 
-## Cosa sta su disco e cosa no
+Il PC mostra un QR con 32 byte a caso; il telefono lo inquadra. Da quel
+momento i due hanno la stessa chiave e nessun altro ce l'ha: è tutto
+l'abbinamento. Le master password possono essere diverse, e i vault possono
+essere nati separati — il caso che col sync di prima non si poteva fare.
 
-Nelle impostazioni finiscono **id del dispositivo, nome, elenco dei fidati e
-basi** — e nient'altro. Le chiavi per parlare con ciascun dispositivo si
-ricavano dalla chiave del vault (vedi `sync_protocol.chiave_verso`), quindi non
-c'è nessun segreto nuovo da custodire.
+Le chiavi dei telefoni stanno **nel vault** (`sync_telefoni` nella radice del
+contenuto cifrato): cifrate come le password, sopravvivono al cambio della
+master password e non si leggono senza. Nelle impostazioni, in chiaro, solo
+ciò che non è segreto: l'ultimo indirizzo, l'ora dell'ultimo sync, le categorie
+concordate (la «base» di `merge._categorie`).
 
-La **base** è `{uid: rev}` all'ultimo sync riuscito con quel dispositivo: è ciò
-che permette di distinguere «sono più avanti di te» da «siamo divergiti». È un
-dato derivato, sta fuori dal vault e non viaggia col backup.
+## Il giro
 
-I **conflitti in sospeso** stanno solo in memoria, di proposito. Se l'app si
-chiude prima che tu abbia deciso, le voci restano com'erano e al sync successivo
-il conflitto si ripresenta identico — perché la base esclude proprio le voci
-contese. Nessuno stato da riparare a mano.
+Ogni pochi secondi, finché il vault è aperto, il PC chiama ciascun telefono
+all'ultimo indirizzo; se lì non risponde lo cerca nella rete di casa
+(`sync_net.bussa`), sempre più di rado finché non ricompare. Il telefono
+risponde solo quando VaultMind è aperto e sbloccato, quindi «apri l'app sul
+telefono» è tutto quello che serve per sincronizzare.
 
-## Quando parte da solo
-
-**A ogni modifica, non a intervalli.** Un giro periodico scambierebbe l'intero
-vault — un megabyte, con 800 voci — anche nelle ore in cui non cambia niente,
-e sarebbe comunque in ritardo di mezzo intervallo su quello che serve davvero:
-aggiungo una voce di là e la voglio vedere di qua. Così invece a vault fermo
-non passa un byte, e quando qualcosa cambia si allinea da sé (`programma_sync`).
-
-Chi **riceve** non rilancia. Lo scambio è simmetrico — ognuno manda il proprio
-vault e fonde in casa propria — quindi dopo un giro sono già allineati: farne
-partire un altro vorrebbe dire due dispositivi che si rimbalzano per sempre.
-
-L'altro momento è lo **sblocco**: recupera quello che è successo mentre l'app
-era chiusa. Non serve altro, perché il dispositivo che si riaccende è sempre
-quello che deve muoversi per primo.
+Ogni lato ha un **gettone**: il PC il contatore delle scritture del vault, il
+telefono un valore a caso che rinnova a ogni modifica. Se nessuno dei due è
+cambiato dall'ultima volta lo scambio finisce lì, in un messaggio. Altrimenti
+il telefono manda il suo contenuto, il PC fonde (vince l'ultima modifica),
+scrive se c'è qualcosa di nuovo, e rimanda il risultato; il telefono lo adotta
+solo se nel frattempo non è cambiato niente, se no si riprova al giro dopo.
+Solo il PC fonde: due fusioni non possono pestarsi i piedi.
 """
 
 from __future__ import annotations
-import json
+import socket
 import threading
 import time
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Tuple
 
-from . import merge, sync_net, sync_protocol as sp
-from .crypto_store import Credential, VaultStore, WrongPassword, VaultCorrupted, apri_blob
+from . import merge, qr, sync_net, sync_protocol as sp
+from .crypto_store import Credential, VaultStore, _clean_categories
+
+#: Ogni quanto si chiama un telefono che risponde.
+INTERVALLO_S = 5.0
+#: Un telefono che non risponde lo si cerca nella rete dopo questa pausa, che
+#: raddoppia a ogni ricerca vuota fino a PAUSA_MAX_S: bussare a 254 indirizzi
+#: ogni 5 secondi per un telefono che è fuori casa sarebbe rumore per niente.
+PAUSA_RICERCA_S = 5.0
+PAUSA_MAX_S = 120.0
+#: Per quanto vale il QR. Abbastanza per trovare la schermata sul telefono.
+VALIDITA_QR_S = 600
+#: Dove stanno, nella radice del vault, i telefoni collegati e le loro chiavi.
+RADICE = "sync_telefoni"
+
+
+def _nome_predefinito() -> str:
+    """«PC di <nome del computer>», tranne quando il nome è uno di quelli che
+    Windows inventa (DESKTOP-4F7G2K1): sul telefono non direbbe niente."""
+    try:
+        h = socket.gethostname().strip()
+    except OSError:
+        h = ""
+    if not h or h.upper().startswith(("DESKTOP-", "LAPTOP-", "WIN-")):
+        return "PC"
+    return f"PC {h}"[:40]
 
 
 class SyncApp:
-    """Il sync di questo dispositivo. Uno solo per processo."""
+    """Il sync di questo PC. Uno solo per processo."""
 
     def __init__(self, store_di: Callable[[], Optional[VaultStore]],
                  leggi_impostazioni: Callable[[], dict],
                  salva_impostazioni: Callable[[dict], None],
                  porta: int = sync_net.PORTA_SYNC,
-                 porta_scoperta: int = sync_net.PORTA_SCOPERTA,
-                 dopo_fusione: Optional[Callable[[], None]] = None):
+                 dopo_fusione: Optional[Callable[[], None]] = None,
+                 reti: Optional[Callable[[], List[List[str]]]] = None,
+                 automatico: bool = True):
         self._store_di = store_di
         self._leggi = leggi_impostazioni
         self._salva = salva_impostazioni
-        #: Chiamata quando una fusione ha cambiato davvero il vault. Serve al
-        #: server per rifare l'indice della ricerca: senza, una voce arrivata
-        #: dal telefono finisce nel vault ma la chat non la trova, e sembra
-        #: che il sync non sia arrivato. `SyncApp` non sa cos'è un indice.
+        #: Chiamata quando il sync ha cambiato il vault: il server rifà
+        #: l'indice della ricerca, altrimenti una voce arrivata dal telefono
+        #: c'è ma la chat non la trova.
         self._dopo_fusione = dopo_fusione
-        # Porte a parametro solo per i test, che devono far convivere due
-        # dispositivi finti sullo stesso computer.
+        # Porta e reti a parametro solo per i test: un telefono finto su
+        # 127.0.0.1, su una porta che non disturba l'app vera.
         self._porta = porta
-        self._porta_scoperta = porta_scoperta
-        self._ascoltatore: Optional[sync_net.Ascoltatore] = None
-        self._annunciatore: Optional[sync_net.Annunciatore] = None
-        self._lucchetto = threading.Lock()
-        #: Una fusione alla volta. L'ascoltatore serve ogni collegamento in un
-        #: thread suo, e da oggi anche il sync automatico chiama da fuori: due
-        #: fusioni insieme riscriverebbero il vault a vicenda.
-        self._lucchetto_fusione = threading.RLock()
-        #: Il rinvio del sync automatico, per non partire a ogni tasto premuto.
+        self._reti = reti or sync_net.reti_locali
+        #: False nei test: il giro lo chiamano loro, quando vogliono, invece
+        #: di un filo che parte da solo ogni pochi secondi.
+        self._automatico = automatico
+
+        self._lucchetto = threading.RLock()   # un giro alla volta
+        self._sveglia = threading.Event()
+        #: Uno per filo: un filo vecchio che sta finendo uno scambio non deve
+        #: ripartire quando se ne avvia uno nuovo.
+        self._fermo = threading.Event()
+        self._filo: Optional[threading.Thread] = None
         self._rinvio: Optional[threading.Timer] = None
 
-        #: Codice di abbinamento in corso: (codice, scadenza, tentativi).
-        self._codice: Optional[str] = None
-        self._scade: float = 0.0
-        self._tentativi: int = 0
+        #: Il QR mostrato in questo momento: {"chiave", "scade", "collegato"}.
+        self._attesa: Optional[dict] = None
+        #: Per telefono: (gettone del telefono, gettone del PC) all'ultimo
+        #: scambio riuscito. In memoria: dopo un riavvio il primo giro fa uno
+        #: scambio completo, che è giusto.
+        self._visti: Dict[str, Tuple[str, Tuple[int, int]]] = {}
+        #: Per telefono, cosa dire nella sezione Sincronizza.
+        self._esiti: Dict[str, dict] = {}
+        self._prossima_ricerca = 0.0
+        self._pausa = PAUSA_RICERCA_S
 
-        #: Conflitti da decidere, per uid, con l'id del dispositivo da cui sono
-        #: nati: serve a registrare la scelta nella base giusta.
-        self.conflitti: Dict[str, merge.Conflitto] = {}
-        self._da_chi: Dict[str, str] = {}
-        #: L'ultimo esito, da mostrare nella sezione Sincronizza.
+        #: Cresce di uno ogni volta che il sync cambia il vault: la pagina lo
+        #: guarda (`/api/sync/novita`) per ricaricare le voci arrivate.
+        self.revisione = 0
+        #: L'ultimo sync che ha portato qualcosa, per la riga sotto il pulsante.
         self.ultimo: Optional[dict] = None
-        #: Cresce di uno ogni volta che una fusione cambia il vault. È il modo
-        #: che ha l'interfaccia di **accorgersi** di quello che arriva mentre è
-        #: aperta: un vault ricevuto lo applica un thread dell'ascoltatore, e
-        #: la pagina non ne saprebbe niente fino alla riapertura dell'app.
-        self.revisione: int = 0
 
     # ----------------------------------------------------------- impostazioni
 
@@ -106,12 +126,21 @@ class SyncApp:
         if not sync.get("id"):
             sync["id"] = sp.id_dispositivo()
             cambiato = True
-        if not sync.get("nome"):
-            sync["nome"] = "Questo PC"
+        if not sync.get("nome") or sync.get("nome") == "Questo PC":
+            # «Questo PC» era il nome predefinito di prima: sul telefono, dove
+            # ora compare, vorrebbe dire il telefono stesso.
+            sync["nome"] = _nome_predefinito()
             cambiato = True
         sync.setdefault("acceso", True)
-        sync.setdefault("dispositivi", {})
-        sync.setdefault("basi", {})
+        if not isinstance(sync.get("telefoni"), dict):
+            sync["telefoni"] = {}
+            cambiato = True
+        # Le chiavi del sync di prima (dispositivi, basi) non servono più e
+        # non si lasciano in giro: dicevano con chi ci si era abbinati.
+        for vecchia in ("dispositivi", "basi"):
+            if vecchia in sync:
+                sync.pop(vecchia)
+                cambiato = True
         if cambiato:
             self._scrivi_sez(sync)
         return sync
@@ -120,6 +149,15 @@ class SyncApp:
         s = self._leggi()
         s["sync"] = sync
         self._salva(s)
+
+    def _aggiorna_telefono(self, tid: str, **campi) -> None:
+        sync = self._sez()
+        t = dict(sync["telefoni"].get(tid) or {})
+        if all(t.get(k) == v for k, v in campi.items()):
+            return   # già così: niente riscrittura delle impostazioni
+        t.update(campi)
+        sync["telefoni"][tid] = t
+        self._scrivi_sez(sync)
 
     @property
     def id_dispositivo(self) -> str:
@@ -136,447 +174,360 @@ class SyncApp:
     def imposta(self, nome: Optional[str] = None, acceso: Optional[bool] = None) -> dict:
         sync = self._sez()
         if nome is not None and nome.strip():
-            sync["nome"] = nome.strip()[:40]
+            sync["nome"] = " ".join(nome.split())[:40]
         if acceso is not None:
             sync["acceso"] = bool(acceso)
         self._scrivi_sez(sync)
-        # Accendere o spegnere il sync deve avere effetto subito, non al
-        # prossimo avvio: chi lo spegne di solito lo fa perché è preoccupato.
-        self.riavvia()
+        # Spegnerlo deve fermarlo subito: chi lo spegne di solito è preoccupato.
+        if self.acceso:
+            self.avvia()
+        else:
+            self.ferma()
         return sync
 
-    def dispositivi(self) -> List[dict]:
-        sync = self._sez()
-        return [{"id": i, **d} for i, d in (sync.get("dispositivi") or {}).items()]
+    # -------------------------------------------------------------- i telefoni
 
-    def revoca(self, id_peer: str) -> bool:
-        sync = self._sez()
-        if id_peer not in (sync.get("dispositivi") or {}):
+    def _store(self) -> Optional[VaultStore]:
+        store = self._store_di()
+        if store is None or not store.unlocked:
+            return None
+        return store
+
+    def _collegati(self, store: VaultStore) -> Dict[str, dict]:
+        """{id: {"nome", "chiave": bytes}} dalla radice del vault. Una voce
+        scritta male si salta: un telefono illeggibile non vale il sync degli
+        altri."""
+        fuori: Dict[str, dict] = {}
+        grezzi = store.radice(RADICE)
+        if not isinstance(grezzi, dict):
+            return fuori
+        for tid, t in grezzi.items():
+            try:
+                chiave = bytes.fromhex(str(t["chiave"]))
+                if len(chiave) == sp.LUNGHEZZA_CHIAVE:
+                    fuori[str(tid)] = {"nome": str(t.get("nome") or "Telefono"),
+                                       "chiave": chiave}
+            except Exception:
+                continue
+        return fuori
+
+    def _registra(self, store: VaultStore, tid: str, nome: str, chiave: bytes) -> None:
+        grezzi = store.radice(RADICE)
+        grezzi = dict(grezzi) if isinstance(grezzi, dict) else {}
+        grezzi[tid] = {"nome": nome, "chiave": chiave.hex()}
+        store.imposta_radice(RADICE, grezzi)
+
+    def telefoni(self) -> List[dict]:
+        store = self._store()
+        if store is None:
+            return []
+        sez = self._sez()["telefoni"]
+        fuori = []
+        for tid, t in self._collegati(store).items():
+            fuori.append({"id": tid, "nome": t["nome"],
+                          "indirizzo": (sez.get(tid) or {}).get("indirizzo") or "",
+                          "quando": (sez.get(tid) or {}).get("quando") or 0,
+                          **(self._esiti.get(tid) or {"esito": "attesa"})})
+        return fuori
+
+    def scollega(self, tid: str) -> bool:
+        store = self._store()
+        if store is None:
             return False
-        sync["dispositivi"].pop(id_peer, None)
-        # Via anche la base: se un giorno si riabbina, si riparte prudenti
-        # invece che con una fotografia vecchia di cui non ci si può più fidare.
-        (sync.get("basi") or {}).pop(id_peer, None)
-        self._scrivi_sez(sync)
+        with self._lucchetto:
+            grezzi = store.radice(RADICE)
+            if not isinstance(grezzi, dict) or tid not in grezzi:
+                return False
+            grezzi = {k: v for k, v in grezzi.items() if k != tid}
+            store.imposta_radice(RADICE, grezzi or None)
+            sync = self._sez()
+            sync["telefoni"].pop(tid, None)
+            self._scrivi_sez(sync)
+            self._visti.pop(tid, None)
+            self._esiti.pop(tid, None)
         return True
 
-    def _abbina(self, id_peer: str, nome: str) -> None:
-        sync = self._sez()
-        sync.setdefault("dispositivi", {})[id_peer] = {
-            "nome": nome or "dispositivo",
-            "quando": int(time.time()),
-        }
-        self._scrivi_sez(sync)
+    # -------------------------------------------------------------- il QR
 
-    # ------------------------------------------------------------ abbinamento
+    def inizia_collegamento(self) -> dict:
+        """Una chiave nuova e il QR che la porta. Vale finché la finestra
+        resta aperta (al massimo VALIDITA_QR_S), e per un telefono solo."""
+        if self._store() is None:
+            raise sync_net.RifiutoSync("Il vault è chiuso.")
+        if not self.acceso:
+            self.imposta(acceso=True)   # chi collega un telefono vuole il sync
+        chiave = sp.nuova_chiave()
+        self._attesa = {"chiave": chiave, "scade": time.time() + VALIDITA_QR_S,
+                        "collegato": None}
+        uri = sp.uri_abbinamento(self.id_dispositivo, self.nome, chiave)
+        self._prossima_ricerca = 0.0
+        self.avvia()
+        self._sveglia.set()
+        return {"uri": uri, "svg": qr.svg(uri), "secondi": VALIDITA_QR_S}
 
-    def codice_attivo(self) -> Optional[str]:
-        """Il codice, se è ancora valido. Scade da solo dopo 120 secondi e dopo
-        5 tentativi sbagliati: una finestra che resta aperta è una finestra."""
-        if self._codice and time.time() < self._scade and self._tentativi < sp.TENTATIVI_MAX:
-            return self._codice
-        self._codice = None
-        return None
-
-    def apri_abbinamento(self) -> dict:
-        self._codice = sp.codice_abbinamento()
-        self._scade = time.time() + sp.VALIDITA_CODICE_S
-        self._tentativi = 0
-        return {"codice": self._codice, "secondi": sp.VALIDITA_CODICE_S}
-
-    def chiudi_abbinamento(self) -> None:
-        self._codice = None
-
-    # ----------------------------------------------------------- il contesto
-
-    def _contesto(self) -> Optional[sync_net.ContestoSync]:
-        store = self._store_di()
-        if store is None or not store.unlocked or store.chiave is None:
+    def stato_collegamento(self) -> Optional[dict]:
+        a = self._attesa
+        if a is None:
             return None
-        sync = self._sez()
-        ctx = sync_net.ContestoSync(
-            id_dispositivo=sync["id"],
-            nome=sync["nome"],
-            chiave_vault=store.chiave,
-            # Non una fotografia: l'elenco cambia mentre l'ascoltatore è già
-            # aperto, ed è proprio quello che succede al primo abbinamento.
-            fidati_ora=lambda: dict((self._sez().get("dispositivi") or {})),
-            leggi_vault_cifrato=lambda: _leggi_file(store.path),
-            ricevi_vault=self.ricevi_vault,
-            salt_vault=store.salt or b"",
-            codice_attivo=self.codice_attivo,
-        )
-        ctx.abbina = self._abbina
-        return ctx
+        if a["collegato"] is None and time.time() > a["scade"]:
+            self._attesa = None
+            return {"scaduto": True}
+        return {"collegato": a["collegato"],
+                "secondi": max(0, int(a["scade"] - time.time()))}
 
-    # ------------------------------------------------------- accendi / spegni
+    def ferma_collegamento(self) -> None:
+        self._attesa = None
+
+    # ------------------------------------------------------ accendi / spegni
 
     def avvia(self) -> bool:
-        """Apre l'ascoltatore. Da chiamare **dopo** lo sblocco: senza chiave non
-        c'è niente da sincronizzare, e infatti non si apre nessuna porta."""
+        """Fa partire il giro. Da chiamare dopo lo sblocco; ripeterlo non fa
+        danni. Il PC non apre nessuna porta: chiama e basta."""
         with self._lucchetto:
-            self._ferma_dentro()
-            if not self.acceso:
-                self._codice = None   # spento il sync, si chiude anche la finestra
+            if not self.acceso or self._store() is None:
                 return False
-            ctx = self._contesto()
-            if ctx is None:
-                return False
-            a = sync_net.Ascoltatore(ctx, porta=self._porta)
-            a.start()
-            if not a.pronto.wait(3):
-                a.ferma()
-                return False
-            self._ascoltatore = a
-            ann = sync_net.Annunciatore(ctx, porta=self._porta_scoperta,
-                                        porta_sync=a.porta_vera)
-            ann.start()
-            self._annunciatore = ann
+            if not self._automatico:
+                return True
+            if self._filo is not None and self._filo.is_alive()                     and not self._fermo.is_set():
+                return True
+            self._fermo = threading.Event()
+            self._filo = threading.Thread(target=self._ciclo, args=(self._fermo,),
+                                          name="sync", daemon=True)
+            self._filo.start()
             return True
 
     def ferma(self) -> None:
-        """Chiude tutto. Da chiamare quando il vault si blocca: da quel momento
-        la chiave non c'è più, e restare in ascolto sarebbe solo una porta
-        aperta che non serve a niente."""
-        with self._lucchetto:
-            self._ferma_dentro()
-            # Chiuso il vault, una finestra di abbinamento aperta non ha piu'
-            # senso: la chiave non c'e' piu' e non si potrebbe dimostrare nulla.
-            self._codice = None
-
-    def _ferma_dentro(self) -> None:
-        """Chiude solo i thread. **Non tocca il codice**: `avvia()` passa di
-        qui per essere ripetibile, e cancellare il codice li' voleva dire
-        buttare via quello che l'utente stava leggendo sullo schermo.
-
-        Il lucchetto ce l'ha già chi chiama, e non è rientrante: qui dentro non
-        si riprende."""
+        """Ferma il giro. Da chiamare quando il vault si blocca."""
+        self._fermo.set()
+        self._sveglia.set()
         if self._rinvio is not None:
-            # Un sync rinviato che scatta a vault chiuso non troverebbe la
-            # chiave, ma proverebbe lo stesso a parlare sulla rete.
             self._rinvio.cancel()
             self._rinvio = None
-        if self._annunciatore:
-            self._annunciatore.ferma()
-            self._annunciatore = None
-        if self._ascoltatore:
-            self._ascoltatore.ferma()
-            self._ascoltatore = None
+        filo = self._filo
+        if filo is not None and filo is not threading.current_thread():
+            # Breve: chi blocca il vault non deve aspettare uno scambio a metà.
+            # Il filo finisce da solo, e col vault chiuso non tocca più niente.
+            filo.join(timeout=2)
+        self._filo = None
+        self._attesa = None
+        self._visti.clear()
 
     def riavvia(self) -> bool:
-        return self.avvia()   # avvia() chiude già quello che c'è
+        self.ferma()
+        return self.avvia()
 
     @property
     def in_ascolto(self) -> bool:
-        return self._ascoltatore is not None
+        """Il giro sta girando (il nome è quello di prima, per la pagina)."""
+        return self._filo is not None and self._filo.is_alive()
 
-    @property
-    def porta_vera(self) -> int:
-        return self._ascoltatore.porta_vera if self._ascoltatore else self._porta
+    def programma_sync(self, ritardo: float = 1.5) -> None:
+        """Una modifica sul PC parte subito verso i telefoni, senza aspettare
+        il giro. Il rinvio raccoglie le modifiche a raffica (salva, cambia
+        categoria, salva) in un solo scambio. Non solleva mai."""
+        if self._rinvio is not None:
+            self._rinvio.cancel()
+        t = threading.Timer(ritardo, self._sveglia.set)
+        t.daemon = True
+        self._rinvio = t
+        t.start()
+
+    def _ciclo(self, fermo: threading.Event) -> None:
+        while not fermo.is_set():
+            try:
+                self.giro()
+            except Exception:
+                pass   # il sync di sfondo non deve mai far cadere niente
+            # Col QR aperto si cerca di continuo: chi ha appena inquadrato
+            # aspetta di vedere «collegato», non cinque secondi.
+            attesa = 1.0 if self._attesa and not self._attesa["collegato"] else INTERVALLO_S
+            self._sveglia.wait(attesa)
+            self._sveglia.clear()
 
     # ------------------------------------------------------------- il lavoro
 
-    def cerca(self) -> List[dict]:
-        # La sonda parte sempre sulla porta di scoperta **normale**, anche
-        # quando questa istanza si annuncia altrove: è di proposito, e va
-        # lasciato così. Due istanze sullo stesso computer — cioè il modo in
-        # cui si prova il sync senza avere due macchine — si spostano con
-        # VAULTMIND_SYNC_SCOPERTA solo per non litigare sulla porta da
-        # ascoltare; se anche la domanda si spostasse, nessuna delle due
-        # sentirebbe l'altra e l'unico modo di provare il sync sparirebbe.
-        # Su una rete vera nessuno tocca quella variabile.
-        ctx = self._contesto()
-        if ctx is None:
-            return []
-        trovati = sync_net.cerca_dispositivi(ctx)
-        noti = self._sez().get("dispositivi") or {}
-        for t in trovati:
-            t["conosciuto"] = t["id"] in noti
-            if t["conosciuto"]:
-                t["nome"] = noti[t["id"]].get("nome") or t["nome"]
-        return trovati
-
-    def sincronizza_con(self, indirizzo: str, porta: int, codice: str = "",
-                        attesa_connessione: float = sync_net.TIMEOUT_S) -> dict:
-        ctx = self._contesto()
-        if ctx is None:
-            raise sync_net.RifiutoSync("Il vault è chiuso.")
-        esito = sync_net.sincronizza(ctx, indirizzo, porta, codice,
-                                     attesa_connessione)
-        self.ultimo = esito
-        self._ricorda_dove(str(esito.get("id") or ""), indirizzo, porta)
-        return esito
-
-    def _ricorda_dove(self, id_peer: str, indirizzo: str, porta: int) -> None:
-        """Si segna l'ultimo indirizzo a cui quel dispositivo ha risposto.
-
-        È il pezzo che fa funzionare il sync **fuori casa**. La scoperta è in
-        broadcast, e un tunnel VPN è un collegamento punto-punto instradato:
-        i broadcast non ci passano, quindi da fuori non si trova mai nessuno.
-        L'indirizzo imparato in casa però resta valido *attraverso* il tunnel —
-        il PC è `192.168.5.53` sia dal divano sia dall'altra parte del mondo —
-        e ricordarlo fa ripartire il sync da solo, senza far scrivere niente
-        a nessuno.
-        """
-        if not id_peer:
-            return
-        sync = self._sez()
-        d = (sync.get("dispositivi") or {}).get(id_peer)
-        if d is None:
-            return   # non abbinato: non si tiene traccia di chi non ci riguarda
-        if d.get("indirizzo") == indirizzo and int(d.get("porta") or 0) == porta:
-            return   # già così: si evita una riscrittura delle impostazioni
-        d["indirizzo"] = indirizzo
-        d["porta"] = porta
-        self._scrivi_sez(sync)
-
-    def sincronizza_tutti(self) -> dict:
-        """Cerca sulla rete e si allinea con **tutti** i dispositivi già
-        abbinati che rispondono.
-
-        È la stessa cosa che fa il pulsante e che fa il sync automatico: uno
-        solo perché non ci siano due comportamenti diversi da spiegare. I
-        dispositivi mai abbinati vengono ignorati di proposito — abbinare
-        richiede il codice, e deve restare una cosa che decidi tu.
-        """
-        ctx = self._contesto()
-        if ctx is None:
+    def sincronizza_adesso(self) -> dict:
+        """Il pulsante: un giro subito, cercando anche chi non risponde."""
+        if self._store() is None:
             return {"ok": False, "motivo": "Il vault è chiuso.", "esiti": []}
-        # Cattura larga: qui si parla con la rete, e una scheda che sparisce o
-        # una WiFi che cade non devono diventare un errore dell'app.
-        try:
-            trovati = self.cerca()
-        except Exception:
-            trovati = []
+        self._prossima_ricerca = 0.0
+        self._pausa = PAUSA_RICERCA_S
+        self.giro()
+        self.avvia()
+        return {"ok": True, "telefoni": self.telefoni()}
 
-        noti = [d for d in trovati if d.get("conosciuto")]
-        # Chi la scoperta non l'ha sentito, si prova dove rispondeva l'ultima
-        # volta: è così che il sync funziona attraverso una VPN, dove i
-        # broadcast non arrivano ma l'indirizzo di casa resta valido.
-        visti = {d["id"] for d in noti}
-        ricordati = []
-        for id_peer, d in (self._sez().get("dispositivi") or {}).items():
-            if id_peer in visti or not d.get("indirizzo"):
-                continue
-            ricordati.append({"id": id_peer, "nome": d.get("nome") or "dispositivo",
-                              "indirizzo": d["indirizzo"],
-                              "porta": int(d.get("porta") or self._porta)})
-
-        esiti: List[dict] = []
-        for d in noti + ricordati:
-            nome = d.get("nome") or "dispositivo"
-            # Sull'indirizzo ricordato si aspetta poco: se quel dispositivo non
-            # c'è più, venti secondi a vuoto per ognuno sarebbero un'app
-            # piantata. Chi ha appena risposto sulla rete invece c'è di sicuro.
-            attesa = sync_net.TIMEOUT_S if d in noti else 3.0
-            try:
-                esito = self.sincronizza_con(d["indirizzo"], int(d["porta"]),
-                                             attesa_connessione=attesa)
-                esiti.append({**esito, "con": esito.get("con") or nome})
-            except sync_net.RifiutoSync as exc:
-                esiti.append({"con": nome, "errore": str(exc)})
-            except Exception:
-                esiti.append({"con": nome,
-                              "errore": "Non è stato possibile raggiungerlo."})
-        return {"ok": True, "trovati": len(trovati),
-                "abbinati": len(noti) + len(ricordati), "esiti": esiti}
-
-    def programma_sync(self, ritardo: float = 3.0) -> None:
-        """Una modifica locale si propaga da sola, poco dopo.
-
-        Il rinvio serve perché le modifiche arrivano a raffica — si salva una
-        voce, si cambia categoria, se ne salva un'altra — e ognuna farebbe
-        partire uno scambio dell'intero vault. Ogni chiamata sposta in avanti
-        quella prima, così parte **una volta sola** quando ti fermi.
-
-        Non solleva mai: chi ha appena salvato una voce l'ha salvata, e il sync
-        che non riesce è un fatto della rete, non del salvataggio.
-        """
+    def giro(self) -> None:
+        store = self._store()
+        if store is None or not self.acceso:
+            return
         with self._lucchetto:
-            if self._rinvio is not None:
-                self._rinvio.cancel()
-                self._rinvio = None
-            if not self.acceso or self._ascoltatore is None:
+            collegati = self._collegati(store)
+            sez = self._sez()["telefoni"]
+            mancanti = []
+            for tid, t in collegati.items():
+                ind = (sez.get(tid) or {}).get("indirizzo")
+                if ind and self._prova(store, ind, t["chiave"], tid):
+                    continue
+                mancanti.append(tid)
+            attesa = self._attesa
+            cerca_nuovo = bool(attesa and not attesa["collegato"]
+                               and time.time() <= attesa["scade"])
+            if not (mancanti or cerca_nuovo):
+                self._pausa = PAUSA_RICERCA_S
                 return
-            if not (self._sez().get("dispositivi") or {}):
-                return   # nessuno con cui allinearsi: niente sonde inutili
-            t = threading.Timer(ritardo, self._sync_di_sfondo)
-            t.daemon = True
-            self._rinvio = t
-            t.start()
+            if not cerca_nuovo and time.time() < self._prossima_ricerca:
+                return
+            self._cerca(store, collegati, mancanti, cerca_nuovo)
 
-    def _sync_di_sfondo(self) -> None:
+    def _cerca(self, store: VaultStore, collegati: Dict[str, dict],
+               mancanti: List[str], cerca_nuovo: bool) -> None:
+        for rete in self._reti():
+            for h in sync_net.bussa(rete, self._porta):
+                if cerca_nuovo and self._attesa:
+                    if self._prova(store, h, self._attesa["chiave"], None):
+                        cerca_nuovo = False
+                        continue
+                for tid in list(mancanti):
+                    if self._prova(store, h, collegati[tid]["chiave"], tid):
+                        mancanti.remove(tid)
+                        break
+            if not mancanti and not cerca_nuovo:
+                break
+        if mancanti:
+            self._prossima_ricerca = time.time() + self._pausa
+            self._pausa = min(self._pausa * 2, PAUSA_MAX_S)
+        else:
+            self._pausa = PAUSA_RICERCA_S
+            self._prossima_ricerca = 0.0
+
+    def _prova(self, store: VaultStore, host: str, chiave: bytes,
+               atteso: Optional[str]) -> bool:
+        """Uno scambio con chi risponde a `host`. Vero se era il telefono
+        cercato (`atteso`, o un telefono nuovo se `atteso` è None), anche se
+        poi lo scambio non è andato fino in fondo: l'indirizzo è quello."""
         try:
-            self.sincronizza_tutti()
-        except Exception:
-            pass   # il sync automatico non deve mai disturbare
+            with sync_net.Collegamento.apri(host, self._porta, chiave) as c:
+                return self._scambio(store, c, host, chiave, atteso)
+        except sync_net.Rifiutato as exc:
+            if atteso and exc.motivo == "pc":
+                self._esiti[atteso] = {
+                    "esito": "sconosciuto",
+                    "messaggio": "Il telefono non riconosce più questo PC: "
+                                 "scollegalo qui e ricollegalo col QR."}
+                return True
+            return False
+        except sync_net.NonRaggiungibile:
+            if atteso:
+                self._esiti[atteso] = {
+                    "esito": "assente",
+                    "messaggio": "Non risponde: apri VaultMind sul telefono, "
+                                 "sulla stessa WiFi."}
+            return False
 
-    def ricevi_vault(self, blob: str, id_peer: str) -> dict:
-        """Il cuore: prende il vault dell'altro, lo fonde col nostro e applica.
+    def _scambio(self, store: VaultStore, c: sync_net.Collegamento, host: str,
+                 chiave: bytes, atteso: Optional[str]) -> bool:
+        mezza = sp.nuova_meta_sessione()
+        c.manda({"t": "ciao", "nome": self.nome, "s": mezza},
+                intestazione={"v": sp.VERSIONE, "pc": self.id_dispositivo})
+        stato = c.ricevi()
+        sessione = str(stato.get("s") or "")
+        tid = str(stato.get("id") or "")
+        if (stato.get("t") != "stato" or len(sessione) != 32
+                or not sessione.startswith(mezza) or not tid):
+            raise sync_net.Rifiutato("protocollo")
+        if atteso is not None and tid != atteso:
+            return False   # un altro dei nostri telefoni, con la stessa chiave: impossibile, ma non è lui
+        nome = " ".join(str(stato.get("nome") or "Telefono").split())[:40] or "Telefono"
 
-        Quello che arriva è cifrato con la stessa chiave che abbiamo — l'ha
-        appena dimostrato la stretta di mano — quindi si apre come si aprirebbe
-        il proprio file. In chiaro sulla rete non è passato niente.
-        """
-        store = self._store_di()
-        if store is None or not store.unlocked or store.chiave is None:
-            return {"errore": "vault chiuso"}
+        if atteso is None:
+            # Il telefono ha inquadrato il QR: da qui è collegato.
+            self._registra(store, tid, nome, chiave)
+            if self._attesa is not None:
+                self._attesa["collegato"] = {"id": tid, "nome": nome}
+        elif self._collegati(store).get(tid, {}).get("nome") != nome:
+            self._registra(store, tid, nome, chiave)   # ha cambiato nome
+
+        self._aggiorna_telefono(tid, indirizzo=host)
+
+        def manda(dati: dict) -> None:
+            c.manda({**dati, "s": sessione})
+
+        def ricevi(tipo: str) -> dict:
+            r = c.ricevi()
+            if r.get("s") != sessione or r.get("t") not in tipo.split("|"):
+                raise sync_net.Rifiutato("protocollo")
+            return r
+
+        gettone = str(stato.get("token") or "")
+        mio = (id(store), store.scritture)
+        if self._visti.get(tid) == (gettone, mio):
+            manda({"t": "fine"})
+            self._esiti[tid] = {"esito": "allineato", "controllato": int(time.time())}
+            return True
+
+        manda({"t": "dammi"})
+        v = ricevi("vault")
         try:
-            dati = apri_blob(blob, store.chiave)
-        except WrongPassword:
-            return {"errore": "I due vault hanno master password diverse."}
-        except VaultCorrupted:
-            return {"errore": "Il vault ricevuto non è leggibile."}
-
-        with self._lucchetto_fusione:
-            sua = merge.Istantanea(
-                entries=[Credential.from_dict(c) for c in (dati.get("credentials") or [])],
-                tombstones=list(dati.get("deleted") or []),
-                categories=list(dati.get("categories") or []),
+            tel = merge.Istantanea(
+                entries=[Credential.from_dict(x) for x in v["voci"]],
+                tombstones=[dict(t) for t in v.get("lapidi") or []],
+                categories=_clean_categories(v.get("categorie") or []),
             )
-            mia = merge.Istantanea(entries=store.entries,
-                                   tombstones=store.tombstones,
-                                   categories=store.categories)
+        except Exception as exc:
+            # Mai una fusione con metà delle voci del telefono: quelle che non
+            # si leggono sparirebbero dal telefono quando adotta il risultato.
+            raise sync_net.Rifiutato("protocollo", "Il telefono ha mandato voci illeggibili.") from exc
+        gettone = str(v.get("token") or "")
 
-            sync = self._sez()
-            base = (sync.get("basi") or {}).get(id_peer)
-            prima = _confrontabile(mia.entries, mia.tombstones, mia.categories)
-            f = merge.fondi(mia, sua, base)
+        prima = store.scritture
+        pc = merge.Istantanea(store.entries, store.tombstones, store.categories)
+        info = self._sez()["telefoni"].get(tid) or {}
+        base = info.get("categorie")
+        f = merge.fondi(pc, tel, base if isinstance(base, list) else None,
+                        primo=not info.get("quando"))
+        risultato = merge.Istantanea(f.entries, f.tombstones, f.categories)
 
-            # Riscrivere solo se è cambiato qualcosa. Il sync automatico parte a
-            # ogni modifica, e quindi capita spessissimo che l'altro non abbia
-            # niente da darci: `applica_fusione` ri-cifra comunque l'INTERO
-            # vault, e sarebbe una riscrittura da un megabyte per confermare che
-            # eravamo già allineati.
-            cambiato = _confrontabile(f.entries, f.tombstones, f.categories) != prima
-            if cambiato:
-                store.applica_fusione(f.entries, f.tombstones, f.categories)
-                self.revisione += 1
+        cambiato_pc = not merge.uguali(risultato, pc)
+        if cambiato_pc:
+            if store.scritture != prima:
+                return True   # hai salvato qualcosa nel frattempo: si rifà al giro dopo
+            store.applica_fusione(f.entries, f.tombstones, f.categories)
+            self.revisione += 1
 
-            # La base registra solo ciò su cui siamo d'accordo: le voci contese
-            # restano fuori, così al prossimo giro risultano ancora cambiate da
-            # entrambi e il conflitto si ripresenta invece di sparire non deciso.
-            contesi = {c.uid for c in f.conflitti}
-            sync.setdefault("basi", {})[id_peer] = {
-                c.uid: c.rev for c in f.entries if c.uid not in contesi
-            }
-            self._scrivi_sez(sync)
+        finale: Optional[str] = gettone
+        if merge.uguali(risultato, tel):
+            manda({"t": "uguale"})
+        else:
+            manda({"t": "prendi", "base": gettone,
+                   "voci": [e.to_dict() for e in f.entries],
+                   "lapidi": f.tombstones, "categorie": f.categories,
+                   "riepilogo": f.sul_telefono})
+            r = ricevi("preso|cambiato")
+            finale = str(r.get("token") or "") if r["t"] == "preso" else None
 
-            self.conflitti = {c.uid: c for c in f.conflitti}
-            self._da_chi = {c.uid: id_peer for c in f.conflitti}
-            riepilogo = {
-                "aggiunte": f.riepilogo.get("aggiunte", 0),
-                "aggiornate": f.riepilogo.get("aggiornate", 0),
-                "cancellate": f.riepilogo.get("cancellate", 0),
-                "conflitti": len(f.conflitti),
-                "quando": int(time.time()),
-                "con": (self._sez().get("dispositivi") or {}).get(id_peer, {}).get("nome") or "",
-            }
-            self.ultimo = riepilogo
-
-        # Fuori dal lucchetto: chi ascolta rifà l'indice della ricerca, che non
-        # ha bisogno del vault fermo e non deve trattenere il collegamento.
-        if cambiato:
+        adesso = int(time.time())
+        if finale:
+            self._visti[tid] = (finale, (id(store), store.scritture))
+            self._aggiorna_telefono(tid, quando=adesso, categorie=f.categories)
+        else:
+            # Il telefono è cambiato mentre si fondeva: si riprova fra poco.
+            self._visti.pop(tid, None)
+            self._sveglia.set()
+        portato = any(f.sul_pc.values())
+        self._esiti[tid] = {"esito": "sincronizzato" if portato or any(f.sul_telefono.values())
+                            else "allineato",
+                            "controllato": adesso,
+                            "sul_pc": f.sul_pc, "sul_telefono": f.sul_telefono}
+        if portato:
+            self.ultimo = {"con": nome, "quando": adesso, **f.sul_pc}
+        if cambiato_pc:
             self._avvisa()
-        return riepilogo
+        return True
 
     def _avvisa(self) -> None:
-        """Dice all'app che il vault è cambiato sotto i suoi piedi. Non deve
-        poter far fallire un sync riuscito: il dato è già salvato."""
         if self._dopo_fusione is None:
             return
         try:
             self._dopo_fusione()
         except Exception:
-            pass
-
-    # ------------------------------------------------------------- conflitti
-
-    def elenco_conflitti(self) -> List[dict]:
-        fuori = []
-        for c in self.conflitti.values():
-            fuori.append({
-                "uid": c.uid,
-                "motivo": c.motivo,
-                "titolo": c.titolo,
-                "mia": _sommario(c.mia),
-                "sua": _sommario(c.sua),
-            })
-        return fuori
-
-    def risolvi(self, uid: str, scelta: str) -> bool:
-        """`scelta` = "mia" | "sua". Applica la versione scelta e chiude il caso.
-
-        Non esiste "decidi tu": la voce contesa è l'unica cosa che questo
-        progetto non risolve da solo, e cambiare idea qui vorrebbe dire buttare
-        una password senza che nessuno l'abbia deciso.
-        """
-        c = self.conflitti.get(uid)
-        store = self._store_di()
-        if c is None or store is None or not store.unlocked:
-            return False
-        tenuta = c.mia if scelta == "mia" else c.sua
-
-        voci = [v for v in store.entries if v.uid != uid]
-        lapidi = [t for t in store.tombstones if t.get("uid") != uid]
-        if tenuta is not None:
-            # Un giro di contatore in più: la scelta è essa stessa una modifica,
-            # e deve battere quella dell'altro dispositivo al prossimo sync.
-            scelto = Credential.from_dict(tenuta.to_dict())
-            scelto.tocca()
-            voci.append(scelto)
-        else:
-            base = c.mia or c.sua
-            lapidi.append({"uid": uid, "rev": (base.rev if base else 1) + 1,
-                           "mod": int(time.time() * 1000)})
-
-        store.applica_fusione(voci, lapidi, store.categories)
-
-        # Il pezzo che fa **convergere** la scelta. Senza, la voce resterebbe
-        # "cambiata da entrambi" per sempre e la stessa domanda tornerebbe a
-        # ogni sync: registrando nella base il `rev` che l'altro aveva, al
-        # prossimo giro lui risulta fermo e la mia decisione vince da sola.
-        id_peer = self._da_chi.pop(uid, None)
-        if id_peer and c.rev_sua:
-            sync = self._sez()
-            sync.setdefault("basi", {}).setdefault(id_peer, {})[uid] = c.rev_sua
-            self._scrivi_sez(sync)
-
-        self.conflitti.pop(uid, None)
-        self.revisione += 1
-        return True
-
-
-def _confrontabile(entries: List[Credential], tombstones: List[dict],
-                   categories: List[str]) -> str:
-    """Il contenuto del vault ridotto a una stringa, per rispondere a una sola
-    domanda: la fusione ha cambiato qualcosa?
-
-    Si confronta il contenuto per intero e non i soli `rev`: due voci con lo
-    stesso numero e contenuto diverso esistono — è esattamente un conflitto — e
-    dire «non è cambiato niente» proprio lì sarebbe il posto peggiore.
-    """
-    return json.dumps({
-        "e": sorted((c.to_dict() for c in entries),
-                    key=lambda d: str(d.get("uid") or "")),
-        "t": sorted(({"uid": str(t.get("uid") or ""), "rev": t.get("rev"),
-                      "mod": t.get("mod")} for t in tombstones),
-                    key=lambda d: d["uid"]),
-        "c": list(categories),
-    }, sort_keys=True, ensure_ascii=False, default=str)
-
-
-def _sommario(c: Optional[Credential]) -> Optional[dict]:
-    """Come si racconta una versione all'utente: titolo, quando, e le
-    ETICHETTE dei campi — mai i valori. Scegliere fra due versioni non deve
-    costringere a guardare due password sullo schermo."""
-    if c is None:
-        return None
-    return {"titolo": c.title, "rev": c.rev, "mod": c.mod,
-            "categoria": c.category, "tags": list(c.tags),
-            "campi": [f.label for f in c.fields], "critica": c.critical}
-
-
-def _leggi_file(path: str) -> str:
-    with open(path, "r", encoding="utf-8") as f:
-        return f.read()
+            pass   # il dato è già salvato: l'indice si rifà al prossimo giro

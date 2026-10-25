@@ -1,523 +1,453 @@
-/// La colla fra il motore del sync e l'app, lato telefono.
+/// Il sync del telefono col PC: la colla fra `sync_protocollo` (chiave e
+/// messaggi), `sync_rete` (la porta aperta) e la [Sessione]. Gemello sul PC:
+/// `VaultMind_Windows/app/sync_app.py`, che fa la parte di chi chiama.
 ///
-/// Gemello di `VaultMind_Windows/app/sync_app.py`. `sync_protocollo` decide di
-/// chi fidarsi, `sync_rete` porta i byte, `fusione` decide cosa vince: qui si
-/// mettono insieme.
+/// ## Il telefono risponde e basta
 ///
-/// ## Cosa sta su disco e cosa no
+/// Il PC chiama ogni pochi secondi; il telefono tiene aperta la porta 8732
+/// finché il vault è sbloccato, e a ogni chiamata risponde. Non cerca
+/// nessuno, non fonde niente: manda le sue voci quando il PC le chiede, e
+/// adotta il risultato che il PC rimanda. La fusione esiste in un posto solo
+/// (`merge.py`), così due fusioni non possono pestarsi i piedi, né divergere
+/// fra due lingue.
 ///
-/// Nelle preferenze finiscono **id del dispositivo, nome, elenco dei fidati e
-/// basi** — e nient'altro. Le chiavi per parlare con ciascun dispositivo si
-/// ricavano dalla chiave del vault, quindi non c'è nessun segreto nuovo da
-/// custodire.
+/// ## Chi può chiamare
 ///
-/// I **conflitti in sospeso** stanno solo in memoria, di proposito. Se l'app si
-/// chiude prima che tu abbia deciso, le voci restano com'erano e al sync
-/// successivo il conflitto si ripresenta identico — perché la base esclude
-/// proprio le voci contese. Nessuno stato da riparare a mano.
+/// Solo un PC di cui il telefono ha la chiave: quella letta dal QR. Le chiavi
+/// stanno **nel vault** (`sync_pc` nella radice del contenuto cifrato):
+/// cifrate come le password, sopravvivono al cambio della master password e
+/// non si leggono senza. A chi bussa senza chiave si risponde `{"no":"pc"}` e
+/// si chiude: non riceve niente, né può scrivere niente.
 ///
-/// ## Quando è aperto
+/// ## Il gettone
 ///
-/// L'ascoltatore vive **insieme alla sessione**: si apre a vault sbloccato e si
-/// chiude al blocco. Senza chiave non c'è niente da sincronizzare, e restare in
-/// ascolto sarebbe solo una porta aperta che non serve a nessuno.
-///
-/// ## Quando parte da solo
-///
-/// **A ogni modifica, non a intervalli** — stessa scelta del PC, e per le
-/// stesse ragioni: un giro periodico scambierebbe l'intero vault anche nelle
-/// ore in cui non cambia niente, e su un telefono si porterebbe via la batteria
-/// per confermare che eravamo allineati. Ci si aggancia a `Sessione`, che è un
-/// `ValueNotifier`: così nessuna schermata deve sapere che il sync esiste.
-///
-/// Chi **riceve** non rilancia (`_fondendo`). Lo scambio è simmetrico e dopo un
-/// giro sono già allineati: senza quella guardia i due si rimbalzerebbero per
-/// sempre, ognuno svegliato dalla fusione dell'altro.
-///
-/// Gli altri due momenti sono lo **sblocco** e il **ritorno in primo piano** —
-/// che è poi il rientro sulla rete di casa col telefono in tasca.
+/// Un valore a caso che cambia a ogni modifica delle voci. Il PC se lo
+/// ricorda: se alla chiamata dopo il gettone è lo stesso e il PC non ha
+/// cambiato niente, lo scambio finisce in un messaggio, senza mandare il
+/// vault. Il risultato del PC si adotta solo se il gettone è ancora quello
+/// che il PC ha visto: una voce salvata qui mentre il PC fondeva non va
+/// persa, ci pensa il giro dopo.
 library;
 
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
-import 'fusione.dart';
 import 'impostazioni.dart';
 import 'sessione.dart';
 import 'sync_protocollo.dart';
 import 'sync_rete.dart';
 import 'vault.dart';
 
-/// Com'è andato l'ultimo sync, da raccontare in una riga.
+/// Dove stanno, nella radice del vault, i PC collegati e le loro chiavi.
+const radiceSync = 'sync_pc';
+
+/// Per quanto il telefono aspetta il PC dopo aver inquadrato il QR. Lo
+/// stesso tempo per cui il PC tiene valido il QR.
+const attesaCollegamento = Duration(minutes: 10);
+
+class PcCollegato {
+  final String id, nome;
+  final Uint8List chiave;
+  const PcCollegato(this.id, this.nome, this.chiave);
+}
+
+/// Com'è andato l'ultimo scambio con un PC, da raccontare in una riga.
 class EsitoSync {
-  final String con;
-  final int aggiunte, aggiornate, cancellate, conflitti;
-  final String? errore;
+  final String pc;
+  final DateTime quando;
+  final int aggiunte, aggiornate, cancellate;
 
-  const EsitoSync({
-    this.con = '',
-    this.aggiunte = 0,
-    this.aggiornate = 0,
-    this.cancellate = 0,
-    this.conflitti = 0,
-    this.errore,
-  });
+  const EsitoSync(this.pc, this.quando,
+      {this.aggiunte = 0, this.aggiornate = 0, this.cancellate = 0});
 
-  bool get qualcosaECambiato =>
-      aggiunte > 0 || aggiornate > 0 || cancellate > 0 || conflitti > 0;
+  bool get qualcosa => aggiunte > 0 || aggiornate > 0 || cancellate > 0;
 
+  /// «2 voci nuove · 1 aggiornata», o «già allineati».
   String get riassunto {
-    if (errore != null) return errore!;
     final pezzi = <String>[
-      if (aggiunte > 0) '$aggiunte in arrivo',
-      if (aggiornate > 0) '$aggiornate aggiornate',
-      if (cancellate > 0) '$cancellate rimosse',
-      if (conflitti > 0) '$conflitti da decidere',
+      if (aggiunte == 1) '1 voce nuova',
+      if (aggiunte > 1) '$aggiunte voci nuove',
+      if (aggiornate == 1) '1 aggiornata',
+      if (aggiornate > 1) '$aggiornate aggiornate',
+      if (cancellate == 1) '1 eliminata',
+      if (cancellate > 1) '$cancellate eliminate',
     ];
-    return pezzi.isEmpty ? 'Già allineati' : pezzi.join(' · ');
+    return pezzi.isEmpty ? 'già allineati' : pezzi.join(' · ');
   }
 }
 
-/// Com'è andato un giro completo: cercare sulla rete e allinearsi con tutti
-/// quelli che si conoscono. È quello che fa il tasto e quello che fa il sync
-/// automatico — uno solo, perché non ci siano due comportamenti da spiegare.
-class EsitoGiro {
-  final int trovati, abbinati;
-  final List<EsitoSync> esiti;
-
-  const EsitoGiro({this.trovati = 0, this.abbinati = 0, this.esiti = const []});
-
-  bool get qualcosaECambiato => esiti.any((e) => e.qualcosaECambiato);
-  int get conflitti => esiti.fold(0, (a, e) => a + e.conflitti);
-
-  /// Il primo errore, se ce n'è stato uno. Se ne mostra uno solo: tre
-  /// dispositivi che non rispondono sono lo stesso problema ripetuto.
-  String? get errore {
-    for (final e in esiti) {
-      if (e.errore != null) return e.errore;
-    }
-    return null;
-  }
-
-  /// Una riga sola per raccontarlo, o `null` se non c'è niente da dire.
-  String? get riassunto {
-    if (errore != null) return errore;
-    final mossi = esiti.where((e) => e.qualcosaECambiato).toList();
-    if (mossi.isEmpty) return null;
-    final da = mossi.first.con;
-    final testa = da.isEmpty ? '' : '$da: ';
-    return '$testa${mossi.first.riassunto}';
-  }
+String _pulito(Object? nome, String predefinito) {
+  final n = '${nome ?? ''}'.trim().split(RegExp(r'\s+')).join(' ');
+  if (n.isEmpty) return predefinito;
+  return n.length <= 40 ? n : n.substring(0, 40);
 }
 
 class GestoreSync extends ChangeNotifier {
   final Sessione sessione;
 
-  /// La porta dell'ascoltatore. A parametro **solo per i test**, come nel
-  /// gemello Python: con quella fissa non si potrebbero far parlare due
-  /// estremi sulla stessa macchina, e soprattutto il test fallirebbe a caso
-  /// quando l'app vera è aperta e la 8732 è già occupata.
+  /// A parametro **solo per i test**, come nel gemello Python: con la 8732
+  /// fissa un test fallirebbe a caso quando l'app vera è aperta.
   final int porta;
 
   Ascoltatore? _ascoltatore;
-  Annunciatore? _annunciatore;
+  bool _portaOccupata = false;
+  bool _chiuso = false;
 
-  /// Il rinvio del sync automatico, per non partire a ogni tasto premuto.
-  Timer? _rinvio;
+  String _gettone = nuovoGettone();
 
-  /// Alzata mentre si applica un vault ricevuto: le scritture di quel momento
-  /// non sono modifiche dell'utente e non devono far ripartire un sync.
-  bool _fondendo = false;
+  /// L'ultimo vault visto: serve a capire se una notifica della sessione è
+  /// una modifica delle voci (gettone nuovo) o solo della radice.
+  Vault? _visto;
 
-  String? _codice;
+  /// Alzata mentre si adotta il risultato del PC: quella scrittura non è una
+  /// modifica di chi usa il telefono, e il gettone lo decide lo scambio.
+  bool _adottando = false;
+
+  /// Un collegamento alla volta. Due PC che chiamano insieme si mettono in
+  /// fila: due adozioni intrecciate si cancellerebbero a vicenda.
+  Future<void> _coda = Future.value();
+
+  QrPc? _attesa;
   DateTime _scade = DateTime.fromMillisecondsSinceEpoch(0);
 
-  /// Conflitti da decidere, per uid, con il dispositivo da cui sono nati:
-  /// serve a registrare la scelta nella base giusta.
-  final conflitti = <String, Conflitto>{};
-  final _daChi = <String, String>{};
+  /// Il PC appena collegato col QR, finché la schermata non l'ha detto.
+  String? collegatoOra;
 
-  EsitoSync? ultimo;
+  /// Per PC: l'ultimo scambio riuscito. Solo in memoria: dopo un riavvio
+  /// il PC richiama entro pochi secondi.
+  final ultimi = <String, EsitoSync>{};
+
+  /// L'ultimo scambio che ha portato qualcosa, e quanti ce ne sono stati: la
+  /// casa lo guarda per dire «dal PC: 2 voci nuove».
+  EsitoSync? ultimoArrivo;
+  int arrivi = 0;
+
+  bool inCorso = false;
 
   GestoreSync(this.sessione, {this.porta = portaSync});
 
   Impostazioni get _imp => impostazioni.value;
 
   String get idDispositivo => _imp.idDispositivo;
-  String get nome => _imp.nomeDispositivo;
+  String get nome => _pulito(_imp.nomeDispositivo, 'Telefono');
   bool get acceso => _imp.syncAcceso;
   bool get inAscolto => _ascoltatore != null;
-  int get portaVera => _ascoltatore?.portaVera ?? portaSync;
-  Map<String, String> get fidati => Map.unmodifiable(_imp.fidati);
+  bool get portaOccupata => _portaOccupata;
+  int get portaVera => _ascoltatore?.portaVera ?? porta;
 
-  // ----------------------------------------------------------- abbinamento
-
-  /// Il codice, se è ancora valido. Scade da solo dopo 120 secondi: una
-  /// finestra che resta aperta è una finestra.
-  String? codiceAttivo() {
-    if (_codice != null && DateTime.now().isBefore(_scade)) return _codice;
-    _codice = null;
-    return null;
+  void _avvisa() {
+    if (!_chiuso) notifyListeners();
   }
 
-  int get secondiRimasti {
-    if (codiceAttivo() == null) return 0;
-    return _scade.difference(DateTime.now()).inSeconds.clamp(0, validitaCodiceS);
+  @override
+  void dispose() {
+    _chiuso = true;
+    sessione.removeListener(_cambiato);
+    super.dispose();
   }
 
-  String apriAbbinamento() {
-    _codice = codiceAbbinamento();
-    _scade = DateTime.now().add(const Duration(seconds: validitaCodiceS));
-    notifyListeners();
-    return _codice!;
-  }
+  // -------------------------------------------------------------- i PC
 
-  void chiudiAbbinamento() {
-    _codice = null;
-    notifyListeners();
-  }
-
-  // ------------------------------------------------------- accendi / spegni
-
-  ContestoSync _contesto() => ContestoSync(
-        idDispositivo: _imp.idDispositivo,
-        nome: _imp.nomeDispositivo,
-        chiaveVault: sessione.chiave,
-        // La mappa VIVA, non una copia: l'elenco cambia mentre l'ascoltatore è
-        // già aperto — è quello che succede al primo abbinamento — e con una
-        // fotografia il dispositivo appena abbinato resterebbe sconosciuto.
-        fidati: _imp.fidati,
-        saltVault: sessione.vault.salt,
-        // Si cifra QUANDO SERVE, e vale per tutte e due le direzioni. Prima
-        // era una copia preparata all'inizio di un sync in uscita: quando era
-        // il PC a chiamare, il telefono faceva da server e mandava una
-        // stringa vuota, e di là si leggeva «il vault ricevuto non è
-        // leggibile». Il difetto c'era da sempre ed è rimasto invisibile
-        // finché il PC non ha imparato a chiamare per primo.
-        leggiVaultCifrato: () => sessione.testoCifrato(),
-        riceviVault: riceviVault,
-        codiceAttivo: codiceAttivo,
-        abbina: _abbina,
-      );
-
-  Future<bool> avvia() async {
-    await ferma(pulisciCodice: false);
-    if (!acceso) {
-      _codice = null;
-      return false;
+  Map<String, PcCollegato> get pcCollegati {
+    final fuori = <String, PcCollegato>{};
+    final grezzi = sessione.vault.extraRadice[radiceSync];
+    if (grezzi is! Map) return fuori;
+    for (final e in grezzi.entries) {
+      // Una voce scritta male si salta: un PC illeggibile non vale il sync
+      // degli altri.
+      try {
+        final v = e.value as Map;
+        final chiave = daEsa('${v['chiave']}');
+        if (chiave.length == lunghezzaChiaveSync) {
+          fuori['${e.key}'] = PcCollegato('${e.key}', _pulito(v['nome'], 'PC'), chiave);
+        }
+      } catch (_) {}
     }
-    final ctx = _contesto();
-    final a = Ascoltatore(ctx, porta: porta);
-    if (!await a.avvia()) return false;
-    _ascoltatore = a;
-    final ann = Annunciatore(ctx, portaDelSync: a.portaVera);
-    await ann.avvia();
-    _annunciatore = ann;
-    // Da qui in poi una voce salvata si propaga da sola. `Sessione` avvisa a
-    // ogni scrittura, quindi non serve che le schermate chiamino niente.
-    sessione.addListener(_modificaLocale);
-    notifyListeners();
+    return fuori;
+  }
+
+  Map<String, dynamic> _grezzi() {
+    final g = sessione.vault.extraRadice[radiceSync];
+    return g is Map ? Map<String, dynamic>.from(g) : <String, dynamic>{};
+  }
+
+  Future<void> _registra(String id, String nomePc, Uint8List chiave) {
+    final g = _grezzi()..[id] = {'nome': nomePc, 'chiave': esa(chiave)};
+    return sessione.impostaRadice(radiceSync, g);
+  }
+
+  Future<bool> scollega(String id) async {
+    final g = _grezzi();
+    if (g.remove(id) == null) return false;
+    await sessione.impostaRadice(radiceSync, g.isEmpty ? null : g);
+    ultimi.remove(id);
+    _avvisa();
     return true;
   }
 
-  Future<void> ferma({bool pulisciCodice = true}) async {
-    sessione.removeListener(_modificaLocale);
-    // Un sync rinviato che scatta a vault chiuso non troverebbe la chiave, ma
-    // proverebbe lo stesso a farsi vivo sulla rete.
-    _rinvio?.cancel();
-    _rinvio = null;
-    _annunciatore?.ferma();
-    _annunciatore = null;
-    await _ascoltatore?.ferma();
+  // ------------------------------------------------------------ il QR
+
+  bool get inAttesaDelPc => _attesa != null && DateTime.now().isBefore(_scade);
+  String get pcInAttesa => _attesa?.nome ?? '';
+
+  /// Legge il QR del PC e aspetta che il PC chiami. Solleva
+  /// [FormatException] con un messaggio da mostrare così com'è.
+  Future<void> collega(String testoQr) async {
+    final q = leggiQr(testoQr);
+    // Chi collega un PC vuole il sync: se era spento si accende.
+    if (!acceso) {
+      await imposta(acceso: true);
+    } else if (!inAscolto) {
+      await avvia();
+    }
+    _attesa = q;
+    _scade = DateTime.now().add(attesaCollegamento);
+    collegatoOra = null;
+    _avvisa();
+  }
+
+  void annullaCollegamento() {
+    _attesa = null;
+    _avvisa();
+  }
+
+  // ---------------------------------------------------- accendi / spegni
+
+  Future<bool> avvia() async {
+    await ferma();
+    if (!acceso) return false;
+    final a = Ascoltatore(_servi, porta: porta);
+    if (!await a.avvia()) {
+      _portaOccupata = true;
+      _avvisa();
+      return false;
+    }
+    _portaOccupata = false;
+    _ascoltatore = a;
+    _visto = sessione.vault;
+    sessione.addListener(_cambiato);
+    _avvisa();
+    return true;
+  }
+
+  Future<void> ferma() async {
+    sessione.removeListener(_cambiato);
+    final a = _ascoltatore;
     _ascoltatore = null;
-    if (pulisciCodice) _codice = null;
-    notifyListeners();
-  }
-
-  void _modificaLocale() {
-    if (_fondendo) return;   // è la fusione che sta scrivendo, non l'utente
-    programmaSync();
-  }
-
-  /// Una modifica locale si propaga da sola, poco dopo.
-  ///
-  /// Il rinvio serve perché le modifiche arrivano a raffica — si salva una
-  /// voce, si cambia categoria, se ne salva un'altra — e ognuna farebbe
-  /// partire uno scambio dell'intero vault. Ogni chiamata sposta in avanti
-  /// quella prima, così parte **una volta sola** quando ti fermi.
-  void programmaSync({Duration ritardo = const Duration(seconds: 3)}) {
-    _rinvio?.cancel();
-    _rinvio = null;
-    if (!acceso || _ascoltatore == null) return;
-    if (_imp.fidati.isEmpty) return;   // nessuno con cui allinearsi
-    _rinvio = Timer(ritardo, () async {
-      try {
-        await sincronizzaTutti();
-      } catch (_) {
-        // il sync automatico non deve mai disturbare
-      }
-    });
+    await a?.ferma();
+    _avvisa();
   }
 
   Future<void> imposta({String? nome, bool? acceso}) async {
     await salvaImpostazioni(_imp.copia(
-      nomeDispositivo: (nome != null && nome.trim().isNotEmpty)
-          ? nome.trim()
-          : _imp.nomeDispositivo,
+      nomeDispositivo:
+          (nome != null && nome.trim().isNotEmpty) ? _pulito(nome, 'Telefono') : null,
       syncAcceso: acceso,
     ));
-    // Accendere o spegnere deve avere effetto subito, non al prossimo avvio:
-    // chi lo spegne di solito lo fa perché è preoccupato.
-    await avvia();
-  }
-
-  // ------------------------------------------------------------- i fidati
-
-  void _abbina(String idPeer, String nomePeer) {
-    // La mappa è quella viva dentro le impostazioni: si aggiorna qui e si
-    // salva, così l'ascoltatore già aperto la vede subito.
-    _imp.fidati[idPeer] = nomePeer.isEmpty ? 'dispositivo' : nomePeer;
-    salvaImpostazioni(_imp);
-    notifyListeners();
-  }
-
-  Future<bool> revoca(String idPeer) async {
-    if (!_imp.fidati.containsKey(idPeer)) return false;
-    final f = Map<String, String>.from(_imp.fidati)..remove(idPeer);
-    final b = Map<String, Map<String, int>>.from(_imp.basi)..remove(idPeer);
-    // Via anche la base: se un giorno si riabbina, si riparte prudenti invece
-    // che con una fotografia vecchia di cui non ci si può più fidare. E via
-    // l'indirizzo, altrimenti si continuerebbe a bussare a un dispositivo che
-    // si è appena deciso di non voler più.
-    final ind = Map<String, String>.from(_imp.indirizzi)..remove(idPeer);
-    await salvaImpostazioni(_imp.copia(fidati: f, basi: b, indirizzi: ind));
-    notifyListeners();
-    return true;
-  }
-
-  // -------------------------------------------------------------- il lavoro
-
-  Future<List<Trovato>> cerca() async {
-    final trovati = await cercaDispositivi(_contesto());
-    for (final t in trovati) {
-      // il nome che conosciamo noi vince su quello annunciato
-      final noto = _imp.fidati[t.id];
-      if (noto != null) t.nomeLocale = noto;
-    }
-    return trovati;
-  }
-
-  Future<EsitoSync> sincronizzaCon(Trovato d,
-          {String codice = '', Duration attesa = attesaMax}) =>
-      _verso(d.indirizzo, d.porta, d.etichetta, codice: codice, attesa: attesa);
-
-  /// Sincronizza con un indirizzo scritto a mano.
-  ///
-  /// Serve quando la strada c'è ma la domanda non arriva: attraverso una VPN i
-  /// broadcast non passano — è un collegamento punto-punto instradato — e lo
-  /// stesso succede sulle reti che isolano i dispositivi fra loro. Si usa una
-  /// volta sola: da lì in poi l'indirizzo se lo ricorda l'app.
-  Future<EsitoSync> sincronizzaConIndirizzo(String indirizzo,
-          {int porta = portaSync}) =>
-      _verso(indirizzo, porta, indirizzo);
-
-  Future<EsitoSync> _verso(String indirizzo, int porta, String nome,
-      {String codice = '', Duration attesa = attesaMax}) async {
-    try {
-      final r = await sincronizza(_contesto(), indirizzo,
-          porta: porta, codice: codice, attesaConnessione: attesa);
-      await _ricordaDove('${r['id'] ?? ''}', indirizzo, porta);
-      return ultimo ?? EsitoSync(con: nome);
-    } on RifiutoSync catch (e) {
-      final esito = EsitoSync(con: nome, errore: e.messaggio);
-      ultimo = esito;
-      notifyListeners();
-      return esito;
-    } catch (e) {
-      final esito = EsitoSync(
-          con: nome,
-          errore: 'Non è stato possibile raggiungere quel dispositivo.');
-      ultimo = esito;
-      notifyListeners();
-      return esito;
-    }
-  }
-
-  /// Si segna dove quel dispositivo ha risposto l'ultima volta. Vedi
-  /// `Impostazioni.indirizzi` per il perché.
-  Future<void> _ricordaDove(String idPeer, String indirizzo, int porta) async {
-    // Solo per chi è già abbinato: di chi non ci riguarda non si tiene traccia.
-    if (idPeer.isEmpty || !_imp.fidati.containsKey(idPeer)) return;
-    final valore = '$indirizzo:$porta';
-    if (_imp.indirizzi[idPeer] == valore) return;
-    final m = Map<String, String>.from(_imp.indirizzi)..[idPeer] = valore;
-    await salvaImpostazioni(_imp.copia(indirizzi: m));
-  }
-
-  /// «192.168.5.53:8732» → indirizzo e porta. Si taglia sull'ULTIMO due punti:
-  /// un indirizzo IPv6 ne ha parecchi, e tagliare sul primo darebbe un
-  /// indirizzo monco e una porta che non esiste.
-  static (String, int)? _dividi(String salvato) {
-    final i = salvato.lastIndexOf(':');
-    if (i <= 0) return null;
-    final p = int.tryParse(salvato.substring(i + 1));
-    if (p == null) return null;
-    return (salvato.substring(0, i), p);
-  }
-
-  /// Cerca sulla rete e si allinea con **tutti** i dispositivi già abbinati
-  /// che rispondono.
-  ///
-  /// Quelli mai abbinati vengono ignorati di proposito: abbinare richiede il
-  /// codice, e deve restare una cosa che decidi tu.
-  Future<EsitoGiro> sincronizzaTutti() async {
-    List<Trovato> trovati;
-    // Cattura larga: qui si parla con la rete, e una WiFi che cade non deve
-    // diventare un errore dell'app.
-    try {
-      trovati = await cerca();
-    } catch (_) {
-      trovati = [];
-    }
-    final noti = trovati.where((t) => t.conosciuto).toList();
-    final visti = noti.map((t) => t.id).toSet();
-    final esiti = <EsitoSync>[];
-
-    for (final d in noti) {
-      esiti.add(_conNome(await sincronizzaCon(d), d.etichetta));
-    }
-
-    // Chi la scoperta non l'ha sentito, si prova dove rispondeva l'ultima
-    // volta: è così che il sync funziona attraverso una VPN, dove i broadcast
-    // non arrivano ma l'indirizzo di casa resta valido.
-    var ricordati = 0;
-    for (final e in _imp.indirizzi.entries) {
-      if (visti.contains(e.key) || !_imp.fidati.containsKey(e.key)) continue;
-      final dove = _dividi(e.value);
-      if (dove == null) continue;
-      ricordati++;
-      final nome = _imp.fidati[e.key] ?? 'dispositivo';
-      // Su un indirizzo ricordato si aspetta poco: se quel dispositivo non c'è
-      // più, venti secondi a vuoto per ognuno sarebbero un'app piantata.
-      esiti.add(_conNome(
-          await _verso(dove.$1, dove.$2, nome,
-              attesa: const Duration(seconds: 3)),
-          nome));
-    }
-
-    return EsitoGiro(
-        trovati: trovati.length,
-        abbinati: noti.length + ricordati,
-        esiti: esiti);
-  }
-
-  /// L'esito col nome di chi c'era dall'altra parte, se non ce l'ha già.
-  EsitoSync _conNome(EsitoSync e, String nome) => e.con.isNotEmpty
-      ? e
-      : EsitoSync(
-          con: nome,
-          aggiunte: e.aggiunte,
-          aggiornate: e.aggiornate,
-          cancellate: e.cancellate,
-          conflitti: e.conflitti,
-          errore: e.errore);
-
-  /// Il cuore: prende il vault dell'altro, lo fonde col nostro e applica.
-  ///
-  /// Quello che arriva è cifrato con la stessa chiave che abbiamo — l'ha appena
-  /// dimostrato la stretta di mano — quindi si apre come si aprirebbe il
-  /// proprio file. In chiaro sulla rete non è passato niente.
-  Future<Map<String, dynamic>> riceviVault(String blob, String idPeer) async {
-    Vault suo;
-    try {
-      suo = await apriVaultConChiave(blob, sessione.chiave);
-    } on WrongPassword {
-      ultimo = const EsitoSync(
-          errore: 'I due vault hanno master password diverse.');
-      notifyListeners();
-      return {};
-    } catch (_) {
-      ultimo = const EsitoSync(errore: 'Il vault ricevuto non è leggibile.');
-      notifyListeners();
-      return {};
-    }
-
-    final base = _imp.basi[idPeer];
-    final f = fondi(Istantanea.da(sessione.vault), Istantanea.da(suo), base);
-
-    // La scrittura che segue non è una modifica dell'utente: senza questa
-    // guardia farebbe partire un altro sync, e i due si rimbalzerebbero per
-    // sempre svegliandosi a vicenda.
-    _fondendo = true;
-    try {
-      await sessione.applicaFusione(f.voci, f.lapidi, f.categorie);
-    } finally {
-      _fondendo = false;
-    }
-
-    // La base registra solo ciò su cui siamo d'accordo: le voci contese restano
-    // fuori, così al prossimo giro risultano ancora cambiate da entrambi e il
-    // conflitto si ripresenta invece di sparire non deciso.
-    final contesi = f.conflitti.map((c) => c.uid).toSet();
-    final basi = Map<String, Map<String, int>>.from(_imp.basi);
-    basi[idPeer] = {
-      for (final c in f.voci)
-        if (!contesi.contains(c.uid)) c.uid: c.rev
-    };
-    await salvaImpostazioni(_imp.copia(basi: basi));
-
-    conflitti
-      ..clear()
-      ..addEntries(f.conflitti.map((c) => MapEntry(c.uid, c)));
-    _daChi
-      ..clear()
-      ..addEntries(f.conflitti.map((c) => MapEntry(c.uid, idPeer)));
-
-    ultimo = EsitoSync(
-      con: _imp.fidati[idPeer] ?? 'dispositivo',
-      aggiunte: f.aggiunte,
-      aggiornate: f.aggiornate,
-      cancellate: f.cancellate,
-      conflitti: f.conflitti.length,
-    );
-    notifyListeners();
-    return {};
-  }
-
-  // ------------------------------------------------------------- conflitti
-
-  /// `scelta` = "mia" | "sua". Applica la versione scelta e chiude il caso.
-  Future<bool> risolvi(String uid, String scelta) async {
-    final c = conflitti[uid];
-    if (c == null) return false;
-    final tenuta = scelta == 'mia' ? c.mia : c.sua;
-
-    final voci = sessione.vault.credenziali.where((v) => v.uid != uid).toList();
-    final lapidi = sessione.vault.lapidi.where((l) => l.uid != uid).toList();
-
-    if (tenuta != null) {
-      // Un giro di contatore in più: la scelta è essa stessa una modifica, e
-      // deve battere quella dell'altro dispositivo al prossimo sync.
-      voci.add(tenuta.modificata());
+    // Spegnerlo deve chiudere la porta subito: chi lo spegne di solito è
+    // preoccupato.
+    if (this.acceso) {
+      if (!inAscolto) await avvia();
     } else {
-      final r = (c.revMia > c.revSua ? c.revMia : c.revSua) + 1;
-      lapidi.add(Lapide(uid, rev: r, mod: oraOra()));
+      _attesa = null;
+      await ferma();
     }
-    await sessione.applicaFusione(voci, lapidi, sessione.vault.categorie);
+    _avvisa();
+  }
 
-    // Il pezzo che fa **convergere** la scelta: registrando nella base il `rev`
-    // che l'altro aveva, al prossimo giro lui risulta fermo e la mia decisione
-    // vince da sola, invece di far tornare la stessa domanda per sempre.
-    final idPeer = _daChi.remove(uid);
-    if (idPeer != null && c.revSua > 0) {
-      final basi = Map<String, Map<String, int>>.from(_imp.basi);
-      basi[idPeer] = {...(basi[idPeer] ?? {}), uid: c.revSua};
-      await salvaImpostazioni(_imp.copia(basi: basi));
+  void _cambiato() {
+    final v = sessione.vault;
+    final prima = _visto;
+    _visto = v;
+    if (_adottando || prima == null) return;
+    // Le liste si confrontano per riferimento: `Vault.con` tiene le stesse
+    // quando non sono state toccate. Scrivere solo la radice (un PC
+    // collegato) non è una modifica delle voci, e non deve far rimandare
+    // il vault al PC.
+    if (!identical(v.credenziali, prima.credenziali) ||
+        !identical(v.lapidi, prima.lapidi) ||
+        !identical(v.categorie, prima.categorie)) {
+      _gettone = nuovoGettone();
+    }
+  }
+
+  // ----------------------------------------------------------- il lavoro
+
+  Future<void> _inCoda(Future<void> Function() lavoro) {
+    final prima = _coda;
+    final fatto = Completer<void>();
+    _coda = fatto.future;
+    return prima.then((_) => lavoro()).whenComplete(fatto.complete);
+  }
+
+  /// Un collegamento in arrivo. La prima riga si legge fuori dalla coda: chi
+  /// bussa soltanto (il PC che cerca il telefono) chiude subito, e non deve
+  /// far aspettare lo scambio vero.
+  Future<void> _servi(Canale c) async {
+    try {
+      final prima = await c.leggi(attesa: const Duration(seconds: 5));
+      if (prima['v'] != versioneSync) {
+        c.scrivi({'no': 'versione'});
+        return;
+      }
+      final idPc = '${prima['pc'] ?? ''}';
+      final m = '${prima['m'] ?? ''}';
+
+      // Prima la chiave del QR appena inquadrato, poi quella salvata: chi
+      // ricollega lo stesso PC con un QR nuovo deve vincere sulla chiave
+      // vecchia, ma un giro del PC ancora con quella non va respinto.
+      final candidate = <(Uint8List, bool)>[
+        if (inAttesaDelPc && _attesa!.idPc == idPc) (_attesa!.chiave, true),
+        if (pcCollegati[idPc] != null) (pcCollegati[idPc]!.chiave, false),
+      ];
+      if (candidate.isEmpty) {
+        c.scrivi({'no': 'pc'});
+        return;
+      }
+      for (final (chiave, nuovo) in candidate) {
+        Map<String, dynamic> ciao;
+        try {
+          ciao = await decifra(chiave, m);
+        } on MessaggioRifiutato {
+          continue;
+        }
+        final mezza = '${ciao['s'] ?? ''}';
+        if (ciao['t'] != 'ciao' || mezza.length != 16) return;
+        await _inCoda(() => _scambio(c, idPc, chiave, nuovo,
+            _pulito(ciao['nome'], 'PC'), mezza));
+        return;
+      }
+      c.scrivi({'no': 'chiave'});
+    } catch (_) {
+      // un collegamento andato male non deve fermare l'ascolto
+    } finally {
+      await c.chiudi();
+    }
+  }
+
+  Future<void> _scambio(Canale c, String idPc, Uint8List chiave, bool nuovo,
+      String nomePc, String mezza) async {
+    if (nuovo) {
+      // Il PC ha dimostrato di avere la chiave del QR: da qui è collegato.
+      await _registra(idPc, nomePc, chiave);
+      _attesa = null;
+      collegatoOra = nomePc;
+    } else if (pcCollegati[idPc]?.nome != nomePc) {
+      await _registra(idPc, nomePc, chiave); // ha cambiato nome sul PC
     }
 
-    conflitti.remove(uid);
-    notifyListeners();
-    return true;
+    final s = mezza + nuovaMetaSessione();
+    Future<void> manda(Map<String, dynamic> d) async =>
+        c.scrivi({'m': await cifra(chiave, {...d, 's': s})});
+    Future<Map<String, dynamic>> ricevi(Set<String> tipi) async {
+      final r = await c.leggi();
+      if (r.containsKey('no')) throw RifiutoSync('Il PC ha rifiutato: ${r['no']}.');
+      final Map<String, dynamic> d;
+      try {
+        d = await decifra(chiave, '${r['m'] ?? ''}');
+      } on MessaggioRifiutato {
+        throw const RifiutoSync('Messaggio del PC non decifrabile.');
+      }
+      if (d['s'] != s || !tipi.contains(d['t'])) {
+        throw const RifiutoSync('Il PC ha detto qualcosa fuori protocollo.');
+      }
+      return d;
+    }
+
+    inCorso = true;
+    _avvisa();
+    try {
+      await manda({'t': 'stato', 'id': idDispositivo, 'nome': nome, 'token': _gettone});
+      final d = await ricevi({'fine', 'dammi'});
+      if (d['t'] == 'fine') {
+        ultimi[idPc] = EsitoSync(nomePc, DateTime.now());
+        return;
+      }
+
+      final v = sessione.vault;
+      await manda({
+        't': 'vault',
+        'token': _gettone,
+        'voci': v.credenziali.map((x) => x.toJson()).toList(),
+        'lapidi': v.lapidi.map((x) => x.toJson()).toList(),
+        'categorie': v.categorie,
+      });
+      final r = await ricevi({'uguale', 'prendi'});
+      if (r['t'] == 'uguale') {
+        ultimi[idPc] = EsitoSync(nomePc, DateTime.now());
+        return;
+      }
+      if (r['base'] != _gettone) {
+        // Hai salvato qualcosa qui mentre il PC fondeva: non si adotta
+        // niente, e il PC riprova fra pochi secondi con la versione nuova.
+        await manda({'t': 'cambiato'});
+        return;
+      }
+
+      final List<Credenziale> voci;
+      final List<Lapide> lapidi;
+      final List<String> categorie;
+      try {
+        voci = (r['voci'] as List)
+            .map((x) => Credenziale.fromJson(x as Map<String, dynamic>))
+            .toList();
+        lapidi = ((r['lapidi'] ?? const []) as List)
+            .whereType<Map<String, dynamic>>()
+            .map(Lapide.fromJson)
+            .where((l) => l.uid.isNotEmpty)
+            .toList();
+        categorie = ripulisciCategorie((r['categorie'] ?? const []) as List);
+      } catch (_) {
+        // Mai un vault adottato a metà: si chiude, e il vault resta com'era.
+        throw const RifiutoSync('Il PC ha mandato voci illeggibili.');
+      }
+      await _adotta(voci, lapidi, categorie);
+      await manda({'t': 'preso', 'token': _gettone});
+
+      final riep = r['riepilogo'] is Map ? r['riepilogo'] as Map : const {};
+      int n(String k) => (riep[k] as num?)?.toInt() ?? 0;
+      final esito = EsitoSync(nomePc, DateTime.now(),
+          aggiunte: n('aggiunte'), aggiornate: n('aggiornate'), cancellate: n('cancellate'));
+      ultimi[idPc] = esito;
+      if (esito.qualcosa) {
+        ultimoArrivo = esito;
+        arrivi++;
+      }
+    } finally {
+      inCorso = false;
+      _avvisa();
+    }
+  }
+
+  /// Il risultato del PC prende il posto delle voci di qui, in una scrittura.
+  ///
+  /// Gli `id` possono cambiare (il telefono prende quelli del PC), quindi le
+  /// voci fissate in cima si ritrovano per `uid`: senza, dopo il primo sync i
+  /// pin punterebbero a voci a caso.
+  Future<void> _adotta(
+      List<Credenziale> voci, List<Lapide> lapidi, List<String> categorie) async {
+    final uidDi = {for (final c in sessione.vault.credenziali) c.id: c.uid};
+    final fissate = [
+      for (final id in _imp.pinnate)
+        if (uidDi[id] != null) uidDi[id]!
+    ];
+    _adottando = true;
+    try {
+      await sessione.applicaFusione(voci, lapidi, categorie);
+    } finally {
+      _adottando = false;
+    }
+    _visto = sessione.vault;
+    _gettone = nuovoGettone();
+
+    final idDi = {for (final c in voci) c.uid: c.id};
+    final nuove = [
+      for (final u in fissate)
+        if (idDi[u] != null) idDi[u]!
+    ];
+    if (!listEquals(nuove, _imp.pinnate)) {
+      await salvaImpostazioni(_imp.copia(pinnate: nuove));
+    }
   }
 }

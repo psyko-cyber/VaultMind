@@ -1,268 +1,165 @@
 {
-  "_leggimi": "Casi di fusione fra due copie dello stesso vault. Li eseguono ENTRAMBE le suite (Python: TestFusione, Dart: fusione_test.dart) a ogni esecuzione: e' cio' che impedisce alle due implementazioni del merge di divergere in silenzio. Ogni voce in ingresso ha almeno id e title; uid assente = ricavato da id, rev assente = 1. In 'atteso.voci' si controllano solo i campi presenti.",
+  "_leggimi": "Casi della fusione fra il vault del PC e quello di un telefono: vince l'ultima modifica (merge.py). La esegue solo il PC, quindi solo la suite Python (test_merge.py); il file resta qui accanto agli altri contratti perche' e' la regola che decide cosa resta nelle due app. Voce in forma corta: id e title bastano; uid assente = '#'+id, rev assente = 1, mod assente = 0; fields come [etichetta, valore]. In 'atteso.voci' si controllano solo i campi scritti; 'titoli' e' l'elenco ordinato dei titoli vivi; 'lapidi' l'elenco ordinato degli uid sepolti.",
 
   "casi": [
     {
-      "nome": "due copie identiche: non succede niente",
-      "perche": "Il caso piu' frequente di tutti. Se qui uscisse anche un solo conflitto, sincronizzare diventerebbe insopportabile.",
-      "base": {"#1": 1, "#2": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}, {"uid": "#2", "title": "Netflix"}],
-        "lapidi": [],
-        "conflitti": []
-      }
+      "nome": "due copie identiche: non cambia niente",
+      "perche": "Il caso di tutti i giorni. Qui non deve muoversi nemmeno un contatore.",
+      "pc": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
+      "atteso": {"titoli": ["Banca", "Netflix"], "lapidi": [],
+                 "sul_pc": {"aggiunte": 0, "aggiornate": 0, "cancellate": 0},
+                 "sul_telefono": {"aggiunte": 0, "aggiornate": 0, "cancellate": 0}}
     },
-
     {
-      "nome": "una voce aggiunta di la' arriva",
-      "perche": "Il motivo per cui il sync esiste.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix", "uid": "n0va01"}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}, {"uid": "n0va01", "title": "Netflix"}],
-        "conflitti": []
-      }
+      "nome": "una voce nuova da ciascuna parte arriva all'altra",
+      "perche": "Le aggiunte non si pestano mai i piedi: hanno uid casuali diversi.",
+      "pc": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Dal PC", "uid": "u-pc", "mod": 100}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Dal telefono", "uid": "u-tel", "mod": 100}]},
+      "atteso": {"titoli": ["Banca", "Dal PC", "Dal telefono"], "lapidi": [],
+                 "sul_pc": {"aggiunte": 1, "aggiornate": 0, "cancellate": 0},
+                 "sul_telefono": {"aggiunte": 1, "aggiornate": 0, "cancellate": 0}}
     },
-
     {
-      "nome": "una voce aggiunta di qua resta",
-      "perche": "L'altro non sa che esiste: non averla non e' averla cancellata.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Slack", "uid": "m1a001"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}, {"uid": "m1a001", "title": "Slack"}],
-        "conflitti": []
-      }
+      "nome": "stesso id da tutte e due le parti: la voce nuova del telefono cambia numero",
+      "perche": "Due dispositivi scollegati danno entrambi max+1. Il numero lo cede la voce dall'uid casuale, mai quella vecchia, per cui il numero e' l'identita'.",
+      "pc": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Vecchia"}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Nuova", "uid": "u-nuova", "mod": 100}]},
+      "atteso": {"titoli": ["Banca", "Nuova", "Vecchia"], "lapidi": [],
+                 "voci": [{"uid": "#2", "id": 2, "title": "Vecchia"}, {"uid": "u-nuova", "id": 3}]}
     },
-
     {
-      "nome": "una modifica fatta di la' arriva",
-      "perche": "Con la base si sa che io non l'ho toccata: nessuna domanda da fare.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca", "rev": 1}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca Intesa", "rev": 2}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca Intesa", "rev": 2}],
-        "conflitti": []
-      }
+      "nome": "modificata dopo sul telefono: vince il telefono",
+      "perche": "La regola scelta da Luca: chi cambia una password per ultimo trova quella dappertutto.",
+      "pc": {"voci": [{"id": 1, "title": "Banca", "rev": 2, "mod": 1000, "fields": [["password", "dal-pc"]]}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca", "rev": 2, "mod": 2000, "fields": [["password", "dal-telefono"]]}]},
+      "atteso": {"titoli": ["Banca"], "voci": [{"uid": "#1", "mod": 2000, "fields": [["password", "dal-telefono"]]}],
+                 "sul_pc": {"aggiunte": 0, "aggiornate": 1, "cancellate": 0},
+                 "sul_telefono": {"aggiunte": 0, "aggiornate": 0, "cancellate": 0}}
     },
-
     {
-      "nome": "una cancellazione fatta di la' si propaga",
-      "perche": "Senza, cancellare non servirebbe a niente: la voce resterebbe viva sull'altro dispositivo per sempre.",
-      "base": {"#1": 1, "#2": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "#2", "rev": 2, "mod": 1000}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}],
-        "lapidi": ["#2"],
-        "conflitti": []
-      }
+      "nome": "modificata dopo sul PC: vince il PC, anche con meno modifiche",
+      "perche": "Conta quando, non quante volte: il telefono l'ha cambiata tre volte ieri, il PC una oggi.",
+      "pc": {"voci": [{"id": 1, "title": "Banca", "rev": 2, "mod": 5000, "fields": [["password", "di-oggi"]]}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca", "rev": 4, "mod": 3000, "fields": [["password", "di-ieri"]]}]},
+      "atteso": {"titoli": ["Banca"], "voci": [{"uid": "#1", "rev": 2, "fields": [["password", "di-oggi"]]}],
+                 "sul_pc": {"aggiunte": 0, "aggiornate": 0, "cancellate": 0},
+                 "sul_telefono": {"aggiunte": 0, "aggiornate": 1, "cancellate": 0}}
     },
-
     {
-      "nome": "una voce cancellata di qua non resuscita",
-      "perche": "L'incidente classico: l'altro ce l'ha ancora e me la rimanda indietro viva.",
-      "base": {"#1": 1, "#2": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "#2", "rev": 2, "mod": 1000}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}],
-        "lapidi": ["#2"],
-        "conflitti": []
-      }
+      "nome": "stessa ora: decide il contatore",
+      "perche": "Due orologi possono dare lo stesso millisecondo. Allora vince chi ha piu' modifiche.",
+      "pc": {"voci": [{"id": 1, "title": "Banca A", "rev": 3, "mod": 1000}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca B", "rev": 2, "mod": 1000}]},
+      "atteso": {"titoli": ["Banca A"]}
     },
-
     {
-      "nome": "cancellata da tutti e due: nessuna domanda",
-      "perche": "Sono d'accordo. Si tiene la lapide piu' avanti, per non farsela rimandare da un terzo dispositivo.",
-      "base": {"#1": 1, "#2": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "#2", "rev": 2, "mod": 1000}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "#2", "rev": 5, "mod": 2000}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}],
-        "lapidi": ["#2"],
-        "revLapidi": {"#2": 5},
-        "conflitti": []
-      }
+      "nome": "cancellata sul telefono dopo l'ultima modifica: sparisce dal PC",
+      "perche": "La lapide e' piu' recente della voce viva: e' una cancellazione voluta.",
+      "pc": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix", "mod": 1000}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "#2", "rev": 2, "mod": 9999999999000}]},
+      "atteso": {"titoli": ["Banca"], "lapidi": ["#2"],
+                 "sul_pc": {"aggiunte": 0, "aggiornate": 0, "cancellate": 1}}
     },
-
     {
-      "nome": "la stessa voce cambiata da entrambi: si chiede",
-      "perche": "Il caso per cui esiste tutta questa complicazione. Nessuna delle due versioni puo' sparire in silenzio.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca mia", "rev": 2}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca sua", "rev": 2}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca mia"}],
-        "conflitti": [{"uid": "#1", "motivo": "entrambi-modificata"}]
-      }
+      "nome": "cancellata sul PC, modificata dopo sul telefono: torna",
+      "perche": "Vince l'ultima, anche contro una cancellazione: chi l'ha corretta dopo la voleva.",
+      "pc": {"voci": [], "lapidi": [{"uid": "#1", "rev": 2, "mod": 1000}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca", "rev": 2, "mod": 2000}]},
+      "atteso": {"titoli": ["Banca"], "lapidi": [],
+                 "sul_pc": {"aggiunte": 1, "aggiornate": 0, "cancellate": 0}}
     },
-
     {
-      "nome": "cambiata identica da entrambi: non e' un conflitto",
-      "perche": "Stessa cosa scritta due volte. Chiedere sarebbe solo fastidio.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca Intesa", "rev": 2}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca Intesa", "rev": 3}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca Intesa", "rev": 3}],
-        "conflitti": []
-      }
+      "nome": "cancellata sul PC, copia vecchia sul telefono: resta cancellata",
+      "perche": "Senza lapide il telefono la rimanderebbe indietro a ogni sync.",
+      "pc": {"voci": [], "lapidi": [{"uid": "#1", "rev": 2, "mod": 9999999999000}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca", "mod": 1000}]},
+      "atteso": {"titoli": [], "lapidi": ["#1"],
+                 "sul_telefono": {"aggiunte": 0, "aggiornate": 0, "cancellate": 1}}
     },
-
     {
-      "nome": "modificata qui, cancellata di la' PRIMA della mia modifica",
-      "perche": "La mia versione contiene cambiamenti che chi ha cancellato non ha mai visto: buttarla sarebbe perdere lavoro.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca aggiornata", "rev": 3}]},
-      "suo": {"voci": [], "lapidi": [{"uid": "#1", "rev": 2, "mod": 1000}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca aggiornata"}],
-        "lapidi": [],
-        "conflitti": [{"uid": "#1", "motivo": "modificata-qui-cancellata-la"}]
-      }
+      "nome": "stessa ora e stesso contatore fra voce e lapide: vince la lapide",
+      "perche": "Nel dubbio la cancellazione voluta resta tale.",
+      "pc": {"voci": [{"id": 1, "title": "Banca", "rev": 2, "mod": 9999999999000}]},
+      "tel": {"voci": [], "lapidi": [{"uid": "#1", "rev": 2, "mod": 9999999999000}]},
+      "atteso": {"titoli": [], "lapidi": ["#1"]}
     },
-
     {
-      "nome": "cancellata di la' DOPO la mia versione: si cancella",
-      "perche": "La mia copia e' semplicemente vecchia: il contatore lo dimostra, e non c'e' niente da chiedere.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca", "rev": 2}]},
-      "suo": {"voci": [], "lapidi": [{"uid": "#1", "rev": 3, "mod": 1000}]},
-      "atteso": {
-        "voci": [],
-        "lapidi": ["#1"],
-        "conflitti": []
-      }
+      "nome": "manca da una parte senza lapide: si tiene",
+      "perche": "L'assenza non e' una cancellazione: e' solo una voce che l'altro non ha ancora.",
+      "pc": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Solo sul PC"}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca"}]},
+      "atteso": {"titoli": ["Banca", "Solo sul PC"],
+                 "sul_telefono": {"aggiunte": 1, "aggiornate": 0, "cancellate": 0}}
     },
-
     {
-      "nome": "cancellata qui, modificata di la' dopo: si chiede",
-      "perche": "Speculare al caso precedente. Chi ha modificato potrebbe aver aggiunto proprio la password che serve.",
-      "base": {"#1": 1},
-      "mio": {"voci": [], "lapidi": [{"uid": "#1", "rev": 2, "mod": 1000}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca aggiornata", "rev": 3}]},
-      "atteso": {
-        "voci": [],
-        "lapidi": ["#1"],
-        "conflitti": [{"uid": "#1", "motivo": "cancellata-qui-modificata-la"}]
-      }
+      "nome": "le lapidi troppo vecchie si buttano",
+      "perche": "Oltre 180 giorni una lapide non serve piu', e la lista non deve crescere per sempre.",
+      "pc": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "u-antica", "rev": 2, "mod": 1000}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca"}], "lapidi": [{"uid": "u-antica", "rev": 2, "mod": 1000}]},
+      "atteso": {"titoli": ["Banca"], "lapidi": []}
     },
-
     {
-      "nome": "senza base, due contenuti diversi sono un conflitto",
-      "perche": "Al primissimo sync non si sa chi ha cambiato cosa. Nel dubbio si chiede, mai si sceglie.",
-      "mio": {"voci": [{"id": 1, "title": "Banca mia"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca sua"}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca mia"}],
-        "conflitti": [{"uid": "#1", "motivo": "entrambi-modificata"}]
-      }
+      "nome": "primo sync, due vault diversi: stesso numero, voci diverse, si tengono entrambe",
+      "perche": "Con il QR si collegano anche vault nati separati, e la voce 5 dell'uno non e' la voce 5 dell'altro. Un doppione si cancella a mano, una password persa no.",
+      "primo": true,
+      "pc": {"voci": [{"id": 1, "title": "Banca", "mod": 5000}]},
+      "tel": {"voci": [{"id": 1, "title": "Posta", "mod": 1000}]},
+      "atteso": {"titoli": ["Banca", "Posta"], "voci": [{"uid": "#1", "id": 1, "title": "Banca"}]}
     },
-
     {
-      "nome": "senza base, una copia mai toccata perde contro una modificata",
-      "perche": "Il `rev` dice qualcosa anche senza base: fermo a 1 significa 'mai modificata da quando i due vault si sono separati', cioe' e' l'originale e l'altra ne discende. Senza questa regola il PRIMO sync di un vault appena riordinato farebbe una domanda per ognuna delle 800 voci.",
-      "mio": {"voci": [{"id": 1, "title": "Banca", "rev": 1}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca Intesa", "rev": 2}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca Intesa", "rev": 2}],
-        "conflitti": []
-      }
+      "nome": "primo sync, stesso numero e stesso titolo: e' la stessa voce",
+      "perche": "Il caso normale: il telefono aveva una copia del vault del PC.",
+      "primo": true,
+      "pc": {"voci": [{"id": 1, "title": "Banca", "mod": 1000, "fields": [["password", "vecchia"]]}]},
+      "tel": {"voci": [{"id": 1, "title": "Banca", "rev": 2, "mod": 2000, "fields": [["password", "nuova"]]}]},
+      "atteso": {"titoli": ["Banca"], "voci": [{"uid": "#1", "fields": [["password", "nuova"]]}]}
     },
-
     {
-      "nome": "senza base, la mia modificata batte la sua mai toccata",
-      "perche": "Speculare al caso precedente: vale nei due versi, altrimenti il risultato dipenderebbe da chi chiama per primo.",
-      "mio": {"voci": [{"id": 1, "title": "Banca Intesa", "rev": 2}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca", "rev": 1}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca Intesa", "rev": 2}],
-        "conflitti": []
-      }
+      "nome": "primo sync: una lapide col numero non cancella la voce dell'altro",
+      "perche": "La lapide #3 del telefono parla della SUA voce 3, che puo' non essere quella del PC.",
+      "primo": true,
+      "pc": {"voci": [{"id": 3, "title": "Banca", "mod": 1000}]},
+      "tel": {"voci": [], "lapidi": [{"uid": "#3", "rev": 2, "mod": 9999999999000}]},
+      "atteso": {"titoli": ["Banca"]}
     },
-
     {
-      "nome": "senza base, due copie entrambe modificate restano un conflitto",
-      "perche": "Qui la regola del 'mai toccata' non aiuta: hanno cambiato tutti e due, e nessun contatore puo' dire chi discende da chi. Si chiede.",
-      "mio": {"voci": [{"id": 1, "title": "Banca mia", "rev": 2}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca sua", "rev": 3}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca mia"}],
-        "conflitti": [{"uid": "#1", "motivo": "entrambi-modificata"}]
-      }
+      "nome": "dopo il primo sync la stessa lapide cancella",
+      "perche": "Da li' in poi #3 e' la stessa voce sulle due parti.",
+      "pc": {"voci": [{"id": 3, "title": "Banca", "mod": 1000}]},
+      "tel": {"voci": [], "lapidi": [{"uid": "#3", "rev": 2, "mod": 9999999999000}]},
+      "atteso": {"titoli": [], "lapidi": ["#3"]}
     },
-
     {
-      "nome": "senza base, contenuti uguali: niente da fare",
-      "perche": "Due copie mai toccate. Il primo sync di un vault appena travasato deve essere silenzioso.",
-      "mio": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Netflix"}]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}, {"uid": "#2", "title": "Netflix"}],
-        "conflitti": []
-      }
+      "nome": "categorie: cancellata sul telefono, resta cancellata",
+      "perche": "La base dice che il PC non l'ha toccata: la lista nuova e' quella del telefono.",
+      "base_categorie": ["Lavoro", "Casa"],
+      "pc": {"voci": [], "categorie": ["Lavoro", "Casa"]},
+      "tel": {"voci": [], "categorie": ["Casa"]},
+      "atteso": {"categorie": ["Casa"]}
     },
-
     {
-      "nome": "due voci nuove con lo stesso id restano due voci",
-      "perche": "Due dispositivi scollegati assegnano entrambi max+1. Senza uid una delle due sparirebbe; con l'uid si tengono tutte e due e si rinumera.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Dal PC", "uid": "aaa111"}]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}, {"id": 2, "title": "Dal telefono", "uid": "bbb222"}]},
-      "atteso": {
-        "voci": [
-          {"uid": "#1", "title": "Banca", "id": 1},
-          {"uid": "aaa111", "title": "Dal PC", "id": 2},
-          {"uid": "bbb222", "title": "Dal telefono", "id": 3}
-        ],
-        "conflitti": []
-      }
+      "nome": "categorie: cambiate da tutte e due le parti, si uniscono",
+      "perche": "Senza sapere chi ha fatto cosa, si perde il meno possibile.",
+      "base_categorie": ["Lavoro"],
+      "pc": {"voci": [], "categorie": ["Lavoro", "Banche"]},
+      "tel": {"voci": [], "categorie": ["Viaggi"]},
+      "atteso": {"categorie": ["Lavoro", "Banche", "Viaggi"]}
     },
-
     {
-      "nome": "una voce con uid ricavato non cede mai il suo numero",
-      "perche": "Per quelle il numero E' l'identita': cambiarlo le farebbe diventare un'altra voce al sync successivo.",
-      "base": {},
-      "mio": {"voci": [{"id": 2, "title": "Vecchia"}]},
-      "suo": {"voci": [{"id": 2, "title": "Nuova di la'", "uid": "ccc333"}]},
-      "atteso": {
-        "voci": [
-          {"uid": "#2", "title": "Vecchia", "id": 2},
-          {"uid": "ccc333", "title": "Nuova di la'", "id": 3}
-        ],
-        "conflitti": []
-      }
+      "nome": "categorie: senza base si uniscono",
+      "perche": "Al primo sync non c'e' niente da cui capire una cancellazione.",
+      "pc": {"voci": [], "categorie": ["Lavoro"]},
+      "tel": {"voci": [], "categorie": ["lavoro", "Casa"]},
+      "atteso": {"categorie": ["Lavoro", "Casa"]}
     },
-
     {
-      "nome": "le categorie si uniscono, le mie davanti",
-      "perche": "Una categoria creata dall'utente non deve sparire perche' l'altro dispositivo non la conosce.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}], "categorie": ["Banche"]},
-      "suo": {"voci": [{"id": 1, "title": "Banca"}], "categorie": ["Social", "Banche"]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca"}],
-        "categorie": ["Banche", "Social"],
-        "conflitti": []
-      }
-    },
-
-    {
-      "nome": "spostare una voce di categoria e' una modifica come le altre",
-      "perche": "Se non contasse, riordinare 800 voci risulterebbe 'niente e' cambiato' e il riordino non arriverebbe mai sull'altro dispositivo.",
-      "base": {"#1": 1},
-      "mio": {"voci": [{"id": 1, "title": "Banca"}], "categorie": ["Banche"]},
-      "suo": {"voci": [{"id": 1, "title": "Banca", "category": "Banche", "rev": 2}], "categorie": ["Banche"]},
-      "atteso": {
-        "voci": [{"uid": "#1", "title": "Banca", "category": "Banche", "rev": 2}],
-        "conflitti": []
-      }
+      "nome": "categorie: quella usata da una voce entra nella lista",
+      "perche": "Una voce non puo' stare in una categoria che non esiste.",
+      "base_categorie": [],
+      "pc": {"voci": [], "categorie": []},
+      "tel": {"voci": [{"id": 1, "title": "Banca", "category": "Banche"}], "categorie": []},
+      "atteso": {"titoli": ["Banca"], "categorie": ["Banche"]}
     }
   ]
 }

@@ -1,332 +1,209 @@
 """
-merge.py — Fusione di due copie dello stesso vault, voce per voce.
+merge.py — Fusione del vault del PC con quello di un telefono.
 
-È il cuore del sync (TODO §2), e l'unica parte del progetto che può
-**distruggere** dati invece di limitarsi a non funzionare. Per questo:
+**Vince l'ultima modifica**, voce per voce. È la regola scelta da Luca il
+25/10/2026, al posto dei conflitti da decidere a mano: chi ha due dispositivi in
+casa e cambia una password su uno si aspetta di ritrovarla cambiata sull'altro,
+non una domanda. È anche quella di Tigert, che funziona.
 
-  - è una **funzione pura**: nessun file, nessuna rete, nessuno stato. Si può
-    provare con centinaia di casi in un secondo;
-  - esiste identica in Dart (`mobile/lib/fusione.dart`), perché entrambi i lati
-    possono ricevere e fondere. Le due implementazioni sono tenute allineate
-    dal vettore di casi `tests/vettore/fusione.json`, che le due suite eseguono
-    a ogni esecuzione — divergere in silenzio è esattamente il modo in cui un
-    sync perde le password;
-  - **non risolve mai un conflitto da sola.** Quando due dispositivi hanno
-    cambiato la stessa voce, la mette da parte e la fa decidere all'utente. Su
-    un gestore di password una versione persa in silenzio è inaccettabile.
+Funzione pura (niente file, niente rete): si prova con i casi di
+`tests/vettore/fusione.json`. La esegue **solo il PC**: il telefono manda il
+suo contenuto e riceve il risultato da adottare così com'è. Prima la fusione
+esisteva uguale in due lingue, e tenerle allineate era un lavoro in più senza
+un vantaggio per chi usa l'app.
 
-## Il punto difficile: capire chi è più avanti
+## Chi vince
 
-Un contatore per voce (`rev`) dice quante volte quella voce è stata modificata,
-ma **non** basta a distinguere due situazioni molto diverse:
+Per ogni `uid`, fra la voce viva e la lapide di ciascun lato, vince quella con
+`mod` più grande; a parità `rev`, poi la lapide (nel dubbio la cancellazione
+voluta resta tale), poi il contenuto, solo per essere deterministici. `mod` lo
+scrive `crypto_store.dopo()`: mai meno di un millisecondo dopo la versione
+precedente, così una correzione fatta *dopo* aver visto la voce vince anche se
+l'altro orologio è avanti.
 
-    io rev 3, tu rev 2   →  sono più avanti di te?   (allora prendo la mia)
-                         →  oppure siamo divergiti?  (allora è un conflitto)
+Una voce che c'è da una parte sola, senza lapide dall'altra, si tiene: l'assenza
+non è una cancellazione.
 
-Dal solo confronto dei numeri non si può sapere. Quello che lo dice è la
-**base**: cosa i due dispositivi si erano detti l'ultima volta che hanno
-sincronizzato. Con quella, "cambiato da me" e "cambiato da te" diventano due
-fatti indipendenti, e il conflitto è esattamente il caso in cui valgono
-entrambi.
+## Due vault diversi
 
-La base è un dizionario `{uid: rev}`, sta nelle preferenze locali (una per
-dispositivo abbinato) e **non** nel vault: è un dato derivato, si rigenera al
-prossimo sync e non deve viaggiare.
+Da quando il collegamento passa dal QR, si possono collegare due vault nati
+separati. Le voci che esistevano prima degli uid hanno un uid ricavato dal
+numero (`#5`), e la voce 5 dell'uno non è la voce 5 dell'altro. Al **primo**
+sync con un telefono (`primo=True`), quindi:
 
-Senza base — cioè al primissimo sync fra due dispositivi — si è prudenti: due
-versioni diverse della stessa voce sono un conflitto, e si chiede.
+  - due voci con lo stesso `#n` e titolo diverso si tengono **tutte e due**
+    (quella del telefono prende un uid nuovo);
+  - una lapide con un `#n` non cancella la voce viva dell'altro lato.
+
+Un doppione si cancella a mano; una password sparita non torna.
+
+## Le categorie
+
+La lista delle categorie si confronta con la **base**, la lista concordata
+all'ultimo sync con quel telefono: se è cambiata da una parte sola vince quella
+(così una categoria cancellata resta cancellata), se è cambiata da tutte e due
+si uniscono. In più ogni categoria usata da una voce entra nella lista, perché
+una voce non può stare in una categoria che non esiste.
 """
 
 from __future__ import annotations
 import json
+import uuid
 from dataclasses import dataclass, field, replace
 from typing import Dict, List, Optional, Tuple
 
-from .crypto_store import Credential, uid_derivato
-
-# ---------------------------------------------------------------- i conflitti
-
-#: Entrambi hanno modificato la stessa voce, in modi diversi.
-ENTRAMBI_MODIFICATA = "entrambi-modificata"
-#: Qui è stata modificata, di là cancellata.
-MODIFICATA_QUI_CANCELLATA_LA = "modificata-qui-cancellata-la"
-#: Qui è stata cancellata, di là modificata.
-CANCELLATA_QUI_MODIFICATA_LA = "cancellata-qui-modificata-la"
-
-
-@dataclass
-class Conflitto:
-    """Una voce che il motore si RIFIUTA di risolvere da solo."""
-    uid: str
-    motivo: str
-    #: La versione locale. `None` se qui è stata cancellata.
-    mia: Optional[Credential] = None
-    #: La versione remota. `None` se di là è stata cancellata.
-    sua: Optional[Credential] = None
-    #: I due contatori, anche quando una delle due versioni non c'è più (in quel
-    #: caso è il `rev` della lapide). Servono a chi risolve: registrare nella
-    #: base il `rev` dell'altro è ciò che fa **convergere** la scelta, invece di
-    #: far ripresentare la stessa domanda a ogni sync.
-    rev_mia: int = 0
-    rev_sua: int = 0
-
-    @property
-    def titolo(self) -> str:
-        """Come chiamarla parlando all'utente, anche se una parte non c'è."""
-        for c in (self.mia, self.sua):
-            if c is not None and c.title:
-                return c.title
-        return self.uid
+from .crypto_store import Credential, pota_lapidi, uid_derivato
 
 
 @dataclass
 class Istantanea:
-    """Lo stato di un vault nel momento della fusione. Volutamente senza
-    chiave e senza file: la fusione non deve poter toccare il disco."""
-    entries: List[Credential] = field(default_factory=list)
+    entries: List[Credential]
     tombstones: List[dict] = field(default_factory=list)
     categories: List[str] = field(default_factory=list)
 
 
 @dataclass
 class Fusione:
-    """Il risultato. Le voci in conflitto restano com'erano **in locale**:
-    applicare una fusione senza aver deciso i conflitti non cambia nulla di
-    quelle voci, e non c'è un momento in cui il vault è a metà."""
-    entries: List[Credential] = field(default_factory=list)
-    tombstones: List[dict] = field(default_factory=list)
-    categories: List[str] = field(default_factory=list)
-    conflitti: List[Conflitto] = field(default_factory=list)
-    #: Quante voci sono arrivate, cambiate, sparite, rimaste uguali.
-    riepilogo: dict = field(default_factory=dict)
-
-    @property
-    def qualcosa_da_fare(self) -> bool:
-        r = self.riepilogo
-        return bool(self.conflitti or r.get("aggiunte") or r.get("aggiornate")
-                    or r.get("cancellate"))
+    entries: List[Credential]
+    tombstones: List[dict]
+    categories: List[str]
+    #: Cosa cambia sul PC e cosa sul telefono: {"aggiunte", "aggiornate",
+    #: "cancellate"} ciascuno. È ciò che le due app raccontano all'utente.
+    sul_pc: Dict[str, int]
+    sul_telefono: Dict[str, int]
 
 
-# ------------------------------------------------------------------- utilità
-
-def impronta(c: Credential) -> str:
-    """Il CONTENUTO di una voce, senza le sue coordinate.
-
-    Fuori restano `id` (è un numero locale: la stessa voce può averne uno
-    diverso sui due dispositivi), `rev` e `mod` (dicono *quando*, non *cosa*).
-    Due voci con la stessa impronta sono la stessa cosa, anche se i contatori
-    non coincidono — e allora non c'è niente da fondere.
-    """
-    return json.dumps([
-        c.title,
-        list(c.tags),
-        bool(c.critical),
-        c.category,
-        [[f.label, f.value] for f in c.fields],
-        {k: c.extra[k] for k in sorted(c.extra)},
-    ], ensure_ascii=False, sort_keys=True)
+def _numerata(uid: str) -> bool:
+    """Un uid ricavato dal numero della voce (vedi `uid_derivato`)."""
+    return uid.startswith("#")
 
 
-def base_da(entries: List[Credential]) -> Dict[str, int]:
-    """La base da conservare dopo un sync riuscito: cosa i due si sono detti.
-    Al prossimo giro è lei a dire chi ha cambiato cosa."""
-    return {c.uid: c.rev for c in entries}
+def contenuto(c: Credential) -> str:
+    """La voce senza `id`, in una forma confrontabile: l'id è un numero locale
+    e lo stesso contenuto può averne due diversi su due dispositivi."""
+    d = c.to_dict()
+    d.pop("id", None)
+    d["uid"] = c.uid
+    return json.dumps(d, sort_keys=True, ensure_ascii=False, default=str)
 
 
-def _per_uid(entries: List[Credential]) -> Dict[str, Credential]:
-    return {c.uid: c for c in entries}
+def _lapide(t: dict) -> dict:
+    return {"uid": str(t.get("uid") or ""), "rev": int(t.get("rev") or 1),
+            "mod": int(t.get("mod") or 0)}
 
 
-def _lapidi_per_uid(tombstones: List[dict]) -> Dict[str, dict]:
-    return {str(t.get("uid")): t for t in tombstones if t.get("uid")}
+def fondi(pc: Istantanea, tel: Istantanea,
+          base_categorie: Optional[List[str]] = None,
+          primo: bool = False) -> Fusione:
+    pc_vive: Dict[str, Credential] = {c.uid: c for c in pc.entries}
+    tel_lista: List[Credential] = []
+    for c in tel.entries:
+        altra = pc_vive.get(c.uid)
+        if primo and _numerata(c.uid) and altra is not None and altra.title != c.title:
+            c = replace(c, uid=uuid.uuid4().hex)   # vedi «Due vault diversi»
+        tel_lista.append(c)
+    tel_vive: Dict[str, Credential] = {c.uid: c for c in tel_lista}
+    pc_morte = {t["uid"]: t for t in map(_lapide, pc.tombstones) if t["uid"]}
+    tel_morte = {t["uid"]: t for t in map(_lapide, tel.tombstones) if t["uid"]}
 
+    def candidati(uid: str) -> List[Tuple[tuple, str, object]]:
+        out = []
+        for lato, vive, morte, vive_altro in (("pc", pc_vive, pc_morte, tel_vive),
+                                              ("tel", tel_vive, tel_morte, pc_vive)):
+            c = vive.get(uid)
+            if c is not None:
+                out.append(((c.mod, c.rev, 0, contenuto(c)), lato, c))
+            t = morte.get(uid)
+            if t is not None:
+                if primo and _numerata(uid) and uid in vive_altro:
+                    continue   # vedi «Due vault diversi» nel docstring
+                out.append(((t["mod"], t["rev"], 1, ""), lato, t))
+        return out
 
-# stato di una voce da un lato: ("viva", cred) | ("morta", rev) | ("assente", None)
-def _stato(uid: str, vive: Dict[str, Credential], morte: Dict[str, dict]) -> Tuple[str, object]:
-    if uid in vive:
-        return ("viva", vive[uid])
-    if uid in morte:
-        return ("morta", int(morte[uid].get("rev") or 1))
-    return ("assente", None)
+    vincitori: Dict[str, object] = {}
+    for uid in set(pc_vive) | set(tel_vive) | set(pc_morte) | set(tel_morte):
+        cand = candidati(uid)
+        if cand:
+            vincitori[uid] = max(cand, key=lambda x: x[0])[2]
 
-
-def _cambiato(stato: Tuple[str, object], base: Optional[Dict[str, int]], uid: str) -> bool:
-    """Questo lato ha toccato la voce dall'ultimo sync?
-
-    Senza base non si può sapere, e si risponde di sì: è la risposta prudente,
-    perché porta a chiedere invece che a scegliere al posto dell'utente.
-    """
-    if base is None:
-        return True
-    tipo, dato = stato
-    if tipo == "viva":
-        return base.get(uid) != dato.rev
-    if tipo == "morta":
-        # Una lapide è sempre una modifica da propagare. Se la cancellazione
-        # era già stata scambiata all'ultimo sync, anche l'altro lato ce l'ha e
-        # sono d'accordo: dirlo di nuovo non fa danni.
-        return True
-    # Assente: nessuna informazione. Non si cancella mai per assenza — una
-    # lapide potata da tempo farebbe sparire la voce dall'altro dispositivo.
-    return False
-
-
-def _lapide(uid: str, rev: int, mod: int) -> dict:
-    return {"uid": uid, "rev": rev, "mod": mod}
-
-
-# ------------------------------------------------------------------ la fusione
-
-def fondi(mia: Istantanea, sua: Istantanea,
-          base: Optional[Dict[str, int]] = None) -> Fusione:
-    """Fonde `sua` dentro `mia` e restituisce il risultato coi conflitti.
-
-    `base` è la fotografia dell'ultimo sync **con quel dispositivo**
-    (`{uid: rev}`). Senza, la fusione è prudente e chiede più spesso.
-    """
-    mie_vive, mie_morte = _per_uid(mia.entries), _lapidi_per_uid(mia.tombstones)
-    sue_vive, sue_morte = _per_uid(sua.entries), _lapidi_per_uid(sua.tombstones)
-
-    uids = list(mie_vive) + list(mie_morte)
-    for u in list(sue_vive) + list(sue_morte):
-        if u not in uids:
-            uids.append(u)
-
-    tenute: Dict[str, Credential] = {}
-    lapidi: Dict[str, dict] = {}
-    conflitti: List[Conflitto] = []
-    conti = {"aggiunte": 0, "aggiornate": 0, "cancellate": 0, "invariate": 0}
-
-    for uid in uids:
-        a = _stato(uid, mie_vive, mie_morte)
-        b = _stato(uid, sue_vive, sue_morte)
-
-        # --- la voce non esiste più da nessuna delle due parti ---
-        if a[0] == "morta" or b[0] == "morta":
-            # si tiene comunque la lapide più avanti fra le due: serve a non
-            # farsi rimandare indietro la voce da un terzo dispositivo
-            revs = [x[1] for x in (a, b) if x[0] == "morta"]
-            mods = [int((m.get(uid) or {}).get("mod") or 0)
-                    for m in (mie_morte, sue_morte) if uid in m]
-            lapidi[uid] = _lapide(uid, max(revs), max(mods) if mods else 0)
-
-        cambiata_qui = _cambiato(a, base, uid)
-        cambiata_la = _cambiato(b, base, uid)
-
-        # --- nessuno l'ha toccata ---
-        if not cambiata_qui and not cambiata_la:
-            if a[0] == "viva":
-                tenute[uid] = a[1]
-                conti["invariate"] += 1
+    voci: List[Credential] = []
+    lapidi: List[dict] = []
+    # Prima le voci nuove arrivate dal telefono, nell'ordine che hanno là; poi
+    # quelle del PC nel loro ordine. È l'ordine di `add()`: l'ultima aggiunta
+    # in testa, che è quella che si cerca.
+    for c in tel_lista:
+        if c.uid in pc_vive:
             continue
+        v = vincitori.get(c.uid)
+        if isinstance(v, Credential):
+            voci.append(v)
+    for c in pc.entries:
+        v = vincitori.get(c.uid)
+        if isinstance(v, Credential):
+            # L'id resta quello del PC: è quello che usano l'indice della
+            # ricerca e la pagina aperta.
+            voci.append(v if v.id == c.id else replace(v, id=c.id))
+    for uid, v in vincitori.items():
+        if isinstance(v, dict):
+            lapidi.append(dict(v))
+    lapidi = pota_lapidi(sorted(lapidi, key=lambda t: t["uid"]))
+    voci = _id_unici(voci)
 
-        # --- l'ha toccata uno solo: si prende la sua versione ---
-        if cambiata_qui and not cambiata_la:
-            if a[0] == "viva":
-                tenute[uid] = a[1]
-            continue
-        if cambiata_la and not cambiata_qui:
-            if b[0] == "viva":
-                tenute[uid] = b[1]
-                conti["aggiornate" if a[0] == "viva" else "aggiunte"] += 1
-            elif a[0] == "viva":
-                conti["cancellate"] += 1
-            continue
+    categorie = _categorie(pc.categories, tel.categories, base_categorie, voci)
 
-        # --- l'hanno toccata entrambi ---
-        if a[0] == "viva" and b[0] == "viva":
-            if impronta(a[1]) == impronta(b[1]):
-                # stessa identica cosa scritta due volte: niente da decidere,
-                # si tiene quella col contatore più avanti per non tornare indietro
-                tenute[uid] = a[1] if a[1].rev >= b[1].rev else b[1]
-                conti["invariate"] += 1
-            elif a[1].rev == 1 and b[1].rev > 1:
-                # Una copia ferma a `rev` 1 non è mai stata toccata da quando i
-                # due vault si sono separati: è l'originale, e l'altra ne
-                # discende. Non è un conflitto, è un aggiornamento — e senza
-                # questa regola il PRIMO sync di un vault appena riordinato
-                # farebbe una domanda per ognuna delle 800 voci.
-                tenute[uid] = b[1]
-                conti["aggiornate"] += 1
-            elif b[1].rev == 1 and a[1].rev > 1:
-                tenute[uid] = a[1]
-                conti["invariate"] += 1
-            else:
-                tenute[uid] = a[1]          # per ora resta la mia
-                conflitti.append(Conflitto(uid, ENTRAMBI_MODIFICATA, a[1], b[1],
-                                           rev_mia=a[1].rev, rev_sua=b[1].rev))
-            continue
-
-        if a[0] == "viva" and b[0] == "morta":
-            # La lapide vince SOLO se è provabilmente più recente della mia
-            # copia: `rev` cresce solo modificando, quindi se la mia versione è
-            # più indietro del momento in cui l'hanno cancellata, la mia è
-            # semplicemente vecchia. Altrimenti ho modifiche che il cancellatore
-            # non ha mai visto, e la decisione non è mia da prendere.
-            if b[1] > a[1].rev:
-                conti["cancellate"] += 1
-            else:
-                tenute[uid] = a[1]
-                conflitti.append(Conflitto(uid, MODIFICATA_QUI_CANCELLATA_LA, a[1], None,
-                                           rev_mia=a[1].rev, rev_sua=b[1]))
-            continue
-
-        if a[0] == "morta" and b[0] == "viva":
-            if a[1] > b[1].rev:
-                pass                        # cancellata qui, e di là è più vecchia
-            else:
-                conflitti.append(Conflitto(uid, CANCELLATA_QUI_MODIFICATA_LA, None, b[1],
-                                           rev_mia=a[1], rev_sua=b[1].rev))
-            continue
-
-        if a[0] == "assente" and b[0] == "viva":
-            tenute[uid] = b[1]
-            conti["aggiunte"] += 1
-            continue
-        if a[0] == "viva" and b[0] == "assente":
-            tenute[uid] = a[1]
-
-    # Una voce che sopravvive alla fusione non può portarsi dietro la propria
-    # lapide: succede quando la cancellazione perde (è più vecchia della
-    # modifica) o quando resta in sospeso come conflitto. Se la si lasciasse,
-    # il vault direbbe due cose opposte sulla stessa voce.
-    lapidi = {u: t for u, t in lapidi.items() if u not in tenute}
-
-    # ordine: prima le mie com'erano, poi quelle arrivate da lui
-    ordine = [c.uid for c in mia.entries] + [c.uid for c in sua.entries]
-    viste = set()
-    finali: List[Credential] = []
-    for uid in ordine:
-        if uid in tenute and uid not in viste:
-            viste.add(uid)
-            finali.append(tenute[uid])
-
-    return Fusione(
-        entries=_id_unici(finali),
-        tombstones=[lapidi[u] for u in sorted(lapidi)],
-        categories=_unisci_categorie(mia.categories, sua.categories),
-        conflitti=conflitti,
-        riepilogo=conti,
-    )
+    return Fusione(entries=voci, tombstones=lapidi, categories=categorie,
+                   sul_pc=_differenze(pc.entries, voci),
+                   sul_telefono=_differenze(tel_lista, voci))
 
 
-def _unisci_categorie(mie: List[str], sue: List[str]) -> List[str]:
-    """Unione, con le mie davanti nell'ordine che avevano.
+def _differenze(prima: List[Credential], dopo: List[Credential]) -> Dict[str, int]:
+    a = {c.uid: contenuto(c) for c in prima}
+    b = {c.uid: contenuto(c) for c in dopo}
+    return {"aggiunte": sum(1 for u in b if u not in a),
+            "aggiornate": sum(1 for u in b if u in a and a[u] != b[u]),
+            "cancellate": sum(1 for u in a if u not in b)}
 
-    Nota onesta: una categoria rinominata su un dispositivo e non sull'altro
-    ricompare qui col vecchio nome, vuota. Non si può distinguere una rinomina
-    da "cancellata di qua, creata di là" guardando solo due liste di stringhe,
-    e fra il rischio di far ricomparire un nome e quello di far sparire una
-    categoria creata dall'utente, si sceglie il primo.
-    """
+
+def _stesse(a: List[str], b: List[str]) -> bool:
+    return [x.casefold() for x in a] == [x.casefold() for x in b]
+
+
+def _unione(*liste: List[str]) -> List[str]:
     fuori: List[str] = []
     viste = set()
-    for c in list(mie) + list(sue):
-        k = c.casefold()
-        if c and k not in viste:
-            viste.add(k)
-            fuori.append(c)
+    for lista in liste:
+        for c in lista:
+            k = c.casefold()
+            if c and k not in viste:
+                viste.add(k)
+                fuori.append(c)
     return fuori
+
+
+def _categorie(pc: List[str], tel: List[str], base: Optional[List[str]],
+               voci: List[Credential]) -> List[str]:
+    if base is not None and _stesse(tel, base):
+        scelte = list(pc)
+    elif base is not None and _stesse(pc, base):
+        scelte = list(tel)
+    else:
+        scelte = _unione(pc, tel)
+    return _unione(scelte, [c.category for c in voci if c.category])
+
+
+def uguali(a: Istantanea, b: Istantanea) -> bool:
+    """Stesso contenuto, a meno di `id` e dell'ordine. Serve a non riscrivere
+    né mandare niente quando non c'è niente di nuovo: il sync parte spesso, e
+    ogni scrittura ri-cifra l'intero vault."""
+    return _forma(a) == _forma(b)
+
+
+def _forma(s: Istantanea) -> str:
+    return json.dumps({
+        "e": sorted(contenuto(c) for c in s.entries),
+        "t": sorted(json.dumps(_lapide(t), sort_keys=True) for t in s.tombstones),
+        "c": list(s.categories),
+    }, ensure_ascii=False)
 
 
 def _id_unici(entries: List[Credential]) -> List[Credential]:

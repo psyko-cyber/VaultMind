@@ -202,19 +202,19 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
           ),
 
           // Nel browser il sync non c'è (`sync_rete_web.dart`): la sezione
-          // porterebbe a una ricerca che non trova mai nessuno.
+          // porterebbe a un collegamento che non può riuscire.
           if (!kIsWeb) _Sezione('Dispositivi'),
-          // Qui e non nella barra: abbinare si fa una volta sola, mentre
-          // sincronizzare si fa spesso — e infatti il tasto in alto ora
-          // sincronizza invece di aprire questa schermata.
+          // Il nome è quello che il PC scrive nelle istruzioni accanto al QR
+          // («Impostazioni › Sincronizza › Collega al PC»): cambiarlo qui
+          // vuol dire cambiarlo anche in `index.html`.
           if (!kIsWeb) ListTile(
             leading: IconaVM(Icone.dispositivi, color: context.cTenue),
-            title: const Text('Sincronizza con altri dispositivi'),
+            title: const Text('Sincronizza'),
             subtitle: Text(
-                widget.gestoreSync.fidati.isEmpty
-                    ? 'Nessuno abbinato. Serve il codice mostrato sull\'altro dispositivo.'
-                    : '${widget.gestoreSync.fidati.length} abbinati. '
-                        'Si allineano da soli quando cambia qualcosa.',
+                widget.gestoreSync.pcCollegati.isEmpty
+                    ? 'Nessun PC collegato. Sul PC si apre un QR da inquadrare qui.'
+                    : 'Collegato a ${widget.gestoreSync.pcCollegati.values.map((p) => p.nome).join(', ')}. '
+                        'Si allinea da solo con VaultMind aperto.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
             onTap: () => Navigator.of(context)
                 .push(MaterialPageRoute(

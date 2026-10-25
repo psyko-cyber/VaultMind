@@ -1,24 +1,30 @@
-/// La schermata Sincronizza.
+/// La schermata Sincronizza: collegare il PC col QR, e vedere com'è andata.
 ///
-/// Non si chiama VPN: dentro l'app non costruiamo una VPN — quella è WireGuard
-/// sul router — e chi legge quel nome si aspetterebbe di essere protetto fuori
-/// casa. La VPN è spiegata qui dentro come la strada per il caso "fuori casa",
-/// che per il codice è identica all'essere sulla rete di casa.
+/// Dal 25/10/2026 non c'è più niente da cercare né codici da scrivere: il PC
+/// mostra un QR, il telefono lo inquadra, e da lì il PC chiama da solo ogni
+/// pochi secondi. Qui restano un pulsante, l'elenco dei PC collegati e una
+/// riga per ciascuno che dice quando si sono parlati l'ultima volta.
 library;
 
 import 'package:flutter/material.dart';
 
-import '../fusione.dart';
+import '../icone.dart';
+import '../interruttore.dart';
+import '../ponte_file.dart';
 import '../sync_gestore.dart';
 import '../sync_rete.dart';
 import '../tema.dart';
 import 'dialoghi.dart';
-import '../icone.dart';
-import '../interruttore.dart';
 
 class SchermataSincronizza extends StatefulWidget {
   final GestoreSync gestore;
-  const SchermataSincronizza({super.key, required this.gestore});
+
+  /// Apre subito la fotocamera: è la strada di chi ha appena creato il vault
+  /// per collegarlo al PC, e non deve cercare il pulsante.
+  final bool inquadraSubito;
+
+  const SchermataSincronizza(
+      {super.key, required this.gestore, this.inquadraSubito = false});
 
   @override
   State<SchermataSincronizza> createState() => _SchermataSincronizzaState();
@@ -26,11 +32,8 @@ class SchermataSincronizza extends StatefulWidget {
 
 class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   late final TextEditingController _nome;
-  final _indirizzo = TextEditingController();
-  List<Trovato> _trovati = const [];
-  bool _cerco = false;
-  bool _aManoInCorso = false;
-  String? _messaggio;
+  late final Future<List<String>> _indirizzi;
+  String? _errore;
 
   GestoreSync get g => widget.gestore;
 
@@ -38,15 +41,18 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   void initState() {
     super.initState();
     _nome = TextEditingController(text: g.nome);
+    _indirizzi = indirizziLocali();
     g.addListener(_aggiorna);
-    if (g.acceso) _cerca();
+    if (widget.inquadraSubito) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _inquadra());
+    }
   }
 
   @override
   void dispose() {
     g.removeListener(_aggiorna);
+    g.collegatoOra = null; // detto: la prossima volta non si ripete
     _nome.dispose();
-    _indirizzo.dispose();
     super.dispose();
   }
 
@@ -54,127 +60,33 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
     if (mounted) setState(() {});
   }
 
-  Future<void> _cerca() async {
-    setState(() {
-      _cerco = true;
-      _messaggio = null;
-    });
-    final t = await g.cerca();
+  Future<void> _inquadra() async {
+    setState(() => _errore = null);
+    final r = await qrDaFotocamera(
+        coloreAccento: context.cAccento.toARGB32(), titolo: 'Inquadra il QR del PC');
     if (!mounted) return;
-    setState(() {
-      _trovati = t;
-      _cerco = false;
-    });
-  }
-
-  Future<void> _sincronizza(Trovato d, {String codice = ''}) async {
-    setState(() => _messaggio = null);
-    final esito = await g.sincronizzaCon(d, codice: codice);
-    if (!mounted) return;
-    setState(() => _messaggio = esito.errore ?? 'Con ${d.etichetta}: ${esito.riassunto}');
-    _cerca();
-  }
-
-  /// Il collegamento all'indirizzo scritto a mano.
-  ///
-  /// Non serve il codice: qui si parla con un dispositivo **già abbinato** —
-  /// se non lo fosse verrebbe respinto, ed è giusto così. Riuscito una volta,
-  /// l'indirizzo se lo ricorda l'app e questo campo non serve mai più.
-  Future<void> _aManoVai() async {
-    final ind = _indirizzo.text.trim();
-    if (ind.isEmpty || _aManoInCorso) return;
-    setState(() {
-      _aManoInCorso = true;
-      _messaggio = null;
-    });
-    final esito = await g.sincronizzaConIndirizzo(ind);
-    if (!mounted) return;
-    setState(() {
-      _aManoInCorso = false;
-      _messaggio = esito.errore ?? 'Con ${esito.con}: ${esito.riassunto}';
-    });
-    if (esito.errore == null) _indirizzo.clear();
-  }
-
-  Widget _aMano(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(top: 12),
-        child: Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _indirizzo,
-                keyboardType: TextInputType.url,
-                autocorrect: false,
-                decoration: const InputDecoration(
-                  labelText: 'Indirizzo del dispositivo',
-                  hintText: '192.168.5.53',
-                  isDense: true,
-                ),
-                onSubmitted: (_) => _aManoVai(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            OutlinedButton(
-              onPressed: _aManoInCorso ? null : _aManoVai,
-              style: OutlinedButton.styleFrom(
-                  side: BorderSide(color: context.cBordo),
-                  padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 14)),
-              child: Text(_aManoInCorso ? '…' : 'Vai',
-                  style: TextStyle(color: context.cAccento)),
-            ),
-          ],
-        ),
-      );
-
-  Future<void> _chiediCodice(Trovato d) async {
-    // Campo in linea e non un dialogo di sistema: stessa scelta del PC, e su
-    // Android un dialogo in più su una schermata già piena è solo rumore.
-    final c = TextEditingController();
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (dc) => AlertDialog(
-        backgroundColor: dc.cPannello,
-        title: Text('Abbina "${d.etichetta}"'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('Scrivi le sei cifre mostrate sull\'altro dispositivo.',
-                style: TextStyle(fontSize: 13, color: dc.cTenue, height: 1.45)),
-            const SizedBox(height: 14),
-            TextField(
-              controller: c,
-              autofocus: true,
-              keyboardType: TextInputType.number,
-              maxLength: 6,
-              style: const TextStyle(
-                  fontSize: 22, letterSpacing: 8, fontFamily: 'JetBrains Mono'),
-              decoration: const InputDecoration(counterText: '', hintText: '000000'),
-              onSubmitted: (_) => Navigator.pop(dc, true),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(dc, false),
-              child: Text('Annulla', style: TextStyle(color: dc.cTenue))),
-          FilledButton(
-            onPressed: () => Navigator.pop(dc, true),
-            style: FilledButton.styleFrom(
-                backgroundColor: dc.cAccento, foregroundColor: dc.cSuAccento),
-            child: const Text('Abbina'),
-          ),
-        ],
-      ),
-    );
-    if (ok == true && c.text.trim().length == 6) {
-      await _sincronizza(d, codice: c.text.trim());
+    switch (r.esito) {
+      case EsitoQr.letto:
+        try {
+          await g.collega(r.testo!);
+        } on FormatException catch (e) {
+          setState(() => _errore = e.message);
+        }
+      case EsitoQr.permessoNegato:
+        setState(() => _errore = 'Serve il permesso della fotocamera: '
+            'consentilo nelle impostazioni di Android per VaultMind.');
+      case EsitoQr.fotocameraNonDisponibile:
+        setState(() => _errore = 'La fotocamera non è disponibile: chiudi le '
+            'altre app che la usano e riprova.');
+      default:
+        break; // tornato indietro: niente da dire
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final codice = g.codiceAttivo();
+    final pc = g.pcCollegati.values.toList();
+    final tenue = TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.5);
     return Scaffold(
       appBar: AppBar(title: const Text('Sincronizza')),
       body: ListView(
@@ -186,115 +98,98 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
             icona: const IconaVM(Icone.sync, size: 20),
             titolo: 'Sincronizzazione',
             descrizione: !g.acceso
-                ? 'Spenta. Nessuna porta aperta, questo telefono non risponde a nessuno.'
-                : (g.inAscolto
-                    ? 'Accesa: risponde solo a chi ha la chiave di questo vault.'
-                    : 'Accesa, ma la porta non si è aperta. Il sync a mano funziona lo stesso.'),
+                ? 'Spenta: nessuna porta aperta, il PC non trova questo telefono.'
+                : (g.portaOccupata
+                    ? 'Accesa, ma la porta $portaSync è occupata da un\'altra app: '
+                        'riavvia il telefono.'
+                    : 'Accesa: risponde solo ai PC collegati col QR.'),
           ),
           const SizedBox(height: 8),
           TextField(
             controller: _nome,
-            decoration: const InputDecoration(labelText: 'Nome di questo telefono'),
+            maxLength: 40,
+            decoration: const InputDecoration(
+                labelText: 'Nome di questo telefono, come lo vedrà il PC',
+                counterText: ''),
             onSubmitted: (v) => g.imposta(nome: v),
-            onTapOutside: (_) => g.imposta(nome: _nome.text),
+            onTapOutside: (_) {
+              if (_nome.text.trim() != g.nome) g.imposta(nome: _nome.text);
+            },
           ),
+          const SizedBox(height: 20),
 
-          if (g.conflitti.isNotEmpty) ...[
-            const SizedBox(height: 20),
-            _Conflitti(gestore: g),
-          ],
-
-          if (_messaggio != null) ...[
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: context.cPannello,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: context.cBordo),
+          if (g.collegatoOra != null)
+            _riquadro(context, Icone.scudoOk,
+                'Collegato a «${g.collegatoOra}». Da adesso le voci si allineano '
+                'da sole, ogni volta che VaultMind è aperto qui.')
+          else if (g.inAttesaDelPc && g.inAscolto)
+            _attesa(context)
+          else
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _inquadra,
+                icon: const IconaVM(Icone.fotocamera),
+                label: Text(pc.isEmpty ? 'Collega al PC' : 'Collega un altro PC',
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
+                style: FilledButton.styleFrom(
+                  backgroundColor: context.cAccento,
+                  foregroundColor: context.cSuAccento,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
               ),
-              child: Text(_messaggio!,
-                  style: TextStyle(fontSize: 12.5, color: context.cTesto, height: 1.45)),
+            ),
+          if (_errore != null) ...[
+            const SizedBox(height: 12),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                IconaVM(Icone.avviso, size: 16, color: context.cErrore),
+                const SizedBox(width: 8),
+                Expanded(
+                    child: Text(_errore!,
+                        style: TextStyle(
+                            fontSize: 12.5, color: context.cErrore, height: 1.45))),
+              ],
             ),
           ],
+          if (pc.isEmpty && !g.inAttesaDelPc) ...[
+            const SizedBox(height: 10),
+            Text(
+                'Sul PC apri VaultMind › Sincronizza › «Collega un telefono», '
+                'poi tocca qui sopra e inquadra il QR.',
+                style: tenue),
+          ],
 
-          const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: g.acceso ? _cerca : null,
-                  icon: IconaVM(Icone.cerca, size: 18, color: context.cAccento),
-                  label: Text(_cerco ? 'Cerco…' : 'Cerca',
-                      style: TextStyle(color: context.cAccento)),
-                  style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: context.cBordo),
-                      padding: const EdgeInsets.symmetric(vertical: 12)),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: g.acceso
-                      ? () {
-                          g.apriAbbinamento();
-                          _cerca();
-                        }
-                      : null,
-                  icon: IconaVM(Icone.piu, size: 18, color: context.cAccento),
-                  label: Text('Abbina', style: TextStyle(color: context.cAccento)),
-                  style: OutlinedButton.styleFrom(
-                      side: BorderSide(color: context.cBordo),
-                      padding: const EdgeInsets.symmetric(vertical: 12)),
-                ),
-              ),
-            ],
-          ),
-
-          if (codice != null) _codiceInCorso(context, codice),
-
-          const SizedBox(height: 18),
-          _titoletto(context, 'Sulla rete adesso'),
-          if (_trovati.isEmpty)
+          const SizedBox(height: 22),
+          _titoletto(context, 'PC collegati'),
+          if (pc.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                _cerco
-                    ? 'Cerco sulla rete locale…'
-                    : 'Nessuno ha risposto. L\'altro dev\'essere sulla stessa rete, '
-                        'con l\'app aperta e il vault sbloccato.\n\n'
-                        'Se sei fuori casa con la VPN, la domanda non passa: i tunnel '
-                        'non portano i broadcast. Scrivi qui sotto l\'indirizzo del PC '
-                        '— poi l\'app se lo ricorda.',
-                style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.5),
-              ),
+              child: Text('Nessuno ancora.', style: tenue),
             )
           else
-            ..._trovati.map((d) => _rigaTrovato(context, d)),
-
-          if (_trovati.isEmpty && !_cerco) _aMano(context),
-
-          const SizedBox(height: 18),
-          _titoletto(context, 'Dispositivi fidati'),
-          if (g.fidati.isEmpty)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Text(
-                'Nessuno ancora. «Abbina» mostra un codice da scrivere sull\'altro '
-                'dispositivo — o scrivi qui quello che mostra lui.',
-                style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.5),
-              ),
-            )
-          else
-            ...g.fidati.entries.map((e) => _rigaFidato(context, e.key, e.value)),
+            ...pc.map((p) => _rigaPc(context, p)),
 
           const SizedBox(height: 24),
           Text(
-            'I due dispositivi devono essere sulla stessa rete e con il vault '
-            'aperto. Fuori casa, una VPN verso casa (WireGuard sul router) '
-            'rimette il telefono dentro la rete: per il sync è identico '
-            'all\'essere sul divano.',
+            'Il PC cerca questo telefono da solo, ogni pochi secondi, finché '
+            'VaultMind è aperto e sbloccato qui e i due sono sulla stessa WiFi. '
+            'Se una voce cambia su tutti e due, vince l\'ultima modifica. I dati '
+            'viaggiano cifrati con la chiave del QR.',
             style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.5),
+          ),
+          FutureBuilder<List<String>>(
+            future: _indirizzi,
+            builder: (context, s) => (s.data ?? const []).isEmpty
+                ? const SizedBox.shrink()
+                : Padding(
+                    padding: const EdgeInsets.only(top: 10),
+                    child: Text(
+                        'Indirizzo di questo telefono: ${s.data!.join(' · ')}',
+                        style: TextStyle(
+                            fontSize: 11.5, color: context.cTenue, height: 1.5)),
+                  ),
           ),
         ],
       ),
@@ -304,175 +199,112 @@ class _SchermataSincronizzaState extends State<SchermataSincronizza> {
   Widget _titoletto(BuildContext c, String t) => Padding(
         padding: const EdgeInsets.only(bottom: 4),
         child: Text(t.toUpperCase(),
-            style: TextStyle(
-                fontSize: 10, letterSpacing: 1.5, color: c.cTenue)),
+            style: TextStyle(fontSize: 10, letterSpacing: 1.5, color: c.cTenue)),
       );
 
-  Widget _codiceInCorso(BuildContext context, String codice) => Container(
-        margin: const EdgeInsets.only(top: 14),
+  Widget _riquadro(BuildContext context, String icona, String testo) => Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: context.cAccento.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: context.cAccento.withValues(alpha: 0.45)),
         ),
-        child: Column(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('CODICE DI ABBINAMENTO',
-                style: TextStyle(
-                    fontSize: 10, letterSpacing: 1.4, color: context.cTenue)),
-            const SizedBox(height: 8),
-            Text(codice,
-                style: TextStyle(
-                    fontSize: 32,
-                    letterSpacing: 8,
-                    fontFamily: 'JetBrains Mono',
-                    color: context.cAccento)),
-            const SizedBox(height: 8),
+            IconaVM(icona, size: 20, color: context.cAccento),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(testo,
+                    style: TextStyle(fontSize: 13, color: context.cTesto, height: 1.5))),
+          ],
+        ),
+      );
+
+  Widget _attesa(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: context.cPannello,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: context.cBordo),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 2, color: context.cAccento),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    g.pcInAttesa.isEmpty
+                        ? 'Aspetto il PC…'
+                        : 'Aspetto «${g.pcInAttesa}»…',
+                    style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
             Text(
-              'Scrivilo sull\'altro dispositivo entro ${g.secondiRimasti} secondi. '
-              'Poi controlla che l\'impronta mostrata sia identica sui due schermi: '
-              'è la verifica che nessuno si sia messo in mezzo.',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 11.5, color: context.cTesto, height: 1.5),
+              'Lascia aperto il QR sul PC e questa schermata qui: si collegano '
+              'da soli in pochi secondi, se sono sulla stessa WiFi.',
+              style: TextStyle(fontSize: 12.5, color: context.cTesto, height: 1.5),
+            ),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: g.annullaCollegamento,
+                child: Text('Annulla', style: TextStyle(color: context.cTenue)),
+              ),
             ),
           ],
         ),
       );
 
-  Widget _rigaTrovato(BuildContext context, Trovato d) => Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          leading: IconaVM(d.conosciuto ? Icone.dispositivi : Icone.dispositivo,
-              color: d.conosciuto ? context.cAccento : context.cTenue),
-          title: Text(d.etichetta, style: const TextStyle(fontSize: 14)),
-          subtitle: Text(
-            d.conosciuto
-                ? 'già abbinato · ${d.indirizzo}'
-                : (d.abbinabile ? 'pronto ad abbinarsi' : 'da abbinare'),
-            style: TextStyle(fontSize: 11.5, color: context.cTenue),
-          ),
-          trailing: FilledButton(
-            onPressed: () =>
-                d.conosciuto ? _sincronizza(d) : _chiediCodice(d),
-            style: FilledButton.styleFrom(
-                backgroundColor: context.cAccento,
-                foregroundColor: context.cSuAccento,
-                visualDensity: VisualDensity.compact),
-            child: Text(d.conosciuto ? 'Sincronizza' : 'Abbina'),
-          ),
-        ),
-      );
-
-  Widget _rigaFidato(BuildContext context, String id, String nome) => Card(
-        margin: const EdgeInsets.only(bottom: 8),
-        child: ListTile(
-          leading: IconaVM(Icone.scudoOk, color: context.cAccento),
-          title: Text(nome, style: const TextStyle(fontSize: 14)),
-          trailing: TextButton(
-            onPressed: () async {
-              final ok = await confermaDistruttiva(
-                context,
-                titolo: 'Revocare "$nome"?',
-                dettaglio: 'Da quel momento non potrà più sincronizzare con '
-                    'questo telefono senza essere abbinato di nuovo.',
-                conferma: 'Revoca',
-              );
-              if (ok == true) await g.revoca(id);
-            },
-            child: Text('Revoca',
-                style: TextStyle(color: context.cErrore, fontSize: 12.5)),
-          ),
-        ),
-      );
-}
-
-/// Le voci cambiate su tutti e due i dispositivi. Finché non decidi, ognuno
-/// tiene la propria: niente è andato perso.
-class _Conflitti extends StatelessWidget {
-  final GestoreSync gestore;
-  const _Conflitti({required this.gestore});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: context.cAccento.withValues(alpha: 0.10),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: context.cAccento.withValues(alpha: 0.45)),
-          ),
-          child: Text(
-            'Da decidere. Queste voci sono state cambiate su tutti e due i '
-            'dispositivi. Finché non scegli, ognuno tiene la propria: niente è '
-            'andato perso.',
-            style: TextStyle(fontSize: 12, color: context.cTesto, height: 1.45),
-          ),
-        ),
-        for (final c in gestore.conflitti.values) _scheda(context, c),
-      ],
-    );
+  String _quando(DateTime t) {
+    final d = DateTime.now().difference(t);
+    if (d.inSeconds < 60) return 'adesso';
+    if (d.inMinutes < 60) return '${d.inMinutes} min fa';
+    String due(int n) => n.toString().padLeft(2, '0');
+    return 'alle ${due(t.hour)}:${due(t.minute)}';
   }
 
-  Widget _scheda(BuildContext context, Conflitto c) => Card(
-        margin: const EdgeInsets.only(top: 10),
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(c.titolo,
-                  style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-              Text(_spiega(c.motivo),
-                  style: TextStyle(fontSize: 11.5, color: context.cTenue)),
-              const SizedBox(height: 10),
-              Row(
-                children: [
-                  Expanded(child: _scelta(context, c, 'mia', 'Tieni la mia', c.mia)),
-                  const SizedBox(width: 8),
-                  Expanded(child: _scelta(context, c, 'sua', 'Tieni la sua', c.sua)),
-                ],
-              ),
-            ],
-          ),
+  Widget _rigaPc(BuildContext context, PcCollegato p) {
+    final e = g.ultimi[p.id];
+    return Card(
+      margin: const EdgeInsets.only(bottom: 8),
+      child: ListTile(
+        leading: IconaVM(Icone.dispositivi,
+            color: e != null ? context.cAccento : context.cTenue),
+        title: Text(p.nome, style: const TextStyle(fontSize: 14)),
+        subtitle: Text(
+          e == null
+              ? 'Non ancora sentito da quando hai aperto l\'app: se il PC è acceso '
+                  'con VaultMind aperto, si fa vivo in pochi secondi.'
+              : 'Sentito ${_quando(e.quando)}${e.qualcosa ? ' · ${e.riassunto}' : ' · allineati'}',
+          style: TextStyle(fontSize: 11.5, color: context.cTenue, height: 1.4),
         ),
-      );
-
-  /// Si mostrano le ETICHETTE dei campi, mai i valori: scegliere fra due
-  /// versioni non deve costringere a farsi stampare due password sullo schermo.
-  Widget _scelta(BuildContext context, Conflitto c, String quale, String etichetta,
-          dynamic versione) =>
-      OutlinedButton(
-        onPressed: () => gestore.risolvi(c.uid, quale),
-        style: OutlinedButton.styleFrom(
-            side: BorderSide(color: context.cBordo),
-            padding: const EdgeInsets.symmetric(vertical: 10)),
-        child: Column(
-          children: [
-            Text(etichetta,
-                style: TextStyle(fontSize: 12.5, color: context.cAccento)),
-            const SizedBox(height: 2),
-            Text(
-              versione == null
-                  ? 'cancellata'
-                  : (versione.fields.isEmpty
-                      ? 'nessun campo'
-                      : versione.fields.map((f) => f.label).join(' · ')),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: TextStyle(fontSize: 10.5, color: context.cTenue),
-            ),
-          ],
+        trailing: TextButton(
+          onPressed: () async {
+            final ok = await confermaDistruttiva(
+              context,
+              titolo: 'Scollegare «${p.nome}»?',
+              dettaglio: 'Le voci restano dove sono, su tutti e due. Per '
+                  'sincronizzare di nuovo servirà inquadrare un QR nuovo.',
+              conferma: 'Scollega',
+            );
+            if (ok == true) await g.scollega(p.id);
+          },
+          child: Text('Scollega',
+              style: TextStyle(color: context.cErrore, fontSize: 12.5)),
         ),
-      );
-
-  String _spiega(String motivo) => const {
-        entrambiModificata: 'modificata su tutti e due',
-        modificataQuiCancellataLa: 'modificata qui, cancellata sull\'altro',
-        cancellataQuiModificataLa: 'cancellata qui, modificata sull\'altro',
-      }[motivo] ??
-      motivo;
+      ),
+    );
+  }
 }

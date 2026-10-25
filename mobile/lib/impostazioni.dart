@@ -64,45 +64,22 @@ class Impostazioni {
   bool genSimboli;
 
   // ---- sincronizzazione ----
-  // Qui dentro **non finisce nessun segreto**, nemmeno adesso: le chiavi verso
-  // ogni dispositivo si ricavano dalla chiave del vault (`chiaveVerso`), non si
-  // salvano. Restano un identificativo, dei nomi e dei contatori.
+  // Qui dentro **non finisce nessun segreto**: le chiavi dei PC collegati
+  // stanno nel vault, cifrate (`sync_gestore.dart`). Restano un
+  // identificativo, un nome e un interruttore. Le chiavi del sync di prima
+  // (`fidati`, `basi`, `indirizzi`) non si leggono più, e alla prima
+  // scrittura spariscono dal file.
 
   /// Identificativo di QUESTO telefono. Casuale: il MAC address si falsifica e
   /// Android lo randomizza per rete, quindi come serratura non regge — e come
   /// etichetta un numero a caso va benissimo, senza dire niente su di te.
   String idDispositivo;
 
-  /// Come si presenta agli altri dispositivi.
+  /// Come lo vede il PC.
   String nomeDispositivo;
 
   /// Sync acceso? Da spento non si apre nessuna porta e non si risponde a nessuno.
   bool syncAcceso;
-
-  /// {idPeer: nome} dei dispositivi abbinati. È un elenco di **autorizzazione**:
-  /// revocare qui chiude la porta anche a chi conosce la master password.
-  Map<String, String> fidati;
-
-  /// {idPeer: {uid: rev}} allo scorso sync riuscito con quel dispositivo.
-  ///
-  /// È ciò che permette di distinguere «sono più avanti di te» da «siamo
-  /// divergiti»: senza, ogni differenza sarebbe un conflitto. Sta qui e non nel
-  /// vault perché è un dato **derivato**, e non deve viaggiare col backup.
-  Map<String, Map<String, int>> basi;
-
-  /// {idPeer: "indirizzo:porta"} dell'ultima volta che quel dispositivo ha
-  /// risposto.
-  ///
-  /// È il pezzo che fa funzionare il sync **fuori casa**. La scoperta è in
-  /// broadcast, e un tunnel VPN è un collegamento punto-punto instradato: i
-  /// broadcast non ci passano, quindi da fuori la domanda non arriva a
-  /// nessuno. L'indirizzo imparato in casa però resta valido *attraverso* il
-  /// tunnel — il PC è `192.168.5.53` sia dal divano sia dall'altra parte del
-  /// mondo — e ricordarlo fa ripartire il sync da solo.
-  ///
-  /// Non è un segreto: è un indirizzo di rete privata, che non dice niente a
-  /// chi non è già dentro quella rete.
-  Map<String, String> indirizzi;
 
   // ---- aggiornamenti dell'app ----
   // Il perché e i vincoli stanno in `aggiornamenti.dart`. Qui c'è solo quello
@@ -143,18 +120,12 @@ class Impostazioni {
     this.idDispositivo = '',
     this.nomeDispositivo = '',
     this.syncAcceso = true,
-    Map<String, String>? fidati,
-    Map<String, Map<String, int>>? basi,
-    Map<String, String>? indirizzi,
     this.aggAttivi = true,
     this.aggControllo = 0,
     Map<String, dynamic>? aggTrovata,
     this.aggRinviata = '',
     this.aggRinviataQuando = 0,
   })  : pinnate = pinnate ?? [],
-        fidati = fidati ?? {},
-        basi = basi ?? {},
-        indirizzi = indirizzi ?? {},
         aggTrovata = aggTrovata ?? {};
 
   Map<String, dynamic> toJson() => {
@@ -175,9 +146,6 @@ class Impostazioni {
         'idDispositivo': idDispositivo,
         'nomeDispositivo': nomeDispositivo,
         'syncAcceso': syncAcceso,
-        'fidati': fidati,
-        'basi': basi,
-        'indirizzi': indirizzi,
         // Si scrivono solo se dicono qualcosa: un file di preferenze pieno di
         // zeri non aiuta nessuno a capire cosa ci sta dentro.
         if (!aggAttivi) 'aggAttivi': false,
@@ -227,21 +195,6 @@ class Impostazioni {
         idDispositivo: '${j['idDispositivo'] ?? ''}',
         nomeDispositivo: '${j['nomeDispositivo'] ?? ''}',
         syncAcceso: j['syncAcceso'] != false,
-        fidati: {
-          for (final e in ((j['fidati'] ?? const {}) as Map).entries)
-            '${e.key}': '${e.value}'
-        },
-        basi: {
-          for (final e in ((j['basi'] ?? const {}) as Map).entries)
-            '${e.key}': {
-              for (final b in (e.value as Map).entries)
-                '${b.key}': (b.value as num).toInt()
-            }
-        },
-        indirizzi: {
-          for (final e in ((j['indirizzi'] ?? const {}) as Map).entries)
-            '${e.key}': '${e.value}'
-        },
         aggAttivi: j['aggAttivi'] != false,
         aggControllo: (j['aggControllo'] as num?)?.toInt() ?? 0,
         aggTrovata: {
@@ -266,9 +219,6 @@ class Impostazioni {
     String? idDispositivo,
     String? nomeDispositivo,
     bool? syncAcceso,
-    Map<String, String>? fidati,
-    Map<String, Map<String, int>>? basi,
-    Map<String, String>? indirizzi,
     bool? aggAttivi,
     int? aggControllo,
     Map<String, dynamic>? aggTrovata,
@@ -288,9 +238,6 @@ class Impostazioni {
         idDispositivo: idDispositivo ?? this.idDispositivo,
         nomeDispositivo: nomeDispositivo ?? this.nomeDispositivo,
         syncAcceso: syncAcceso ?? this.syncAcceso,
-        fidati: fidati ?? this.fidati,
-        basi: basi ?? this.basi,
-        indirizzi: indirizzi ?? this.indirizzi,
         aggAttivi: aggAttivi ?? this.aggAttivi,
         aggControllo: aggControllo ?? this.aggControllo,
         aggTrovata: aggTrovata ?? this.aggTrovata,
@@ -317,8 +264,8 @@ Future<void> caricaImpostazioni() async {
     // si riparte dai valori predefiniti.
   }
   // L'identità del dispositivo si crea una volta sola e poi non cambia più: se
-  // cambiasse, gli altri dispositivi lo vedrebbero come uno nuovo e l'elenco
-  // dei fidati si riempirebbe di fantasmi.
+  // cambiasse, il PC lo vedrebbe come un telefono nuovo e l'elenco dei
+  // telefoni collegati si riempirebbe di fantasmi.
   final i = impostazioni.value;
   if (i.idDispositivo.isEmpty || i.nomeDispositivo.isEmpty) {
     await salvaImpostazioni(i.copia(

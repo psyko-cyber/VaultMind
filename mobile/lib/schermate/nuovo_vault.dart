@@ -1,23 +1,22 @@
 /// Un vault che nasce sul telefono, senza un PC.
 ///
 /// Fino al 16/09/2026 un vault nasceva solo sul PC: il telefono sapeva
-/// riceverlo (travaso, file di backup) ma non crearlo. Luca ha dato l'APK a un
+/// riceverlo (dalla rete, da un file di backup) ma non crearlo. Luca ha dato l'APK a un
 /// amico, e l'amico si è fermato alla prima schermata — senza un PC l'app non
 /// serviva a niente.
 ///
 /// ## È lo stesso vault del PC
 ///
 /// Non c'è un formato "da telefono": salt di 16 byte, Argon2id coi parametri
-/// di sempre, AES-256-GCM — quello che fa `crypto_store.create()`. Il giorno
-/// che arriva un PC, il vault ci va con un backup («Ripristina da backup») e da
-/// lì il sync funziona, perché la chiave è la stessa.
+/// di sempre, AES-256-GCM — quello che fa `crypto_store.create()`.
 ///
-/// ## Il rischio, dichiarato a schermo
+/// ## Col PC
 ///
-/// Chi il PC ce l'ha già e crea qui un vault per sbaglio si ritrova con **due
-/// vault diversi**, che non si sincronizzano: le chiavi del sync si ricavano
-/// dalla chiave del vault. Per questo la schermata lo dice prima del pulsante,
-/// e non dopo.
+/// Dal 25/10/2026 un vault nato qui si collega al PC col QR, e al primo sync
+/// le voci dei due si uniscono (`merge.py`, «Due vault diversi»): le master
+/// password possono anche essere diverse, ognuno tiene la sua. È anche la
+/// strada di chi il PC ce l'ha già ([SchermataNuovoVault.collegaPc]): si crea
+/// qui, poi si inquadra il QR.
 ///
 /// Come sul PC, la password si scrive due volte: un refuso qui renderebbe il
 /// vault inapribile, e non esiste un modo di recuperarlo.
@@ -35,7 +34,10 @@ import 'casa.dart';
 import 'dialoghi.dart';
 
 class SchermataNuovoVault extends StatefulWidget {
-  const SchermataNuovoVault({super.key});
+  /// Dopo la creazione, apri subito il collegamento col PC.
+  final bool collegaPc;
+
+  const SchermataNuovoVault({super.key, this.collegaPc = false});
 
   @override
   State<SchermataNuovoVault> createState() => _SchermataNuovoVaultState();
@@ -89,8 +91,9 @@ class _SchermataNuovoVaultState extends State<SchermataNuovoVault> {
       // una schermata che dice "non c'è ancora nessun vault" sarebbe falso.
       Navigator.of(context).pushAndRemoveUntil(
         MaterialPageRoute(
-            builder: (_) =>
-                SchermataCasa(sessione: Sessione(nuovo.vault, nuovo.chiave))),
+            builder: (_) => SchermataCasa(
+                sessione: Sessione(nuovo.vault, nuovo.chiave),
+                collegaPc: widget.collegaPc)),
         (_) => false,
       );
     } on FormatException catch (e) {
@@ -192,16 +195,18 @@ class _SchermataNuovoVaultState extends State<SchermataNuovoVault> {
                 ),
               ],
               const SizedBox(height: 28),
+              // Nel browser il sync non c'è: col PC resta il backup.
               Text(
-                'Hai già VaultMind su un PC? Allora non crearne uno qui: torna '
-                'indietro e ricevi quello del PC. Due vault diversi non si '
-                'sincronizzano fra loro.',
-                style: tenue,
-              ),
-              const SizedBox(height: 10),
-              Text(
-                'Se il PC arriva dopo: Impostazioni › «Salva un backup» qui, e '
-                'sul PC «Ripristina da backup» con questa stessa password.',
+                kIsWeb
+                    ? 'Se un giorno usi VaultMind anche sul PC: Impostazioni › '
+                        '«Salva un backup» qui, e sul PC «Ripristina da backup».'
+                    : widget.collegaPc
+                        ? 'Appena creato, si apre la fotocamera: inquadra il QR '
+                            'che mostra il PC in Sincronizza › «Collega un '
+                            'telefono». Le voci del PC arrivano da sole.'
+                        : 'Hai VaultMind anche su un PC? Dopo, collegali da '
+                            'Impostazioni › Sincronizza: le voci dei due si '
+                            'uniscono.',
                 style: tenue,
               ),
             ],

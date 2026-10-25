@@ -18,7 +18,6 @@ import '../vault.dart';
 import 'casa.dart';
 import 'dialoghi.dart';
 import 'nuovo_vault.dart';
-import 'travaso.dart';
 import '../icone.dart';
 
 class SchermataSblocco extends StatefulWidget {
@@ -389,13 +388,13 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
   /// Prima c'erano solo le due strade dal PC, e chi aveva ricevuto l'APK senza
   /// avere un PC si fermava qui.
   ///
-  /// Le due strade dal PC stanno sotto una domanda che le separa, perché
-  /// premere «Crea» avendo già un PC fa nascere un secondo vault che col primo
-  /// non si sincronizza. Fra le due il travaso viene prima del file, non per
-  /// gusto: passare da WhatsApp funziona ma è un passaggio da spiegare, e ogni
-  /// passaggio da spiegare è qualcuno che si ferma. Il file resta perché fuori
-  /// casa è l'unica strada: il salt arriva dalla scoperta, che è in broadcast e
-  /// in una VPN non passa.
+  /// Le due strade dal PC stanno sotto una domanda che le separa. Dal
+  /// 25/10/2026 la prima è «collegati al PC»: si crea un vault qui e si
+  /// inquadra il QR del PC, e al primo sync le voci dei due si uniscono — un
+  /// vault nato qui e uno nato sul PC si sincronizzano, cosa che col sync di
+  /// prima non si poteva. Prima c'era il «travaso», che passava dalla
+  /// scoperta in broadcast e sul PC di Luca non trovava mai niente. Il file
+  /// resta per chi non ha il PC sulla stessa WiFi.
   List<Widget> _invitoImport() => [
         const Text(
           'Su questo telefono non c\'è ancora nessun vault.',
@@ -426,13 +425,13 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         ),
         const SizedBox(height: 6),
         Text(
-          // Nel browser il travaso via rete non c'è (`sync_rete_web.dart`):
-          // resta il file, e il testo dice dove prenderlo sul PC.
+          // Nel browser il sync non c'è (`sync_rete_web.dart`): resta il
+          // file, e il testo dice dove prenderlo sul PC.
           kIsWeb
               ? 'Sul PC apri il menu › «Backup del vault», manda il file a '
                   'questo telefono e sceglilo qui sotto.'
-              : 'Se il PC è acceso sulla stessa WiFi, il vault arriva da lì: '
-                  'niente file da mandarsi.',
+              : 'Crea qui un vault (anche con la stessa password del PC) e '
+                  'collegalo col QR che mostra il PC: le voci arrivano da sole.',
           textAlign: TextAlign.center,
           style: TextStyle(fontSize: 12.5, color: context.cTenue, height: 1.55),
         ),
@@ -440,9 +439,9 @@ class _SchermataSbloccoState extends State<SchermataSblocco> {
         if (!kIsWeb) ...[
           OutlinedButton.icon(
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(
-                builder: (_) => const SchermataTravaso())),
-            icon: IconaVM(Icone.rete, color: context.cAccento),
-            label: Text('Ricevi il vault dal PC',
+                builder: (_) => const SchermataNuovoVault(collegaPc: true))),
+            icon: IconaVM(Icone.qr, color: context.cAccento),
+            label: Text('Collegati al PC',
                 style: TextStyle(color: context.cAccento)),
             style: OutlinedButton.styleFrom(
               side: BorderSide(color: context.cBordo),

@@ -68,6 +68,17 @@ void main() {
       expect(dopo.title, 'Dopo');
     });
 
+    test('una modifica viene sempre dopo la versione di prima', () {
+      // Al sync vince la più recente: una voce arrivata da un PC con
+      // l'orologio avanti, corretta qui subito dopo, deve vincere lo stesso.
+      final futuro = DateTime.now().millisecondsSinceEpoch + 3600 * 1000;
+      final v = Credenziale(
+          id: 1, title: 'X', tags: const [], critical: false, fields: const [], mod: futuro);
+      expect(v.modificata(title: 'Y').mod, futuro + 1);
+      final senza = Vault([v], salt: _salt()).senzaVoce(1);
+      expect(senza.lapidi.single.mod, futuro + 1);
+    });
+
     test('anche spostare di categoria è una modifica', () {
       // Se non contasse, il sync non si accorgerebbe di un riordino intero:
       // 800 voci spostate e nessuna che risulta cambiata.

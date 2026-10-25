@@ -1,14 +1,11 @@
 r"""
-Test sul motore di fusione (`app/merge.py`), il cuore del sync.
+Test sulla fusione fra PC e telefono (`app/merge.py`): vince l'ultima modifica.
 
-Il grosso non sta qui dentro: sta in `vettore/fusione.json`, un elenco di casi
-che **anche la suite Dart esegue**. Le due implementazioni del merge devono
-dare lo stesso risultato sugli stessi ingressi, altrimenti il PC e il telefono
-si allineerebbero su idee diverse di cosa e' successo — e nessuno se ne
-accorgerebbe finche' non manca una password.
-
-Qui restano le verifiche che hanno senso solo in Python: che la fusione sia
-davvero una funzione pura, e i casi limite del contorno.
+Il grosso sta in `vettore/fusione.json`, un elenco di casi ognuno col suo
+*perche'*: leggerlo e' il modo piu' veloce di capire cosa resta nelle due app
+dopo un sync. Qui restano le proprieta' che valgono per tutti i casi (nessuna
+voce viva e sepolta insieme, id unici) e quelle che un vettore non mostra: che
+la fusione non tocchi cio' che riceve, e che `uguali` guardi il contenuto.
 
     tests\run.ps1
 """
@@ -23,12 +20,7 @@ _QUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(os.path.dirname(_QUI), "VaultMind_Windows"))
 
 from app.crypto_store import Credential, Field  # noqa: E402
-from app.merge import (  # noqa: E402
-    Istantanea, fondi, impronta, base_da,
-    ENTRAMBI_MODIFICATA, MODIFICATA_QUI_CANCELLATA_LA, CANCELLATA_QUI_MODIFICATA_LA,
-)
-
-_MOTIVI = {ENTRAMBI_MODIFICATA, MODIFICATA_QUI_CANCELLATA_LA, CANCELLATA_QUI_MODIFICATA_LA}
+from app.merge import Istantanea, contenuto, fondi, uguali  # noqa: E402
 
 
 def voce(d: dict) -> Credential:
@@ -54,8 +46,12 @@ def istantanea(d: dict) -> Istantanea:
     )
 
 
+def esegui(caso: dict):
+    return fondi(istantanea(caso["pc"]), istantanea(caso["tel"]),
+                 caso.get("base_categorie"), primo=bool(caso.get("primo")))
+
+
 class TestVettoreFusione(unittest.TestCase):
-    """Esegue i casi condivisi con la suite Dart."""
 
     @classmethod
     def setUpClass(cls):
@@ -63,140 +59,99 @@ class TestVettoreFusione(unittest.TestCase):
             cls.casi = json.load(f)["casi"]
 
     def test_ogni_caso_del_vettore(self):
-        self.assertGreater(len(self.casi), 10, "il vettore si e' svuotato")
+        self.assertGreater(len(self.casi), 15, "il vettore si e' svuotato")
         for caso in self.casi:
             with self.subTest(caso["nome"]):
-                self._verifica(caso)
+                self._verifica(caso, esegui(caso))
 
-    def _verifica(self, caso):
-        f = fondi(istantanea(caso["mio"]), istantanea(caso["suo"]), caso.get("base"))
+    def _verifica(self, caso, f):
         atteso = caso["atteso"]
-
-        # --- voci, confrontate per uid (l'ordine della lista non fa parte del contratto)
-        ottenute = sorted(f.entries, key=lambda c: c.uid)
-        attese = sorted(atteso.get("voci", []), key=lambda v: v["uid"])
-        self.assertEqual([v["uid"] for v in attese], [c.uid for c in ottenute],
-                         "voci sopravvissute alla fusione")
-        for att, ott in zip(attese, ottenute):
-            for chiave in ("title", "rev", "id", "category"):
-                if chiave in att:
-                    self.assertEqual(att[chiave], getattr(ott, chiave),
-                                     f'{chiave} di «{att["uid"]}»')
-
-        # --- lapidi
+        if "titoli" in atteso:
+            self.assertEqual(atteso["titoli"], sorted(c.title for c in f.entries), "voci vive")
         if "lapidi" in atteso:
-            self.assertEqual(sorted(atteso["lapidi"]),
-                             sorted(t["uid"] for t in f.tombstones), "lapidi")
-        for uid, rev in (atteso.get("revLapidi") or {}).items():
-            trovata = next((t for t in f.tombstones if t["uid"] == uid), None)
-            self.assertIsNotNone(trovata, f"lapide «{uid}» mancante")
-            self.assertEqual(rev, trovata["rev"], f"rev della lapide «{uid}»")
-
+            self.assertEqual(atteso["lapidi"], sorted(t["uid"] for t in f.tombstones), "lapidi")
         if "categorie" in atteso:
-            self.assertEqual(atteso["categorie"], f.categories)
-
-        # --- conflitti
-        self.assertEqual(
-            sorted((c["uid"], c["motivo"]) for c in atteso.get("conflitti", [])),
-            sorted((c.uid, c.motivo) for c in f.conflitti),
-            "conflitti")
+            self.assertEqual(atteso["categorie"], f.categories, "categorie")
+        for lato in ("sul_pc", "sul_telefono"):
+            if lato in atteso:
+                self.assertEqual(atteso[lato], getattr(f, lato), lato)
+        per_uid = {c.uid: c for c in f.entries}
+        for att in atteso.get("voci", []):
+            ott = per_uid.get(att["uid"])
+            self.assertIsNotNone(ott, f'voce «{att["uid"]}» mancante')
+            for chiave, valore in att.items():
+                if chiave == "fields":
+                    self.assertEqual(valore, [[x.label, x.value] for x in ott.fields],
+                                     f'campi di «{att["uid"]}»')
+                elif chiave != "uid":
+                    self.assertEqual(valore, getattr(ott, chiave), f'{chiave} di «{att["uid"]}»')
 
     def test_nessuna_voce_e_viva_e_sepolta_insieme(self):
-        """Una voce non puo' risultare contemporaneamente presente e cancellata:
-        il vault direbbe due cose opposte, e il sync successivo impazzirebbe."""
+        """Il vault direbbe due cose opposte, e il sync dopo impazzirebbe."""
         for caso in self.casi:
             with self.subTest(caso["nome"]):
-                f = fondi(istantanea(caso["mio"]), istantanea(caso["suo"]), caso.get("base"))
-                vive = {c.uid for c in f.entries}
-                sepolte = {t["uid"] for t in f.tombstones}
-                self.assertEqual(set(), vive & sepolte)
+                f = esegui(caso)
+                self.assertEqual(set(), {c.uid for c in f.entries} & {t["uid"] for t in f.tombstones})
 
-    def test_gli_id_restano_unici(self):
+    def test_gli_id_e_gli_uid_restano_unici(self):
         for caso in self.casi:
             with self.subTest(caso["nome"]):
-                f = fondi(istantanea(caso["mio"]), istantanea(caso["suo"]), caso.get("base"))
-                ids = [c.id for c in f.entries]
-                self.assertEqual(len(ids), len(set(ids)), "id duplicati dopo la fusione")
+                f = esegui(caso)
+                self.assertEqual(len(f.entries), len({c.id for c in f.entries}), "id doppi")
+                self.assertEqual(len(f.entries), len({c.uid for c in f.entries}), "uid doppi")
 
-    def test_i_motivi_dei_conflitti_sono_quelli_dichiarati(self):
+    def test_rifondere_il_risultato_non_cambia_niente(self):
+        """Dopo un sync le due parti hanno la stessa cosa: il giro seguente
+        non deve trovare niente da fare, o il sync ripartirebbe all'infinito."""
         for caso in self.casi:
-            f = fondi(istantanea(caso["mio"]), istantanea(caso["suo"]), caso.get("base"))
-            for c in f.conflitti:
-                self.assertIn(c.motivo, _MOTIVI)
+            with self.subTest(caso["nome"]):
+                f = esegui(caso)
+                fatto = Istantanea(f.entries, f.tombstones, f.categories)
+                g = fondi(fatto, fatto, f.categories)
+                self.assertTrue(uguali(fatto, Istantanea(g.entries, g.tombstones, g.categories)))
+                zero = {"aggiunte": 0, "aggiornate": 0, "cancellate": 0}
+                self.assertEqual((zero, zero), (g.sul_pc, g.sul_telefono))
 
 
 class TestFusionePura(unittest.TestCase):
-    """La fusione non deve toccare NIENTE di quello che riceve: chi la chiama
-    la usa per far vedere all'utente cosa succederebbe, e deve poter decidere
-    di non applicarla."""
-
-    def _due(self):
-        mia = Istantanea(entries=[voce({"id": 1, "title": "Banca"}),
-                                  voce({"id": 2, "title": "Dal PC", "uid": "aaa111"})])
-        sua = Istantanea(entries=[voce({"id": 1, "title": "Banca"}),
-                                  voce({"id": 2, "title": "Dal telefono", "uid": "bbb222"})])
-        return mia, sua
+    """La fusione non deve toccare niente di quello che riceve: il PC la
+    calcola prima di sapere se potrà scriverla (il vault può cambiare nel
+    frattempo, e allora si butta)."""
 
     def test_gli_ingressi_non_vengono_modificati(self):
-        mia, sua = self._due()
-        prima = [(c.uid, c.id, c.title, c.rev) for c in mia.entries + sua.entries]
-        fondi(mia, sua, None)
-        dopo = [(c.uid, c.id, c.title, c.rev) for c in mia.entries + sua.entries]
-        self.assertEqual(prima, dopo, "la fusione ha modificato i vault ricevuti")
-
-    def test_fondere_due_volte_da_lo_stesso_risultato(self):
-        mia, sua = self._due()
-        a = fondi(mia, sua, None)
-        b = fondi(mia, sua, None)
-        self.assertEqual([c.uid for c in a.entries], [c.uid for c in b.entries])
-        self.assertEqual(len(a.conflitti), len(b.conflitti))
-
-    def test_fondere_con_se_stessi_non_cambia_niente(self):
-        mia, _ = self._due()
-        f = fondi(mia, mia, base_da(mia.entries))
-        self.assertEqual([c.uid for c in mia.entries], [c.uid for c in f.entries])
-        self.assertEqual([], f.conflitti)
-        self.assertFalse(f.qualcosa_da_fare)
-
-    def test_l_impronta_ignora_le_coordinate_e_non_il_contenuto(self):
-        a = voce({"id": 1, "title": "Banca", "rev": 1})
-        b = voce({"id": 9, "title": "Banca", "rev": 7, "uid": "diverso"})
-        self.assertEqual(impronta(a), impronta(b), "id, rev e uid non sono contenuto")
-        c = voce({"id": 1, "title": "Banca", "fields": [["password", "x"]]})
-        self.assertNotEqual(impronta(a), impronta(c), "un campo in piu' e' contenuto")
-
-    def test_una_password_cambiata_non_passa_inosservata(self):
-        """Il caso che conta piu' di tutti: se l'impronta non guardasse i
-        VALORI, due password diverse sembrerebbero la stessa voce e una delle
-        due sparirebbe senza che nessuno chieda niente."""
-        a = voce({"id": 1, "title": "Banca", "fields": [["password", "vecchia"]]})
-        b = voce({"id": 1, "title": "Banca", "fields": [["password", "nuova"]]})
-        self.assertNotEqual(impronta(a), impronta(b))
-
-        f = fondi(Istantanea(entries=[a]), Istantanea(entries=[b]), None)
-        self.assertEqual(1, len(f.conflitti))
-        self.assertEqual(ENTRAMBI_MODIFICATA, f.conflitti[0].motivo)
-
-    def test_la_base_si_costruisce_dalle_voci(self):
-        mia, _ = self._due()
-        self.assertEqual({"#1": 1, "aaa111": 1}, base_da(mia.entries))
+        pc = Istantanea([voce({"id": 1, "title": "Banca"}),
+                         voce({"id": 2, "title": "Vecchia"})])
+        tel = Istantanea([voce({"id": 2, "title": "Nuova", "uid": "u-nuova", "mod": 5})])
+        prima = [(c.uid, c.id, c.title, c.rev) for c in pc.entries + tel.entries]
+        fondi(pc, tel, primo=True)
+        self.assertEqual(prima, [(c.uid, c.id, c.title, c.rev) for c in pc.entries + tel.entries])
 
     def test_due_vault_vuoti(self):
-        f = fondi(Istantanea(), Istantanea(), None)
-        self.assertEqual([], f.entries)
-        self.assertEqual([], f.conflitti)
-        self.assertFalse(f.qualcosa_da_fare)
+        f = fondi(Istantanea([]), Istantanea([]))
+        self.assertEqual(([], [], []), (f.entries, f.tombstones, f.categories))
 
-    def test_il_titolo_del_conflitto_c_e_anche_se_una_parte_manca(self):
-        """Serve a scrivere «Eliminare "Banca"?» anche quando la voce, da un
-        lato, non esiste piu'."""
-        viva = voce({"id": 1, "title": "Banca", "rev": 3})
-        f = fondi(Istantanea(entries=[viva]),
-                  Istantanea(tombstones=[{"uid": "#1", "rev": 2, "mod": 1}]),
-                  {"#1": 1})
-        self.assertEqual(1, len(f.conflitti))
-        self.assertEqual("Banca", f.conflitti[0].titolo)
-        self.assertIsNone(f.conflitti[0].sua)
+
+class TestUguali(unittest.TestCase):
+
+    def test_id_e_ordine_non_contano(self):
+        a = Istantanea([voce({"id": 1, "title": "A", "uid": "u1"}),
+                        voce({"id": 2, "title": "B", "uid": "u2"})])
+        b = Istantanea([voce({"id": 7, "title": "B", "uid": "u2"}),
+                        voce({"id": 3, "title": "A", "uid": "u1"})])
+        self.assertTrue(uguali(a, b))
+
+    def test_una_password_cambiata_si_vede(self):
+        """Se il confronto non guardasse i valori, il PC direbbe «uguale» e il
+        telefono resterebbe con la password vecchia."""
+        a = voce({"id": 1, "title": "Banca", "fields": [["password", "vecchia"]]})
+        b = voce({"id": 1, "title": "Banca", "fields": [["password", "nuova"]]})
+        self.assertNotEqual(contenuto(a), contenuto(b))
+        self.assertFalse(uguali(Istantanea([a]), Istantanea([b])))
+
+    def test_lapidi_e_categorie_contano(self):
+        a = Istantanea([], [{"uid": "u1", "rev": 2, "mod": 1}], ["Casa"])
+        self.assertFalse(uguali(a, Istantanea([], [], ["Casa"])))
+        self.assertFalse(uguali(a, Istantanea([], [{"uid": "u1", "rev": 2, "mod": 1}], [])))
 
 
 if __name__ == "__main__":

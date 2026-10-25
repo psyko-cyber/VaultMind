@@ -1,18 +1,29 @@
 {
-  "_leggimi": "Ingressi fissi e byte attesi del protocollo di abbinamento. Li verificano la suite Python (test_sync_protocol.py) e quella Dart (sync_protocollo_test.dart). Se le due implementazioni calcolassero prove diverse l'abbinamento fallirebbe SEMPRE, e senza questo file nessun test se ne accorgerebbe: si scoprirebbe con due dispositivi veri in mano, che e' il momento peggiore. Tutti i valori sono in esadecimale, tranne codice e impronte.",
-  "chiave_vault": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
-  "nonce_a": "a0a1a2a3a4a5a6a7a8a9aaabacadaeaf",
-  "nonce_b": "b0b1b2b3b4b5b6b7b8b9babbbcbdbebf",
-  "codice": "123456",
-  "id_peer": "0011223344556677",
-  "sfida": "c0c1c2c3c4c5c6c7c8c9cacbcccdcecf",
-  "atteso": {
-    "chiave_sessione": "f00e2eff70097e781c8a24ed0a830206b600ac45128400930b75e1137042982b",
-    "prova_a": "b1616eec5120dfccef5978f2de41ee2ec5306f613bdf93459ff55ef48dc47607",
-    "prova_b": "8055dab923b049eb6f8efbfde01249b953fb3faa0e13eb941f4ee500e0765797",
-    "impronta_sessione": "900 493",
-    "chiave_verso_peer": "f2a191b91000a1d2d851fc760435eaeab43dcbbaee172d08967c827d078f97ce",
-    "risposta_sfida": "21d6fa5293f4aba72994cea52756d8ddaa89dce8e747c130dba02a29c2ff2a1c",
-    "impronta_vault": "95a9823be6760352"
-  }
+  "_leggimi": "I byte del sync fra PC e telefono (sync_protocol.py / sync_protocollo.dart). Con questa chiave e questo nonce, il testo 'chiaro' cifrato con AES-256-GCM e AAD 'vaultmind-sync' deve dare esattamente 'm' (base64 di nonce || cifrato || tag), e 'm' decifrato deve ridare 'dati'. Se le due lingue divergessero, il primo collegamento fallirebbe sempre: meglio scoprirlo qui che col telefono in mano.",
+  "chiave_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+  "nonce_hex": "6465666768696a6b6c6d6e6f",
+  "aad": "vaultmind-sync",
+  "dati": {
+    "t": "stato",
+    "s": "00112233445566778899aabbccddeeff",
+    "id": "7e7e7e7e7e7e7e7e",
+    "nome": "Telefono di Lucà 📱",
+    "token": "a1b2c3"
+  },
+  "chiaro": "{\"t\":\"stato\",\"s\":\"00112233445566778899aabbccddeeff\",\"id\":\"7e7e7e7e7e7e7e7e\",\"nome\":\"Telefono di Lucà 📱\",\"token\":\"a1b2c3\"}",
+  "m": "ZGVmZ2hpamtsbW5vMzmqREPLJepfFjDK9kcZ33jgNjq6XcFAlOKYfM6Wk36j3nj4dSv6ZZ+RG1yZJq+qfT26ywIjJQrA05uz2OSS7z/p7GvhLgxgvArPbzPkXosBWiUW86Dho7meWKtbdydxwgTxvcttSOEgS/zpgHnXg0dFoiXjGIhWgBqgk6etikG46UYZRt0c0bp0n9eP",
+  "qr": {
+    "uri": "vaultmind://abbina?v=1&pc=0123456789abcdef&k=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f&n=PC%20di%20casa%20%E2%80%94%20studio",
+    "pc": "0123456789abcdef",
+    "nome": "PC di casa — studio",
+    "chiave_hex": "000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "v": 1
+  },
+  "qr_non_validi": [
+    "https://example.com/abbina?v=1&pc=0123456789abcdef&k=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "vaultmind://abbina?v=1&pc=0123456789abcdef&k=0011",
+    "vaultmind://abbina?v=1&pc=0123456789abcdef",
+    "vaultmind://altro?v=1&pc=0123456789abcdef&k=000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "testo qualunque"
+  ]
 }

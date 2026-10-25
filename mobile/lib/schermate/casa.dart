@@ -32,7 +32,13 @@ import '../icone.dart';
 
 class SchermataCasa extends StatefulWidget {
   final Sessione sessione;
-  const SchermataCasa({super.key, required this.sessione});
+
+  /// Appena dentro, apri Sincronizza con la fotocamera pronta: è il seguito
+  /// di «Collegati al PC» sulla prima schermata, per chi ha appena creato il
+  /// vault apposta.
+  final bool collegaPc;
+
+  const SchermataCasa({super.key, required this.sessione, this.collegaPc = false});
 
   @override
   State<SchermataCasa> createState() => _SchermataCasaState();
@@ -50,10 +56,8 @@ class _SchermataCasaState extends State<SchermataCasa>
   DateTime _ultimoTocco = DateTime.now();
   late final GestoreSync _sync;
 
-  /// Un giro alla volta, e non due di fila: senza, tornare in primo piano due
-  /// volte in dieci secondi vorrebbe dire scambiare il vault due volte.
-  bool _syncInCorso = false;
-  DateTime _ultimoGiro = DateTime.fromMillisecondsSinceEpoch(0);
+  /// Quanti arrivi dal PC sono già stati detti con un avviso.
+  int _arriviDetti = 0;
 
   IndiceRicerca? _indice;
   List<Credenziale>? _indicizzate;
@@ -94,14 +98,16 @@ class _SchermataCasaState extends State<SchermataCasa>
     super.initState();
     _riarmaBlocco();
     WidgetsBinding.instance.addObserver(this);
-    // Il sync vive insieme al vault aperto: si accende qui e si spegne al
-    // blocco. Senza chiave non c'è niente da sincronizzare, e restare in
-    // ascolto sarebbe solo una porta aperta che non serve a nessuno.
+    // Il sync vive insieme al vault aperto: la porta si apre qui e si chiude
+    // al blocco. Senza chiave non c'è niente da sincronizzare, e restare in
+    // ascolto sarebbe solo una porta aperta che non serve a nessuno. Da qui
+    // in poi è il PC a chiamare: il telefono non deve fare altro.
     _sync = GestoreSync(widget.sessione);
-    _sync.addListener(_aggiorna);
-    _sync.avvia().then((ok) {
-      if (ok) _syncAutomatico();
-    });
+    _sync.addListener(_novitaSync);
+    _sync.avvia();
+    if (widget.collegaPc && !kIsWeb) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _apriSync(inquadra: true));
+    }
     // Il controllo della versione si chiede da QUI, col vault già aperto, e
     // non all'avvio dell'app: la schermata di sblocco deve comportarsi
     // esattamente nello stesso modo senza rete. Niente await e niente errori
@@ -113,16 +119,15 @@ class _SchermataCasaState extends State<SchermataCasa>
   void dispose() {
     _inattivita?.cancel();
     WidgetsBinding.instance.removeObserver(this);
-    _sync.removeListener(_aggiorna);
+    _sync.removeListener(_novitaSync);
     _sync.ferma();
     _sync.dispose();
     super.dispose();
   }
 
-  /// Il rientro vero: il telefono è stato in tasca, l'app è rimasta aperta, e
-  /// tornando a casa la rete c'è di nuovo. Prima il sync automatico partiva
-  /// **solo** allo sblocco, quindi chi non blocca mai il vault non si
-  /// allineava più — ed è il caso normale, non un caso limite.
+  /// Il rientro: il telefono è stato in tasca con l'app aperta. Android può
+  /// aver chiuso la porta mentre l'app dormiva, quindi la si riapre: costa
+  /// niente, e senza il PC busserebbe a una porta chiusa finché non riavvii.
   @override
   void didChangeAppLifecycleState(AppLifecycleState stato) {
     if (stato != AppLifecycleState.resumed) return;
@@ -134,12 +139,9 @@ class _SchermataCasaState extends State<SchermataCasa>
     }
     // Chi non blocca mai il vault potrebbe non riavviare l'app per settimane:
     // il tetto delle 12 ore sta in `controlla()`, qui si guarda solo al
-    // rientro. Prima del sync, che può metterci un po'.
+    // rientro.
     _controllaAggiornamento();
-    if (DateTime.now().difference(_ultimoGiro) < const Duration(seconds: 20)) {
-      return;   // rientri a raffica: uno vale per tutti
-    }
-    _syncAutomatico();
+    if (_sync.acceso && !_sync.inCorso) _sync.avvia();
   }
 
   /// La versione nuova si propone una volta, e solo se non è stata rimandata.
@@ -154,63 +156,27 @@ class _SchermataCasaState extends State<SchermataCasa>
     }
   }
 
-  void _aggiorna() {
-    if (mounted) setState(() {});
-  }
-
-  /// Torni a casa, apri l'app, e i due si allineano da soli.
-  ///
-  /// **Quasi silenzioso di proposito**: se non c'è niente da decidere lascia
-  /// una riga che sparisce da sé. Si fa vivo solo per i conflitti, che sono
-  /// l'unica cosa che richiede te. Un sync automatico che chiede conferma a
-  /// ogni rientro non lo terrebbe acceso nessuno.
-  ///
-  /// Chiesto **a mano** invece parla sempre, anche per dire che non c'era
-  /// niente da fare: chi tocca un pulsante e non vede succedere nulla non sa
-  /// se ha funzionato.
-  Future<void> _syncAutomatico({bool aMano = false}) async {
-    if (_syncInCorso) return;
-    setState(() => _syncInCorso = true);
-    try {
-      final giro = await _sync.sincronizzaTutti();
-      _ultimoGiro = DateTime.now();
-      if (!mounted) return;
-
-      if (giro.conflitti > 0) {
-        _avviso(giro.riassunto ?? 'Ci sono voci da decidere.', importante: true);
-      } else if (giro.errore != null) {
-        if (aMano) _avviso(giro.errore!, importante: true);
-      } else if (giro.qualcosaECambiato) {
-        _avviso(giro.riassunto!);
-      } else if (aMano) {
-        _avviso(giro.abbinati == 0
-            ? 'Nessun dispositivo abbinato in linea: apri l\'app sull\'altro '
-                'e sblocca il vault.'
-            : 'Era già tutto allineato.');
-      }
-    } catch (_) {
-      // Il sync automatico non deve mai disturbare: se non riesce, pazienza.
-      if (aMano && mounted) _avviso('Sincronizzazione non riuscita.', importante: true);
-    } finally {
-      if (mounted) setState(() => _syncInCorso = false);
-    }
-  }
-
-  void _avviso(String testo, {bool importante = false}) {
+  /// Il PC ha portato qualcosa: lo si dice in una riga che sparisce da sé.
+  /// Gli scambi in cui non cambia niente — quasi tutti, uno ogni pochi
+  /// secondi — non dicono niente: un avviso ogni cinque secondi non lo
+  /// terrebbe acceso nessuno.
+  void _novitaSync() {
     if (!mounted) return;
+    setState(() {});
+    final e = _sync.ultimoArrivo;
+    if (e == null || _sync.arrivi == _arriviDetti) return;
+    _arriviDetti = _sync.arrivi;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(testo),
-      duration: Duration(seconds: importante ? 6 : 3),
-      action: importante
-          ? SnackBarAction(label: 'Decidi', onPressed: _apriSync)
-          : null,
+      content: Text('Da «${e.pc}»: ${e.riassunto}'),
+      duration: const Duration(seconds: 3),
     ));
   }
 
-  void _apriSync() {
+  void _apriSync({bool inquadra = false}) {
     Navigator.of(context)
         .push(MaterialPageRoute(
-            builder: (_) => SchermataSincronizza(gestore: _sync)))
+            builder: (_) =>
+                SchermataSincronizza(gestore: _sync, inquadraSubito: inquadra)))
         .then((_) => _riarmaBlocco());
   }
 
@@ -288,28 +254,15 @@ class _SchermataCasaState extends State<SchermataCasa>
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.2)),
           actions: [
-            // Toccarlo SINCRONIZZA, non apre una schermata: è quello che
-            // vuol dire un'icona così in una barra, ed è la cosa che si fa
-            // spesso. L'abbinamento e i dispositivi fidati stanno nelle
-            // impostazioni, dov'è giusto che stia una cosa da configurare
-            // una volta sola.
+            // Apre Sincronizza: il sync parte da solo (è il PC a chiamare),
+            // quindi qui non c'è niente da far partire, ma si vede con chi
+            // ci si è parlati e quando.
             // Nel browser niente sync (`sync_rete_web.dart`): un pulsante che
             // non trova mai nessuno insegna solo a non fidarsi dei pulsanti.
             if (!kIsWeb) IconButton(
-              icon: Badge(
-                isLabelVisible: _sync.conflitti.isNotEmpty,
-                label: Text('${_sync.conflitti.length}'),
-                child: _syncInCorso
-                    ? SizedBox(
-                        width: 18,
-                        height: 18,
-                        child: CircularProgressIndicator(
-                            strokeWidth: 2, color: context.cTenue),
-                      )
-                    : const IconaVM(Icone.sync),
-              ),
-              tooltip: 'Sincronizza ora',
-              onPressed: _syncInCorso ? null : () => _syncAutomatico(aMano: true),
+              icon: const IconaVM(Icone.sync),
+              tooltip: 'Sincronizza',
+              onPressed: _apriSync,
             ),
             IconButton(
               icon: const IconaVM(Icone.impostazioni),

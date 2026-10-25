@@ -100,14 +100,31 @@ _CRED_KEYS = {"id", "title", "fields", "tags", "critical", "category",
 TOMBSTONE_DAYS = 180
 
 
-def now_ms() -> int:
-    """Ora vera in millisecondi.
+def pota_lapidi(lapidi: List[dict]) -> List[dict]:
+    """Le lapidi ancora da tenere: via quelle più vecchie di TOMBSTONE_DAYS.
 
-    Serve a MOSTRARE quando una voce è cambiata e come spareggio estremo, non
-    a decidere chi vince: due dispositivi con l'orologio sfasato deciderebbero
-    male. Per quello c'è `rev`, che è un contatore e non un orologio.
+    Una lapide senza `mod` (arrivata da un file scritto male) si tiene: nel
+    dubbio è meglio una lapide di troppo che una voce che resuscita.
     """
+    limite = now_ms() - TOMBSTONE_DAYS * 24 * 60 * 60 * 1000
+    return [t for t in lapidi if not t.get("mod") or t["mod"] >= limite]
+
+
+def now_ms() -> int:
+    """Ora vera in millisecondi."""
     return int(time.time() * 1000)
+
+
+def dopo(mod: int) -> int:
+    """L'ora da scrivere su una voce che cambia adesso: `mod` decide chi vince
+    al sync («vince l'ultima modifica», vedi `merge.py`).
+
+    Mai meno di un millisecondo dopo la versione precedente. Se è arrivata da
+    un telefono con l'orologio avanti, la modifica fatta qui DOPO averla vista
+    deve vincere lo stesso: chi ha corretto una password sul PC, dopo averla
+    ricevuta dal telefono, non deve vedersela rimettere com'era.
+    """
+    return max(now_ms(), int(mod or 0) + 1)
 
 
 def uid_derivato(cred_id: int) -> str:
@@ -118,9 +135,9 @@ def uid_derivato(cred_id: int) -> str:
     Si ricava invece dal numero che la voce ha già — che è lo stesso su tutte le
     copie dello stesso vault, perché gli id non cambiano mai dopo l'inserimento.
 
-    (Due vault *diversi* avrebbero uid derivati che si scontrano, ma due vault
-    diversi non si sincronizzano: hanno master password diverse e non
-    superano nemmeno l'abbinamento.)
+    Due vault *diversi* hanno uid derivati che si scontrano (la voce 5 dell'uno
+    non è la voce 5 dell'altro), e dal 2026-10 due vault diversi si possono
+    collegare: al primo sync `merge.fondi(primo=True)` le tiene separate.
     """
     return f"#{cred_id}"
 
@@ -144,10 +161,10 @@ class Credential:
     # Identificativo stabile e unico, che sopravvive alla copia del vault da un
     # dispositivo all'altro. Vuoto = si ricava da `id` (vedi uid_derivato).
     uid: str = ""
-    # Contatore logico: cresce di uno a ogni modifica di QUESTA voce. È lui a
-    # dire chi è più avanti, non l'orologio.
+    # Contatore: cresce di uno a ogni modifica di QUESTA voce. Al sync decide
+    # solo a parità di `mod`.
     rev: int = 1
-    # Ora dell'ultima modifica, in millisecondi. Da mostrare all'utente.
+    # Ora dell'ultima modifica, in millisecondi: al sync vince la più recente.
     mod: int = 0
     # Chiavi lette dal file ma sconosciute a questa versione (vedi _CRED_KEYS).
     extra: dict = field(default_factory=dict)
@@ -160,7 +177,7 @@ class Credential:
         """Segna la voce come modificata adesso. Da chiamare a ogni cambiamento
         del suo contenuto, altrimenti il sync non si accorge che è cambiata."""
         self.rev += 1
-        self.mod = now_ms()
+        self.mod = dopo(self.mod)
 
     def public(self) -> dict:
         """Versione senza valori, per liste/ambiguità."""
@@ -303,8 +320,13 @@ class VaultStore:
         # ancora — e resusciterebbe al primo sync.
         self._tombstones: List[dict] = []
         # Chiavi del contenuto in chiaro che questa versione non conosce:
-        # stessa ragione di Credential.extra, un piano più su.
+        # stessa ragione di Credential.extra, un piano più su. Ci stanno anche
+        # quelle che il sync ci mette apposta (`radice()`).
         self._root_extra: dict = {}
+        #: Cresce a ogni scrittura. Il sync lo confronta per sapere se il vault
+        #: è cambiato dall'ultimo giro, senza dover ricordare nulla nel codice
+        #: che modifica le voci (che è dappertutto).
+        self.scritture: int = 0
 
     # ---------- stato ----------
     def exists(self) -> bool:
@@ -478,14 +500,14 @@ class VaultStore:
     def _seppellisci(self, cred: Credential) -> None:
         """Registra la lapide di una voce cancellata.
 
-        `rev` della lapide è quello della voce **più uno**: la cancellazione è
-        essa stessa una modifica, e deve battere la copia ancora viva
-        sull'altro dispositivo — altrimenti il sync la rimanderebbe indietro e
-        la voce resusciterebbe.
+        La cancellazione è essa stessa una modifica: `mod` e `rev` vanno oltre
+        quelli della voce, così batte la copia ancora viva sull'altro
+        dispositivo — altrimenti il sync la rimanderebbe indietro e la voce
+        resusciterebbe.
         """
         self._tombstones = [t for t in self._tombstones if t["uid"] != cred.uid]
         self._tombstones.append(
-            {"uid": cred.uid, "rev": cred.rev + 1, "mod": now_ms()})
+            {"uid": cred.uid, "rev": cred.rev + 1, "mod": dopo(cred.mod)})
 
     def delete(self, cred_id: int) -> None:
         self._require_unlocked()
@@ -632,6 +654,26 @@ class VaultStore:
         perché possa derivare la chiave dalla master password."""
         return self._salt
 
+    def radice(self, nome: str):
+        """Un valore tenuto nel contenuto cifrato, fuori dalle voci.
+
+        Ci sta il sync (`sync_telefoni`: i telefoni collegati e le loro
+        chiavi): dentro il vault le chiavi sono cifrate come le password, e
+        sopravvivono al cambio della master password. Un'app più vecchia le
+        conserva senza capirle, come ogni chiave sconosciuta.
+        """
+        return self._root_extra.get(nome)
+
+    def imposta_radice(self, nome: str, valore) -> None:
+        if nome in ("credentials", "categories", "deleted"):
+            raise ValueError(f"«{nome}» non è una chiave libera.")
+        self._require_unlocked()
+        if valore is None:
+            self._root_extra.pop(nome, None)
+        else:
+            self._root_extra[nome] = valore
+        self._flush()
+
     def applica_fusione(self, entries: List[Credential], tombstones: List[dict],
                         categories: List[str]) -> None:
         """Sostituisce il contenuto col risultato di una fusione, in **una sola
@@ -662,13 +704,8 @@ class VaultStore:
     def _pota_lapidi(self) -> None:
         """Butta via le lapidi troppo vecchie. Qui e non a ogni cancellazione:
         svuotando un vault da 800 voci si potrebbe una volta sola invece di 800.
-
-        Una lapide senza `mod` (arrivata da un file scritto male) si tiene: nel
-        dubbio è meglio una lapide di troppo che una voce che resuscita.
         """
-        limite = now_ms() - TOMBSTONE_DAYS * 24 * 60 * 60 * 1000
-        self._tombstones = [t for t in self._tombstones
-                            if not t["mod"] or t["mod"] >= limite]
+        self._tombstones = pota_lapidi(self._tombstones)
 
     def _flush(self) -> None:
         self._require_unlocked()
@@ -708,6 +745,7 @@ class VaultStore:
         finally:
             if os.path.exists(tmp):
                 os.remove(tmp)
+        self.scritture += 1
 
 
 # Nessun dato di esempio: un vault appena creato deve essere VUOTO.

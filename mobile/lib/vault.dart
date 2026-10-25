@@ -70,10 +70,18 @@ const _chiaviNote = {
   'id', 'title', 'fields', 'tags', 'critical', 'category', 'uid', 'rev', 'mod'
 };
 
-/// Ora vera in millisecondi. Serve a MOSTRARE quando una voce è cambiata, non
-/// a decidere chi vince: due telefoni con l'orologio sfasato deciderebbero
-/// male. Per quello c'è `rev`, che è un contatore e non un orologio.
+/// Ora vera in millisecondi.
 int oraOra() => DateTime.now().millisecondsSinceEpoch;
+
+/// Il `mod` di una voce appena toccata: adesso, ma **mai meno di un
+/// millisecondo dopo** quello di prima. Al sync vince la modifica più recente
+/// (`merge.py`), e così una correzione fatta *dopo* aver visto una voce
+/// arrivata dal PC vince anche se l'orologio del PC è un po' avanti. Stessa
+/// regola di `dopo()` in `crypto_store.py`.
+int dopo(int mod) {
+  final ora = oraOra();
+  return ora > mod ? ora : mod + 1;
+}
 
 /// L'identificativo di una voce che esisteva PRIMA che gli uid esistessero.
 ///
@@ -154,11 +162,11 @@ class Credenziale {
   /// dispositivo all'altro. Per le voci nate prima si ricava da [id].
   final String uid;
 
-  /// Contatore logico: cresce di uno a ogni modifica di QUESTA voce. È lui a
-  /// dire chi è più avanti, non l'orologio.
+  /// Contatore: cresce di uno a ogni modifica di QUESTA voce. Al sync decide
+  /// solo a parità di [mod].
   final int rev;
 
-  /// Ora dell'ultima modifica, in millisecondi. Da mostrare all'utente.
+  /// Ora dell'ultima modifica, in millisecondi: al sync vince la più recente.
   final int mod;
 
   /// Chiavi lette dal file ma sconosciute a questa versione (vedi [_chiaviNote]).
@@ -230,27 +238,11 @@ class Credenziale {
         categoria: (categoria ?? this.categoria).trim(),
         uid: uid,
         rev: rev + 1,
-        mod: oraOra(),
+        mod: dopo(mod),
         extra: extra,
       );
 
   Credenziale conCategoria(String nuova) => modificata(categoria: nuova);
-
-  /// Copia con un altro `id` e **senza** far avanzare il contatore: serve alla
-  /// fusione, quando due voci diverse si ritrovano lo stesso numero. Cambiare
-  /// il numero non è modificare la voce.
-  Credenziale conId(int nuovo) => Credenziale(
-        id: nuovo,
-        title: title,
-        tags: tags,
-        critical: critical,
-        fields: fields,
-        categoria: categoria,
-        uid: uid,
-        rev: rev,
-        mod: mod,
-        extra: extra,
-      );
 }
 
 /// Il contenuto decifrato di un vault.
@@ -288,20 +280,21 @@ class Vault {
     List<Credenziale>? credenziali,
     List<String>? categorie,
     List<Lapide>? lapidi,
+    Map<String, dynamic>? extraRadice,
   }) =>
       Vault(
         credenziali ?? this.credenziali,
         categorie: categorie ?? this.categorie,
         lapidi: lapidi ?? this.lapidi,
         salt: salt,
-        extraRadice: extraRadice,
+        extraRadice: extraRadice ?? this.extraRadice,
       );
 
   /// Il vault senza la voce indicata, con la sua lapide al posto giusto.
   ///
-  /// `rev` della lapide è quello della voce **più uno**: la cancellazione è
-  /// essa stessa una modifica, e deve battere la copia ancora viva sull'altro
-  /// dispositivo, altrimenti il sync la rimanderebbe indietro.
+  /// La cancellazione è essa stessa una modifica: `rev` e `mod` della lapide
+  /// vengono **dopo** quelli della voce, così batte la copia ancora viva
+  /// sull'altro dispositivo e il sync non la rimanda indietro.
   Vault senzaVoce(int id) {
     final voce = credenziali.where((c) => c.id == id).firstOrNull;
     if (voce == null) return this;
@@ -309,7 +302,7 @@ class Vault {
       credenziali: credenziali.where((c) => c.id != id).toList(),
       lapidi: [
         ...lapidi.where((l) => l.uid != voce.uid),
-        Lapide(voce.uid, rev: voce.rev + 1, mod: oraOra()),
+        Lapide(voce.uid, rev: voce.rev + 1, mod: dopo(voce.mod)),
       ],
     );
   }
