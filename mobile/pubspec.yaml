@@ -24,7 +24,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # dalla versione non si sbaglia. Un APK con versionCode piu' basso di quello
 # installato Android lo rifiuta, e l'aggiornamento dentro l'app si fermerebbe
 # davanti a una schermata di errore.
-version: 7.0.0+70
+version: 7.1.0+71
 
 environment:
   sdk: ^3.12.2
