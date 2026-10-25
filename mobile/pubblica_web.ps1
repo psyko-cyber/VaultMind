@@ -111,6 +111,19 @@ Copy-Item (Join-Path $PSScriptRoot "web_pubblico\README.md") $clone -Force
 # Senza, GitHub Pages passa i file da Jekyll, che ignora quelli con "_" davanti.
 New-Item -ItemType File (Join-Path $clone ".nojekyll") -Force | Out-Null
 
+# "* -text": git deve salvare questi file BYTE PER BYTE, senza toccare i fine
+# riga. Qui dentro c'e' solo la build, e sw.js porta l'impronta SHA-256 di
+# ogni file. Su Windows index.html e flutter_bootstrap.js escono con CRLF;
+# senza questa riga git li normalizza a LF nel commit, GitHub serve i file LF,
+# le impronte non tornano piu' e sw.js RIFIUTA l'installazione cancellando la
+# cache. L'app resta per sempre alla versione precedente, in silenzio, e
+# offline non si apre.
+# E' successo davvero, dal 18/09/2026 al 25/10/2026: il service worker non si
+# e' mai installato, su nessuna pubblicazione, e nessuno se n'e' accorto
+# perche' l'app vecchia continuava a funzionare.
+[IO.File]::WriteAllText((Join-Path $clone ".gitattributes"), "* -text`n",
+                        (New-Object Text.UTF8Encoding $false))
+
 # Chi firma il commit: il nome del repo privato, ma l'email "noreply" di
 # GitHub e non quella vera. Il repo e' pubblico, e l'email di un commit la
 # legge chiunque, per sempre.
@@ -122,6 +135,23 @@ $email = "$idGithub+psyko-cyber@users.noreply.github.com"
 Push-Location $clone
 try {
   & git add -A
+  # La prova che i byte sono intatti: la dimensione del blob in indice deve
+  # essere identica a quella del file su disco. Se git ha convertito qualcosa
+  # la dimensione cambia, e le impronte scritte in sw.js non valgono piu'
+  # niente. Meglio fermarsi qui che pubblicare un'app che non si installa:
+  # il guasto, online, e' invisibile.
+  foreach ($f in $file) {
+    $riga = (& git ls-files -s -- $f)
+    if (-not $riga) { Err "$f non e' finito in indice."; exit 1 }
+    $dimIndice = [int](& git cat-file -s (($riga -split '\s+')[1]))
+    $dimDisco  = (Get-Item -LiteralPath (Join-Path $clone $f)).Length
+    if ($dimIndice -ne $dimDisco) {
+      Err "$f : git ha cambiato i byte ($dimDisco -> $dimIndice)."
+      Err "Le impronte di sw.js non torneranno e l'app non si aggiornera'."
+      exit 1
+    }
+  }
+  Ok "Byte intatti: le impronte di sw.js valgono anche online"
   & git diff --cached --quiet
   if ($LASTEXITCODE -eq 0) { Ok "Niente di nuovo da pubblicare."; exit 0 }
   & git -c "user.name=$nome" -c "user.email=$email" commit --quiet -m "VaultMind web $versione"
