@@ -121,6 +121,23 @@ begin
   Result := WizardSilent() and (ExpandConstant('{param:RELAUNCH|0}') = '1');
 end;
 
+{ L'exe e' un "onefile" di PyInstaller: si scompatta in una cartella
+  temporanea e lo dice al proprio processo figlio con variabili d'ambiente.
+  Quando l'aggiornamento parte da dentro l'app, questo setup le eredita
+  dall'app vecchia - che ha appena chiuso - e le passerebbe a quella nuova:
+  l'app nuova cercherebbe i suoi file nella cartella di quella vecchia, e si
+  fermerebbe su "Failed to load Python DLL" (successo il 10/11/2026 passando
+  alla 7.3). Con questa variabile l'exe riparte da capo. Va messa QUI e non
+  solo nell'app: chi aggiorna parte da una versione che non la metteva. }
+function SetEnvironmentVariable(lpName, lpValue: String): Boolean;
+  external 'SetEnvironmentVariableW@kernel32.dll stdcall';
+
+function InitializeSetup(): Boolean;
+begin
+  SetEnvironmentVariable('PYINSTALLER_RESET_ENVIRONMENT', '1');
+  Result := True;
+end;
+
 procedure InitializeWizard;
 begin
   DownloadPage := CreateDownloadPage(SetupMessage(msgWizardPreparing),

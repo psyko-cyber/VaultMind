@@ -334,9 +334,20 @@ def installa(percorso: str) -> bool:
     PowerShell staccato e su alcune build non partiva mai).
     `/FORCECLOSEAPPLICATIONS` perché in silenzio nessuno può rispondere alla
     domanda «chiudo VaultMind?», e `/RELAUNCH=1` lo riapre aggiornato.
+
+    `PYINSTALLER_RESET_ENVIRONMENT`: il setup eredita l'ambiente di questo
+    processo, e l'app che riapre lo eredita dal setup. Dentro ci sono le
+    variabili con cui l'exe di PyInstaller dice a se stesso «sei il figlio,
+    i tuoi file sono in questa cartella temporanea» — quella dell'app
+    VECCHIA, che il setup ha appena chiuso e svuotato. Il 10/11/2026
+    l'aggiornamento alla 7.3 finiva con «Failed to load Python DLL». Con
+    questa variabile l'exe nuovo riparte da capo. (L'installer la mette
+    anche lui, vedi `VaultMind.iss`: serve a chi aggiorna DA una versione
+    che non la metteva.)
     """
     if sys.platform != "win32":
         return False
+    os.environ["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     parametri = "/SILENT /NORESTART /FORCECLOSEAPPLICATIONS /RELAUNCH=1"
     r = int(ctypes.windll.shell32.ShellExecuteW(None, "open", percorso, parametri, None, 1))
     return r > 32
