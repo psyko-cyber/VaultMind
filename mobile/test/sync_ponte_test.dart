@@ -170,6 +170,60 @@ void main() {
       expect(scritti, isEmpty);
     });
 
+    // Pentest del 10/11/2026, M2: chi non ha la chiave non deve poter far
+    // tenere niente in memoria al telefono, né occuparne tutti i posti.
+    test('una riga enorme senza chiave: chiuso, e l\'ascolto resta', () async {
+      final s = await Socket.connect('127.0.0.1', g.portaVera);
+      final finito = s.drain<void>().catchError((_) {}); // si chiude lui
+      final pezzo = Uint8List(64 * 1024)..fillRange(0, 64 * 1024, 0x61);
+      try {
+        for (var i = 0; i < 64; i++) {
+          s.add(pezzo); // 4 MB senza un a-capo: il tetto è 64 KB
+          await s.flush();
+        }
+      } catch (_) {
+        // il telefono ha chiuso mentre scrivevamo: è quello che deve fare
+      }
+      await finito.timeout(const Duration(seconds: 5),
+          onTimeout: () => fail('il telefono ha continuato a leggere'));
+      s.destroy();
+
+      final pc = await _PcFinto.apri(g);
+      expect(await pc.ciao(), {'no': 'pc'}, reason: 'la porta risponde ancora');
+    });
+
+    test('mille righe che nessuno ha chiesto: chiuso', () async {
+      final s = await Socket.connect('127.0.0.1', g.portaVera);
+      final finito = s.drain<void>().catchError((_) {});
+      try {
+        s.add(utf8.encode('{}\n' * 1000));
+        await s.flush();
+      } catch (_) {}
+      await finito.timeout(const Duration(seconds: 8),
+          onTimeout: () => fail('il collegamento è rimasto aperto'));
+      s.destroy();
+    });
+
+    test('troppi collegamenti insieme: quelli in più chiusi subito', () async {
+      final muti = <Socket>[];
+      for (var i = 0; i < maxCollegamenti; i++) {
+        muti.add(await Socket.connect('127.0.0.1', g.portaVera));
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+      final inPiu = await Socket.connect('127.0.0.1', g.portaVera);
+      await inPiu.drain<void>().catchError((_) {}).timeout(
+          const Duration(seconds: 2),
+          onTimeout: () => fail('il collegamento in più non è stato chiuso'));
+      inPiu.destroy();
+      // Chi se ne va libera il posto: il PC vero torna a passare.
+      for (final m in muti) {
+        m.destroy();
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 300));
+      final pc = await _PcFinto.apri(g);
+      expect(await pc.ciao(), {'no': 'pc'});
+    });
+
     test('una versione che non conosce si rifiuta, in chiaro', () async {
       await g.collega(_qr(_chiavePc));
       final pc = await _PcFinto.apri(g);

@@ -30,14 +30,18 @@ sys.path.insert(0, os.path.join(os.path.dirname(_QUI), "VaultMind_Windows"))
 from app import aggiornamenti, __version__  # noqa: E402
 
 
-def _release(tag="7.0", allegati=("VaultMind-Setup.exe", "SHA256SUMS.txt")) -> str:
+_SCARICA = "https://github.com/psyko-cyber/VaultMind/releases/download/v7.0/"
+
+
+def _release(tag="7.0", allegati=("VaultMind-Setup.exe", "SHA256SUMS.txt",
+                                  "SHA256SUMS.txt.sig"), base=_SCARICA) -> str:
     """Una risposta di GitHub come quella vera, ridotta ai campi che leggiamo."""
     return json.dumps({
         "tag_name": tag,
         "html_url": f"https://github.com/psyko-cyber/VaultMind/releases/tag/{tag}",
         "body": "## Novita\n**Aggiornamenti dentro l'app**\n\n\n- e altro",
         "assets": [
-            {"name": n, "browser_download_url": f"https://esempio/{n}"}
+            {"name": n, "browser_download_url": f"{base}{n}"}
             for n in allegati
         ],
     })
@@ -93,8 +97,27 @@ class TestLetturaRelease(unittest.TestCase):
         i = aggiornamenti.leggi_release(_release())
         self.assertIsNotNone(i)
         self.assertEqual(i["versione"], "7.0")
-        self.assertEqual(i["download"], "https://esempio/VaultMind-Setup.exe")
-        self.assertEqual(i["sums"], "https://esempio/SHA256SUMS.txt")
+        self.assertEqual(i["download"], _SCARICA + "VaultMind-Setup.exe")
+        self.assertEqual(i["sums"], _SCARICA + "SHA256SUMS.txt")
+        self.assertEqual(i["firma"], _SCARICA + "SHA256SUMS.txt.sig")
+        self.assertTrue(aggiornamenti.installabile(i))
+
+    def test_allegati_ospitati_altrove_non_si_prendono(self):
+        # L'indirizzo finisce nelle impostazioni e si rilegge al momento di
+        # installare: deve essere una release del nostro repo, non «un .exe».
+        for base in ("https://esempio/", "http://github.com/psyko-cyber/VaultMind/releases/download/v7.0/",
+                     "https://github.com/altro/VaultMind/releases/download/v7.0/",
+                     "https://github.com.esempio/psyko-cyber/VaultMind/releases/download/v7.0/"):
+            with self.subTest(base):
+                i = aggiornamenti.leggi_release(_release(base=base))
+                self.assertIsNone(i["download"])
+                self.assertFalse(aggiornamenti.installabile(i))
+
+    def test_senza_firma_non_e_installabile(self):
+        i = aggiornamenti.leggi_release(
+            _release(allegati=("VaultMind-Setup.exe", "SHA256SUMS.txt")))
+        self.assertIsNotNone(i["download"])
+        self.assertFalse(aggiornamenti.installabile(i))
 
     def test_il_v_del_tag_sparisce(self):
         self.assertEqual(aggiornamenti.leggi_release(_release("v7.1"))["versione"], "7.1")
@@ -192,6 +215,98 @@ class TestSenzaRete(unittest.TestCase):
             aggiornamenti.scarica({"versione": "7.0"})
 
 
+class TestFirma(unittest.TestCase):
+    """Il setup si installa solo se le impronte sono firmate con la nostra
+    chiave (pentest del 10/11/2026, A2). Qui la chiave e' una di prova: quella
+    vera sta fuori dal repo."""
+
+    SETUP = b"MZ finto setup di VaultMind" * 100
+
+    @classmethod
+    def setUpClass(cls):
+        import base64
+        import hashlib
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        cls.chiave = Ed25519PrivateKey.generate()
+        cls.pubblica = cls.chiave.public_key().public_bytes(
+            serialization.Encoding.Raw, serialization.PublicFormat.Raw).hex()
+        cls.somme = (hashlib.sha256(cls.SETUP).hexdigest()
+                     + " *VaultMind-Setup.exe\n").encode("ascii")
+        cls.firma = base64.b64encode(cls.chiave.sign(cls.somme)).decode("ascii") + "\n"
+        cls.info = aggiornamenti.leggi_release(_release())
+
+    def tearDown(self):
+        aggiornamenti.pulisci()
+
+    def _scarica(self, setup=None, somme=None, firma=None, manca=()):
+        corpi = {"VaultMind-Setup.exe": self.SETUP if setup is None else setup,
+                 "SHA256SUMS.txt": self.somme if somme is None else somme,
+                 "SHA256SUMS.txt.sig": (self.firma if firma is None else firma).encode("ascii")}
+
+        def finta(richiesta, timeout=None):
+            nome = richiesta.full_url.rsplit("/", 1)[-1]
+            if nome in manca:
+                raise OSError("404")
+            r = _Risposta("")
+            r._corpo = corpi[nome]
+            r.headers = {"Content-Length": str(len(r._corpo))}
+            # `scarica` legge a blocchi finche' non arriva un blocco vuoto.
+            pezzi = [r._corpo, b""]
+            r.read = lambda quanti=-1: pezzi.pop(0) if pezzi else b""
+            return r
+
+        with mock.patch.object(aggiornamenti, "CHIAVE_PUBBLICA", self.pubblica):
+            with mock.patch.object(aggiornamenti.urllib.request, "urlopen", side_effect=finta):
+                return aggiornamenti.scarica(self.info)
+
+    def test_release_firmata_si_scarica(self):
+        percorso = self._scarica()
+        with open(percorso, "rb") as f:
+            self.assertEqual(f.read(), self.SETUP)
+
+    def test_la_chiave_vera_non_e_quella_di_prova(self):
+        # Se un giorno questo test firmasse con la chiave dentro l'app, la
+        # chiave privata sarebbe finita nel repo.
+        self.assertNotEqual(self.pubblica, aggiornamenti.CHIAVE_PUBBLICA)
+        self.assertEqual(len(bytes.fromhex(aggiornamenti.CHIAVE_PUBBLICA)), 32)
+
+    def test_impronte_di_un_altro_non_passano(self):
+        # Il caso del pentest: chi pubblica la release pubblica anche le sue
+        # impronte, giuste per il SUO setup. Senza la nostra firma non vale.
+        import hashlib
+        suo = b"MZ setup di qualcun altro"
+        sue_somme = (hashlib.sha256(suo).hexdigest() + " *VaultMind-Setup.exe\n").encode()
+        with self.assertRaises(IOError) as e:
+            self._scarica(setup=suo, somme=sue_somme)
+        self.assertIn("firma", str(e.exception).lower())
+        self.assertFalse(os.path.exists(os.path.join(aggiornamenti.cartella(), "VaultMind-Setup.exe")))
+
+    def test_firma_di_un_altra_chiave(self):
+        import base64
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+        altra = base64.b64encode(Ed25519PrivateKey.generate().sign(self.somme)).decode()
+        with self.assertRaises(IOError):
+            self._scarica(firma=altra)
+
+    def test_firma_storta_o_assente(self):
+        for firma in ("", "non base64 !!", "AAAA"):
+            with self.subTest(firma):
+                with self.assertRaises(IOError):
+                    self._scarica(firma=firma)
+        with self.assertRaises(IOError):
+            self._scarica(manca=("SHA256SUMS.txt.sig",))
+
+    def test_setup_diverso_da_quello_firmato(self):
+        with self.assertRaises(IOError) as e:
+            self._scarica(setup=self.SETUP + b"!")
+        self.assertIn("sha-256", str(e.exception).lower())
+
+    def test_firma_valida_non_solleva_mai(self):
+        for somme, firma, chiave in ((b"x", "", None), (b"x", "AAAA", "zz"), (b"", "ÿ", "00")):
+            self.assertFalse(aggiornamenti.firma_valida(somme, firma, chiave))
+
+
 class TestControlloNelServer(unittest.TestCase):
     """Il tetto delle 12 ore, la memoria di quello che si sapeva, l'interruttore.
 
@@ -224,8 +339,9 @@ class TestControlloNelServer(unittest.TestCase):
 
     def _nuova(self, versione="99.0"):
         return {"versione": versione, "pagina": "https://esempio",
-                "note": "", "download": "https://esempio/s.exe",
-                "sums": "https://esempio/sums"}
+                "note": "", "download": _SCARICA + "VaultMind-Setup.exe",
+                "sums": _SCARICA + "SHA256SUMS.txt",
+                "firma": _SCARICA + "SHA256SUMS.txt.sig"}
 
     def test_spento_non_chiede_niente(self):
         self.server._save_settings({"aggiornamenti": False})

@@ -14,6 +14,7 @@ import shutil
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 _QUI = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, _QUI)
@@ -22,6 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(_QUI), "VaultMind_Windows"))
 from app.crypto_store import VaultStore  # noqa: E402
 from app.sync_app import RADICE, SyncApp  # noqa: E402
 from app import sync_protocol as sp  # noqa: E402
+from app import sync_net  # noqa: E402
 from telefono_finto import TelefonoFinto  # noqa: E402
 
 MASTER = "master-di-prova-1"
@@ -258,6 +260,67 @@ class TestGiro(Base):
         self.tel.chiudi()
         self.sync.giro()
         self.assertEqual(self.sync.telefoni()[0]["esito"], "assente")
+
+
+class TestFuoriCasa(Base):
+    """Pentest del 10/11/2026, M3: fuori casa il PC non deve bussare a tutta
+    la rete in cui si trova, né chiamare l'ultimo indirizzo del telefono (che
+    lì è il computer di un altro)."""
+
+    ALBERGO = [["10.9.9.1", "10.9.9.2"]]
+
+    def setUp(self):
+        super().setUp()
+        self.collega()                       # visto a casa, su 127.0.0.1
+        self.sync.ferma_collegamento()
+        self.bussate = []
+        self.chiamati = []
+        vero_bussa, vero_apri = sync_net.bussa, sync_net.Collegamento.apri
+
+        def bussa(indirizzi, porta, *a, **k):
+            self.bussate.append(list(indirizzi))
+            return vero_bussa(indirizzi, porta, *a, **k)
+
+        def apri(indirizzo, porta, chiave, *a, **k):
+            self.chiamati.append(indirizzo)
+            return vero_apri(indirizzo, porta, chiave, *a, **k)
+
+        p1 = mock.patch.object(sync_net, "bussa", side_effect=bussa)
+        p2 = mock.patch.object(sync_net.Collegamento, "apri", side_effect=apri)
+        p1.start(), p2.start()
+        self.addCleanup(p1.stop)
+        self.addCleanup(p2.stop)
+
+    def test_in_un_altra_rete_non_si_bussa_a_nessuno(self):
+        self.sync._reti = lambda: self.ALBERGO
+        self.sync.giro()
+        self.assertEqual(self.bussate, [])
+        self.assertEqual(self.chiamati, [], "nemmeno all'ultimo indirizzo")
+        self.assertEqual(self.sync.telefoni()[0]["esito"], "assente")
+
+    def test_il_pulsante_cerca_anche_li(self):
+        self.sync._reti = lambda: self.ALBERGO
+        self.sync.sincronizza_adesso()
+        self.assertEqual(self.bussate, self.ALBERGO)
+
+    def test_col_qr_aperto_si_cerca_ovunque(self):
+        self.sync._reti = lambda: self.ALBERGO
+        self.sync.inizia_collegamento()
+        self.sync.giro()
+        self.assertEqual(self.bussate, self.ALBERGO)
+
+    def test_a_casa_si_cerca_solo_nella_rete_di_casa(self):
+        self.tel.chiudi()                    # spento: va cercato
+        self.sync._reti = lambda: [["127.0.0.1"], ["10.9.9.1"]]
+        self.sync.giro()
+        self.assertEqual(self.bussate, [["127.0.0.1"]])
+
+    def test_un_telefono_mai_visto_si_cerca_ovunque(self):
+        # Un vault ripristinato su un PC nuovo: la chiave c'è, l'indirizzo no.
+        self.impostazioni["sync"]["telefoni"].clear()
+        self.sync._reti = lambda: self.ALBERGO
+        self.sync.giro()
+        self.assertEqual(self.bussate, self.ALBERGO)
 
 
 if __name__ == "__main__":

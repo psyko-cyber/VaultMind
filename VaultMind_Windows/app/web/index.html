@@ -984,6 +984,8 @@
     <button id="unlockBtn" class="btn" disabled>Sblocca</button>
     <button id="restoreBtn" class="link-btn">Ripristina da backup…</button>
     <input id="restoreFile" type="file" accept="application/json,.json" class="hidden" />
+    <button id="copieBtn" class="link-btn hidden" style="margin-top:8px">Copie automatiche…</button>
+    <div id="copieBox" class="hidden" style="margin-top:10px;max-height:190px;overflow:auto"></div>
     <div id="lockErr" class="err"></div>
     <p class="hint" id="lockHint">La master password deriva la chiave di cifratura del database (Argon2 + AES-256) e non lascia mai il dispositivo.</p>
   </div>
@@ -1137,7 +1139,7 @@
         </div>
         <div id="changeMasterBox" class="hidden" style="padding:10px 0">
           <input id="cmOld" class="field" type="password" placeholder="Password attuale" />
-          <input id="cmNew" class="field" type="password" placeholder="Nuova password (min 8)" />
+          <input id="cmNew" class="field" type="password" placeholder="Nuova password (min 12)" />
           <input id="cmNew2" class="field" type="password" placeholder="Ripeti nuova password" />
           <button id="cmSave" class="btn">Aggiorna password</button>
           <div id="cmMsg" class="set-msg"></div>
@@ -1461,6 +1463,10 @@ function somiglianzaEl(s){
    poteva inviare POST ciechi (es. /api/clear) verso 127.0.0.1.
    Il wrapper aggiunge l'header a ogni chiamata: i singoli fetch non cambiano. */
 const VM_TOKEN = "__VM_TOKEN__";
+/* La finestra si apre su /?avvio=<segreto monouso> (vedi home() in
+   server.py). Ormai e' speso: via dall'indirizzo, cosi' non resta in vista
+   ne' nella cronologia di chi usa il ripiego nel browser. */
+if (location.search) history.replaceState(null, "", location.pathname);
 const _rawFetch = window.fetch.bind(window);
 window.fetch = (url, opts) => {
   if (typeof url === "string" && url.startsWith("/api/")) {
@@ -1490,7 +1496,7 @@ function applyLockMode(){
   $("#firstRunNote").classList.toggle("hidden", !FIRST_RUN);
   $("#master2Box").classList.toggle("hidden", !FIRST_RUN);
   $("#masterLbl").textContent = FIRST_RUN ? "Imposta la master password" : "Master password";
-  $("#master").placeholder = FIRST_RUN ? "almeno 8 caratteri" : "";
+  $("#master").placeholder = FIRST_RUN ? "almeno 12 caratteri" : "";
   $("#master").autocomplete = FIRST_RUN ? "new-password" : "current-password";
   $("#unlockBtn").textContent = FIRST_RUN ? "Crea il vault" : "Sblocca";
   $("#lockHint").innerHTML = FIRST_RUN
@@ -1501,7 +1507,7 @@ function applyLockMode(){
 function checkLockValid(){
   const p = $("#master").value;
   $("#unlockBtn").disabled = FIRST_RUN
-    ? !(p.length >= 8 && p === $("#master2").value)
+    ? !(p.length >= 12 && p === $("#master2").value)
     : !p;
 }
 $("#master").addEventListener("input", checkLockValid);
@@ -2072,7 +2078,47 @@ $("#restoreFile").addEventListener("change", async (e)=>{
     $("#lockErr").style.color="var(--ok)"; $("#lockErr").textContent="Backup ripristinato. Sblocca con la master password del dispositivo di origine."; }
   else { $("#lockErr").style.color=""; $("#lockErr").textContent = j.detail||"Ripristino non riuscito."; }
   e.target.value="";
+  caricaCopie();
 });
+
+/* ---- COPIE AUTOMATICHE (dalla schermata di blocco) ----
+   Il server mette da parte il vault prima di ogni cosa che lo riscrive per
+   intero (un ripristino, un sync, «svuota tutto») e a ogni apertura in cui e'
+   cambiato. Qui si scelgono: senza questa lista, per tornare indietro
+   bisognerebbe andare a cercare un file in una cartella nascosta. Sono file
+   cifrati come il vault: si aprono con la master password che avevano. */
+const MOTIVI_COPIA = { apertura:"all'apertura", sync:"prima di un sync",
+                       svuota:"prima di svuotare", ripristino:"prima di un ripristino" };
+function quandoCopia(sec){
+  const d=new Date(sec*1000), oggi=new Date();
+  const ora=d.toLocaleTimeString("it-IT",{hour:"2-digit",minute:"2-digit"});
+  if(d.toDateString()===oggi.toDateString()) return "oggi alle "+ora;
+  return d.toLocaleDateString("it-IT",{day:"numeric",month:"long",year:"numeric"})+" alle "+ora;
+}
+async function caricaCopie(){
+  let lista=[];
+  try{ const r=await fetch("/api/copie"); if(r.ok) lista=(await r.json()).copie||[]; }catch(e){}
+  const btn=$("#copieBtn"), box=$("#copieBox");
+  btn.classList.toggle("hidden", !lista.length);
+  box.innerHTML="";
+  if(!lista.length){ box.classList.add("hidden"); return; }
+  lista.forEach(c=>{
+    const b=document.createElement("button"); b.type="button"; b.className="link-btn";
+    b.style.cssText="display:block;width:100%;margin:0 0 6px;font-size:13px;text-align:left";
+    b.textContent=quandoCopia(c.quando)+" · "+(MOTIVI_COPIA[c.motivo]||c.motivo)+" · "+Math.max(1,Math.round(c.byte/1024))+" KB";
+    b.onclick=async()=>{
+      if(!confirm("Rimettere il vault com'era "+quandoCopia(c.quando)+"?\n\nQuello di adesso non si perde: finisce anche lui fra le copie automatiche.")) return;
+      const {ok,j}=await api("/api/copie/ripristina",{nome:c.nome});
+      if(ok){ FIRST_RUN=false; $("#master").value=""; $("#master2").value=""; applyLockMode();
+        $("#lockErr").style.color="var(--ok)"; $("#lockErr").textContent="Copia ripristinata. Sblocca con la master password che avevi in quel momento."; }
+      else { $("#lockErr").style.color=""; $("#lockErr").textContent=j.detail||"Ripristino non riuscito."; }
+      caricaCopie();
+    };
+    box.appendChild(b);
+  });
+}
+$("#copieBtn").onclick=()=>$("#copieBox").classList.toggle("hidden");
+caricaCopie();
 
 /* ---- IMPORT INTELLIGENTE ---- */
 $("#importBtn").onclick=()=>{ resetImport(); $("#importModal").classList.remove("hidden"); };
@@ -2731,7 +2777,7 @@ async function loadExtList(){
   const exts=j.extensions||[];
   box.innerHTML=exts.map(e=>
     `<div class="set-row"><div><div class="lab">${ic("estensione","ic-16")} ${esc(e.name)}</div>
-       <div class="desc">ID ${esc(_idBreve(e.origin))} · abbinata il ${esc(_dataIt(e.created))}</div></div>
+       <div class="desc">ID ${esc(_idBreve(e.origin))} · abbinata il ${esc(_dataIt(e.created))}${e.last_used ? " · ultima lettura "+esc(quandoFa(e.last_used)) : ""}${j.scadenza_giorni ? ` · va riabbinata dopo ${parseInt(j.scadenza_giorni)} giorni senza usarla` : ""}</div></div>
        <button class="iconbtn ctl" data-revoke="${_escAttr(e.origin)}">Revoca</button></div>`).join("");
   box.querySelectorAll("[data-revoke]").forEach(b=>b.onclick=async()=>{
     await api("/api/pair/revoke",{origin:b.dataset.revoke});
@@ -2781,7 +2827,7 @@ $("#openChangeMaster").onclick=()=>$("#changeMasterBox").classList.toggle("hidde
 $("#cmSave").onclick=async()=>{
   const o=$("#cmOld").value, n=$("#cmNew").value, n2=$("#cmNew2").value;
   const msg=$("#cmMsg");
-  if(n.length<8){ msg.textContent="La nuova password deve avere almeno 8 caratteri."; msg.className="set-msg err"; return; }
+  if(n.length<12){ msg.textContent="La nuova password deve avere almeno 12 caratteri."; msg.className="set-msg err"; return; }
   if(n!==n2){ msg.textContent="Le due nuove password non coincidono."; msg.className="set-msg err"; return; }
   const {ok,j}=await api("/api/change_master",{old_master:o,new_master:n});
   if(ok){ msg.textContent="Password aggiornata."; msg.className="set-msg ok";
@@ -2818,8 +2864,21 @@ function scriviAutoblocco(){
   bar.style.width=(100*resto/AUTOLOCK_DURATA).toFixed(1)+"%";
 }
 setInterval(()=>{ if(!$("#app").classList.contains("hidden")) scriviAutoblocco(); }, 1000);
+/* Il blocco vero lo decide il server (vedi `_guardiano` in server.py): un
+   timer in una pagina non scatta se la pagina e' ferma. Qui gli si dice che
+   l'utente c'e', al massimo ogni 30 secondi; lui aspetta un minuto piu' del
+   timer qui sopra, cosi' in condizioni normali scatta prima questo e la
+   schermata si ricarica pulita. Se risponde 401 il vault e' gia' chiuso. */
+let _vivoDetto=0;
+function diVivo(){
+  const ora=Date.now();
+  if(ora-_vivoDetto<30000) return;
+  _vivoDetto=ora;
+  fetch("/api/vivo",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"})
+    .then(r=>{ if(r.status===401) location.reload(); }).catch(()=>{});
+}
 ["click","keydown","mousemove","touchstart"].forEach(ev=>
-  document.addEventListener(ev, ()=>{ if(!$("#app").classList.contains("hidden")) resetAutolock(); }, {passive:true}));
+  document.addEventListener(ev, ()=>{ if(!$("#app").classList.contains("hidden")){ resetAutolock(); diVivo(); } }, {passive:true}));
 
 
 /* ================= DATABASE GUI ================= */

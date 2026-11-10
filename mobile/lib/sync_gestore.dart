@@ -314,6 +314,7 @@ class GestoreSync extends ChangeNotifier {
         }
         final mezza = '${ciao['s'] ?? ''}';
         if (ciao['t'] != 'ciao' || mezza.length != 16) return;
+        c.fidati(); // ha la chiave: adesso può mandare un vault intero
         await _inCoda(() => _scambio(c, idPc, chiave, nuovo,
             _pulito(ciao['nome'], 'PC'), mezza));
         return;

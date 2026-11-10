@@ -227,6 +227,25 @@ if (-not $Release) {
 }
 
 Fase "4/4  Aggiornamento della release su GitHub"
+# La chiave che firma le impronte si controlla PRIMA di creare la release:
+# una release pubblicata senza firma e' una release che l'app del PC rifiuta.
+$PY_VENV = Join-Path $WIN ".venv\Scripts\python.exe"
+$CHIAVE_AGG = $env:VAULTMIND_CHIAVE_AGGIORNAMENTI
+if (-not $CHIAVE_AGG) { $CHIAVE_AGG = "C:\Android\vaultmind-aggiornamenti.key" }
+if (-not (Test-Path $PY_VENV)) { Err "venv non trovato: lancia prima run.bat in VaultMind_Windows."; exit 1 }
+if (-not (Test-Path $CHIAVE_AGG)) {
+  Err "Manca la chiave che firma gli aggiornamenti: $CHIAVE_AGG"
+  Info "Senza, le app installate non accettano la release. Vedi installer\firma_somme.py."
+  exit 1
+}
+# La chiave pubblica dentro l'app deve essere quella di questa chiave: se non
+# combaciano, l'app appena costruita rifiuterebbe la sua stessa release.
+$pubChiave = ("" + (& $PY_VENV (Join-Path $PSScriptRoot "firma_somme.py") --pubblica)).Trim()
+$aggPy = [IO.File]::ReadAllText((Join-Path $WIN "app\aggiornamenti.py"))
+if ($LASTEXITCODE -ne 0 -or -not $pubChiave -or -not $aggPy.Contains($pubChiave)) {
+  Err "La chiave pubblica in app\aggiornamenti.py non e' quella di $CHIAVE_AGG"
+  exit 1
+}
 # Il token esce dal credential helper di git (lo stesso usato da push) e resta
 # in una variabile: mai stampato, mai scritto su disco.
 # Lo stdin passa da un file: il pipe di PowerShell 5.1 arriva a git con
@@ -288,6 +307,21 @@ $righe = foreach ($n in $daFirmare) {
                         (New-Object Text.UTF8Encoding $false))
 $nomi += "SHA256SUMS.txt"
 Ok ("SHA256SUMS.txt  " + $daFirmare.Count + " file: " + ($daFirmare -join ", "))
+
+# --- SHA256SUMS.txt.sig: senza, l'app del PC NON installa -----------------
+# Le impronte stanno nella stessa release del setup: da sole dicono che il
+# download non si e' rotto, non chi l'ha pubblicato. La firma si fa con una
+# chiave che sta su questo PC e non su GitHub (installer\firma_somme.py), e
+# l'app ha dentro la meta' pubblica: chi ruba l'account puo' pubblicare una
+# release, ma non farla installare. Niente "2>&1": PowerShell lo fa fallire.
+$firmaOut = & $PY_VENV (Join-Path $PSScriptRoot "firma_somme.py") (Join-Path $PACCHETTO "SHA256SUMS.txt")
+if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $PACCHETTO "SHA256SUMS.txt.sig"))) {
+  Err "Firma di SHA256SUMS.txt non riuscita: non carico niente."
+  Info "$firmaOut"
+  exit 1
+}
+$nomi += "SHA256SUMS.txt.sig"
+Ok ("SHA256SUMS.txt.sig  chiave pubblica " + ("$firmaOut").Trim())
 foreach ($a in $rel.assets) {
   if ($nomi -contains $a.name) {
     Invoke-RestMethod -Method Delete -Uri "https://api.github.com/repos/$GH_REPO/releases/assets/$($a.id)" -Headers $H | Out-Null
@@ -300,6 +334,7 @@ foreach ($n in $nomi) {
     "*.exe" { "application/octet-stream" }
     "*.apk" { "application/vnd.android.package-archive" }
     "*.txt" { "text/plain; charset=utf-8" }
+    "*.sig" { "text/plain; charset=utf-8" }
     default { "application/zip" }
   }
   Info ("carico $n (" + [math]::Round((Get-Item $f).Length / 1MB, 1) + " MB)...")

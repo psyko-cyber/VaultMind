@@ -58,9 +58,9 @@ class _SchermataNuovoVaultState extends State<SchermataNuovoVault> {
 
   Future<void> _crea() async {
     final master = _password.text;
-    if (master.runes.length < kMasterMinima) {
-      setState(() => _errore =
-          'Almeno $kMasterMinima caratteri: è l\'unica chiave del vault.');
+    final debole = masterTroppoDebole(master);
+    if (debole != null) {
+      setState(() => _errore = debole);
       return;
     }
     if (master != _conferma.text) {

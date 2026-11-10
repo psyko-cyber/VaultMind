@@ -160,10 +160,27 @@ void main() {
 
   group('vault nato sul telefono', () {
     test('password troppo corta: rifiutata prima di Argon2', () {
-      expect(() => nuovoVault('1234567'), throwsArgumentError);
+      expect(() => nuovoVault('12345678901'), throwsArgumentError);
       // Si contano i caratteri come fa Python: sette emoji sono sette, non
       // quattordici unità UTF-16 che passerebbero la soglia.
       expect(() => nuovoVault('🔑' * 7), throwsArgumentError);
+    });
+
+    test('le stesse regole di master.py sul PC', () {
+      // Le due liste sono quelle di `tests/test_server_blocco.py`.
+      for (final pw in [
+        '12345678', 'corta', 'aaaaaaaaaaaaaaaa', 'abababababab',
+        '123456789012', 'qwertyuiopas', 'lkjhgfdsapoi', 'password1234',
+        'Password2026!', 'passwordpassword', 'vaultmind2026', '!!benvenuto!!',
+      ]) {
+        expect(masterTroppoDebole(pw), isNotNull, reason: pw);
+      }
+      for (final pw in [
+        'cavallo-pila-graffetta', 'Tr0mba!verde#lago', 'la mia frase lunga',
+        r'x9$Lq2@vB7!n',
+      ]) {
+        expect(masterTroppoDebole(pw), isNull, reason: pw);
+      }
     });
 
     test('salt nuovo da 16 byte, e si riapre con la sola password', () async {

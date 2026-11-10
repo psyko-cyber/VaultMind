@@ -352,22 +352,37 @@ class SyncApp:
             return {"ok": False, "motivo": "Il vault è chiuso.", "esiti": []}
         self._prossima_ricerca = 0.0
         self._pausa = PAUSA_RICERCA_S
-        self.giro()
+        self.giro(larga=True)
         self.avvia()
         return {"ok": True, "telefoni": self.telefoni()}
 
-    def giro(self) -> None:
+    def giro(self, larga: bool = False) -> None:
+        """Un giro: chiama ogni telefono, e cerca chi non risponde.
+
+        `larga`: la ricerca l'ha chiesta qualcuno (il pulsante), quindi si
+        bussa a tutte le reti private del PC. In sottofondo no: vedi `_cerca`.
+        """
         store = self._store()
         if store is None or not self.acceso:
             return
         with self._lucchetto:
             collegati = self._collegati(store)
             sez = self._sez()["telefoni"]
+            reti = self._reti()
             mancanti = []
             for tid, t in collegati.items():
                 ind = (sez.get(tid) or {}).get("indirizzo")
-                if ind and self._prova(store, ind, t["chiave"], tid):
-                    continue
+                # L'ultimo indirizzo si chiama solo se sta in una rete a cui
+                # il PC è collegato adesso: in albergo `192.168.1.37` è il
+                # computer di un altro, e non c'è motivo di dirgli chi siamo.
+                if ind and any(ind in rete for rete in reti):
+                    if self._prova(store, ind, t["chiave"], tid):
+                        continue
+                elif ind:
+                    self._esiti[tid] = {
+                        "esito": "assente",
+                        "messaggio": "Questo PC non è sulla rete in cui ha visto "
+                                     "il telefono. Sulla stessa WiFi, premi «Sincronizza»."}
                 mancanti.append(tid)
             attesa = self._attesa
             cerca_nuovo = bool(attesa and not attesa["collegato"]
@@ -377,11 +392,26 @@ class SyncApp:
                 return
             if not cerca_nuovo and time.time() < self._prossima_ricerca:
                 return
-            self._cerca(store, collegati, mancanti, cerca_nuovo)
+            # Larga anche per un telefono mai visto da questo PC (un vault
+            # ripristinato su un computer nuovo): di lui non si sa dove sta.
+            mai_visti = any(not (sez.get(tid) or {}).get("indirizzo") for tid in mancanti)
+            if not (larga or cerca_nuovo or mai_visti):
+                noti = {sync_net.prefisso(str((sez.get(tid) or {}).get("indirizzo")))
+                        for tid in mancanti}
+                reti = [r for r in reti if r and sync_net.prefisso(r[0]) in noti]
+            self._cerca(store, collegati, mancanti, cerca_nuovo, reti)
 
     def _cerca(self, store: VaultStore, collegati: Dict[str, dict],
-               mancanti: List[str], cerca_nuovo: bool) -> None:
-        for rete in self._reti():
+               mancanti: List[str], cerca_nuovo: bool,
+               reti: List[List[str]]) -> None:
+        """Bussa alla porta del sync su `reti` e prova la chiave con chi apre.
+
+        In sottofondo `reti` sono solo quelle in cui un telefono che manca è
+        già stato visto: fuori casa di solito non ce n'è nessuna, e non si
+        bussa a nessuno. Il limite è che due reti con lo stesso prefisso
+        (`192.168.1.x` a casa e in albergo) si somigliano: lì si bussa ancora.
+        """
+        for rete in reti:
             for h in sync_net.bussa(rete, self._porta):
                 if cerca_nuovo and self._attesa:
                     if self._prova(store, h, self._attesa["chiave"], None):

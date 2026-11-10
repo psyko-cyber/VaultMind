@@ -38,6 +38,13 @@ Due dettagli pagati:
 - **Lo SHA-256 si verifica prima di eseguire**, contro `SHA256SUMS.txt` della
   release. Senza quel controllo, un download corrotto a metà diventerebbe un
   eseguibile lanciato con fiducia.
+- **`SHA256SUMS.txt` deve essere firmato** (`SHA256SUMS.txt.sig`, Ed25519) con
+  la chiave la cui metà pubblica sta qui sotto. Le impronte stanno nella
+  stessa release del setup: da sole dicono che il download non si è rotto,
+  non chi l'ha pubblicato. La chiave privata non sta su GitHub
+  (`installer/firma_somme.py`), quindi chi ruba l'account può pubblicare una
+  release ma non farla installare da qui (pentest del 10/11/2026, A2).
+  Sul telefono non serve: lì la firma dell'APK la controlla Android.
 - **Niente UAC**: l'installer è per-utente (`PrivilegesRequired=lowest`),
   quindi `ShellExecuteW` con il verbo `open` basta e nessuna finestra di
   Windows chiede conferma. Era la parte più fragile in Tigert, che installa
@@ -50,6 +57,7 @@ muoia subito dopo.
 """
 
 from __future__ import annotations
+import base64
 import ctypes
 import hashlib
 import json
@@ -73,6 +81,17 @@ PAGINA_RELEASE = f"https://github.com/{REPO}/releases/latest"
 #: Cercare per nome e non «il primo .exe» evita di scaricare l'APK o uno zip.
 NOME_SETUP = "VaultMind-Setup.exe"
 NOME_SUMS = "SHA256SUMS.txt"
+NOME_FIRMA = "SHA256SUMS.txt.sig"
+
+#: La metà pubblica della chiave con cui `installer/firma_somme.py` firma
+#: `SHA256SUMS.txt`. Cambiarla vuol dire che le app già installate non
+#: accettano più gli aggiornamenti firmati con quella nuova.
+CHIAVE_PUBBLICA = "ce32d4910404485eee2f15fb9946561b7c783c03c9dbed8f676ed72e7124065b"
+
+#: Gli allegati si scaricano solo da qui. L'indirizzo arriva da GitHub, ma poi
+#: resta scritto nelle impostazioni fino a quando si preme «Aggiorna»: quello
+#: che si rilegge da un file non si dà per buono.
+PREFISSO_ALLEGATI = f"https://github.com/{REPO}/releases/download/"
 
 #: Corti di proposito: un controllo che non risponde non è un problema da
 #: aspettare. Il download invece vale la pena di attenderlo.
@@ -117,6 +136,33 @@ def piu_recente(a: str, b: str) -> bool:
     return False
 
 
+def allegato_nostro(url) -> bool:
+    return isinstance(url, str) and url.startswith(PREFISSO_ALLEGATI)
+
+
+def installabile(info) -> bool:
+    """La release ha tutto quello che serve per installarla da qui: il setup,
+    le impronte e la firma delle impronte, tutti allegati al nostro repo.
+    Se manca qualcosa si manda alla pagina, invece di scaricare 100 MB per
+    poi rifiutarli."""
+    return isinstance(info, dict) and all(
+        allegato_nostro(info.get(k)) for k in ("download", "sums", "firma"))
+
+
+def firma_valida(somme: bytes, firma_b64: str, chiave_esa: Optional[str] = None) -> bool:
+    """La firma è quella della nostra chiave su ESATTAMENTE questi byte?
+    Non solleva mai: una firma storta è una firma che non vale."""
+    try:
+        from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
+        chiave = Ed25519PublicKey.from_public_bytes(
+            bytes.fromhex(chiave_esa or CHIAVE_PUBBLICA))
+        chiave.verify(base64.b64decode(firma_b64.strip().encode("ascii"), validate=True),
+                      somme)
+        return True
+    except Exception:
+        return False
+
+
 def sha_atteso(sums: str, nome: str) -> Optional[str]:
     """Lo SHA-256 di `nome` dentro un SHA256SUMS.txt (`hash *nome`)."""
     for riga in (sums or "").splitlines():
@@ -157,6 +203,7 @@ def leggi_release(testo: str) -> Optional[dict]:
         "note": str(j.get("body") or "").strip(),
         "download": None,
         "sums": None,
+        "firma": None,
     }
     allegati = j.get("assets")
     for a in allegati if isinstance(allegati, list) else []:
@@ -164,12 +211,14 @@ def leggi_release(testo: str) -> Optional[dict]:
             continue
         nome = str(a.get("name") or "")
         url = a.get("browser_download_url")
-        if not isinstance(url, str):
+        if not allegato_nostro(url):
             continue
         if nome == NOME_SETUP:
             info["download"] = url
         elif nome == NOME_SUMS:
             info["sums"] = url
+        elif nome == NOME_FIRMA:
+            info["firma"] = url
     return info
 
 
@@ -227,6 +276,8 @@ def scarica(info: dict, su_progresso: Optional[Callable[[float], None]] = None) 
     url = info.get("download")
     if not url:
         raise ValueError("Questa release non ha il setup di Windows.")
+    if not installabile(info):
+        raise ValueError("Questa release non è firmata: scaricala dalla pagina.")
     pulisci()
     os.makedirs(cartella(), exist_ok=True)
     percorso = os.path.join(cartella(), NOME_SETUP)
@@ -248,18 +299,25 @@ def scarica(info: dict, su_progresso: Optional[Callable[[float], None]] = None) 
         if totale and fatto != totale:
             raise IOError("Download incompleto.")
 
-        atteso = None
-        if info.get("sums"):
-            try:
-                with urllib.request.urlopen(_richiesta(info["sums"]), timeout=TIMEOUT_DOWNLOAD) as r:
-                    atteso = sha_atteso(r.read(64 * 1024).decode("utf-8", "replace"), NOME_SETUP)
-            except Exception:
-                atteso = None     # il file dei controlli non c'è: vedi sotto
-        # Senza SHA256SUMS.txt non si installa: è l'unica cosa che distingue
-        # «ho scaricato il setup» da «ho scaricato qualcosa». Una release
-        # pubblicata senza quel file va corretta, non aggirata.
+        def _piccolo(indirizzo: str) -> bytes:
+            with urllib.request.urlopen(_richiesta(indirizzo), timeout=TIMEOUT_DOWNLOAD) as r:
+                return r.read(64 * 1024)
+
+        try:
+            somme = _piccolo(info["sums"])
+            firma = _piccolo(info["firma"]).decode("ascii", "replace")
+        except Exception:
+            # Senza impronte firmate non si installa: sono l'unica cosa che
+            # distingue «ho scaricato il setup» da «ho scaricato qualcosa».
+            # Una release pubblicata senza va corretta, non aggirata.
+            raise IOError("La release non pubblica lo SHA-256 firmato: niente da verificare.")
+        # Prima la firma, poi l'impronta: un'impronta che non è nostra non
+        # vale niente, anche se combacia.
+        if not firma_valida(somme, firma):
+            raise IOError("La firma della release non è quella di VaultMind: non installo.")
+        atteso = sha_atteso(somme.decode("utf-8", "replace"), NOME_SETUP)
         if not atteso:
-            raise IOError("La release non pubblica lo SHA-256: niente da verificare.")
+            raise IOError("La release non pubblica lo SHA-256 del setup: niente da verificare.")
         if h.hexdigest() != atteso:
             raise IOError("Il file scaricato non corrisponde allo SHA-256 della release.")
         return percorso

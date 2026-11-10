@@ -131,12 +131,7 @@ class _SchermataCasaState extends State<SchermataCasa>
   @override
   void didChangeAppLifecycleState(AppLifecycleState stato) {
     if (stato != AppLifecycleState.resumed) return;
-    final minuti = impostazioni.value.autoBlocco;
-    if (minuti > 0 &&
-        DateTime.now().difference(_ultimoTocco) >= Duration(minutes: minuti)) {
-      _blocca();
-      return;
-    }
+    if (_seScadutoBlocca()) return;
     // Chi non blocca mai il vault potrebbe non riavviare l'app per settimane:
     // il tetto delle 12 ore sta in `controlla()`, qui si guarda solo al
     // rientro.
@@ -182,12 +177,30 @@ class _SchermataCasaState extends State<SchermataCasa>
 
   /// Il vault si richiude da solo dopo un po' che non lo si tocca: un telefono
   /// si lascia sul tavolo molto più facilmente di un computer.
+  ///
+  /// Si guarda **l'orologio**, ogni venti secondi, invece di armare un timer
+  /// lungo quanto l'attesa: i timer di Dart contano il tempo in cui il
+  /// telefono è sveglio, e con lo schermo spento un «dieci minuti» poteva
+  /// durare ore — ore in cui, a ogni risveglio di Android, la porta del sync
+  /// rispondeva e la chiave era in memoria (pentest del 10/11/2026, M4). Così
+  /// al primo momento in cui l'app gira davvero, se il tempo è passato, si
+  /// chiude; e chi cambia l'attesa nelle impostazioni non deve toccare lo
+  /// schermo perché valga.
   void _riarmaBlocco() {
     _ultimoTocco = DateTime.now();
-    _inattivita?.cancel();
+    _inattivita ??=
+        Timer.periodic(const Duration(seconds: 20), (_) => _seScadutoBlocca());
+  }
+
+  /// Vero se ha bloccato.
+  bool _seScadutoBlocca() {
     final minuti = impostazioni.value.autoBlocco;
-    if (minuti <= 0) return;
-    _inattivita = Timer(Duration(minutes: minuti), _blocca);
+    if (minuti <= 0 ||
+        DateTime.now().difference(_ultimoTocco) < Duration(minutes: minuti)) {
+      return false;
+    }
+    _blocca();
+    return true;
   }
 
   void _blocca() {

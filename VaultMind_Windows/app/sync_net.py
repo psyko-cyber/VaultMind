@@ -23,9 +23,19 @@ scheda, e chi non c'è non risponde e basta.
 
 Limite, dichiarato: si bussa sulle reti /24 del PC (`192.168.1.x`), che è
 la rete di casa quasi sempre. Fuori casa il sync non c'è, ed è voluto.
+
+«Fuori casa» però il PC non lo sa da solo, e fino alla 7.2 bussava a ogni
+rete di ogni scheda, ogni due minuti, per tutto il tempo che un telefono non
+rispondeva: anche in ufficio o in albergo, dove 254 collegamenti a una porta
+sono una scansione, e la prima riga dice in chiaro l'id di questo PC a
+chiunque ascolti sulla 8732. Adesso si bussa solo a reti private (`di_casa`),
+e in sottofondo solo a quelle dove il telefono è già stato visto (vedi
+`SyncApp._cerca`): la ricerca larga resta a chi la chiede, col QR aperto o
+col pulsante.
 """
 
 from __future__ import annotations
+import ipaddress
 import json
 import socket
 from concurrent.futures import ThreadPoolExecutor
@@ -154,8 +164,28 @@ def indirizzi_locali() -> List[str]:
                 tutti.append(ip)
     except OSError:
         pass
-    return [ip for ip in tutti
-            if not ip.startswith(("127.", "169.254.", "0."))]
+    return [ip for ip in tutti if di_casa(ip)]
+
+
+def di_casa(ip: str) -> bool:
+    """Un indirizzo da rete privata (192.168.x, 10.x, 172.16-31.x)?
+
+    Solo lì si bussa. Un PC con un indirizzo pubblico sulla scheda (certe
+    università, certe connessioni mobili) avrebbe bussato a 254 computer di
+    sconosciuti su Internet; e l'intervallo 100.64.x delle VPN come Tailscale
+    non è «casa» (pentest del 10/11/2026, M3).
+    """
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return False
+    return (a.version == 4 and a.is_private and not a.is_loopback
+            and not a.is_link_local and not a.is_unspecified)
+
+
+def prefisso(ip: str) -> str:
+    """La rete /24 di un indirizzo: `192.168.1.37` → `192.168.1`."""
+    return ip.rsplit(".", 1)[0]
 
 
 def reti_locali() -> List[List[str]]:

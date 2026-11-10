@@ -6,6 +6,7 @@ dell'esecuzione. Nessun endpoint è esposto sulla rete: il bind è loopback.
 """
 
 from __future__ import annotations
+import contextlib
 import os
 import sys
 import json
@@ -21,7 +22,9 @@ from fastapi.responses import HTMLResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from .crypto_store import VaultStore, WrongPassword, VaultCorrupted
+from .crypto_store import (VaultStore, WrongPassword, VaultCorrupted,
+                           copia_di_sicurezza, elenco_copie, cartella_copie,
+                           sostituisci_vault)
 from .embedding import Embeddings
 from .search import SearchIndex, interpret
 from .import_parse import heuristic_extract
@@ -32,13 +35,24 @@ from . import sync_net
 from . import __version__
 from . import aggiornamenti
 from . import llm
+from . import master as regole_master
 from . import totp
 from . import transcribe
 
 WEB_DIR = Path(__file__).parent / "web"
 DEFAULT_VAULT = os.environ.get("VAULTMIND_FILE", str(Path.home() / ".vaultmind" / "vault.json"))
 
-app = FastAPI(title="VaultMind (local)")
+@contextlib.asynccontextmanager
+async def _vita(_app):
+    _stampa_avvio()
+    yield
+
+
+# Niente /docs, /redoc, /openapi.json: rispondevano senza token, elencavano
+# ogni endpoint, e /docs carica script da un CDN — una connessione in uscita
+# che l'app promette di non fare.
+app = FastAPI(title="VaultMind (local)", lifespan=_vita,
+              docs_url=None, redoc_url=None, openapi_url=None)
 app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
 # ---- stato di processo (singolo utente locale) ----
@@ -48,6 +62,8 @@ class Session:
         self.index: Optional[SearchIndex] = None
         self.embeddings: Optional[Embeddings] = None
         self.index_dirty: bool = False   # indice da riallineare prima della prossima ricerca
+        # L'ultima volta che l'utente ha toccato la pagina (vedi `_guardiano`).
+        self.attivo: float = 0.0
 
 S = Session()
 
@@ -128,13 +144,122 @@ def _require_index():
 
 
 # ---------------- endpoints ----------------
+# ---- chi riceve la pagina col token ----
+# La pagina porta dentro UI_TOKEN, cioè l'accesso pieno alle API. La
+# same-origin policy impedisce a un SITO di leggerla, ma non a un PROGRAMMA:
+# fino alla 7.2 bastava una GET a "/" — da qualunque processo, anche di un
+# altro utente Windows sullo stesso PC, perché il loopback è della macchina e
+# non della sessione — per avere il token e, a vault aperto, tutte le voci
+# (pentest del 10/11/2026, punto A1).
+#
+# Adesso la pagina col token la riceve solo:
+#   - chi presenta un **segreto d'avvio**: monouso, a scadenza, mai scritto su
+#     disco. Lo fabbrica `nuovo_avvio()`, che può chiamare solo chi sta in
+#     questo processo: il launcher, che ci apre la finestra;
+#   - chi ha il **cookie** che quella prima risposta consegna. Serve perché la
+#     pagina si ricarica da sola (`location.reload()` al blocco), e a quel
+#     punto il segreto è già speso.
+# Chiunque altro riceve una pagina che spiega da dove si apre VaultMind.
+#
+# Le API non cambiano: vogliono l'header col token, e il token ora non si può
+# più chiedere. Il cookie da solo non apre niente.
+#
+# Limite: un programma che gira come lo stesso utente può ancora leggere la
+# memoria di questo processo. Qui si chiude la strada che non richiedeva
+# nessuna capacità, e quella dell'altro utente.
+COOKIE_SESSIONE = "vm_sessione"
+_SESSIONE = secrets.token_urlsafe(32)
+VALIDITA_AVVIO_S = 120
+_avvii: dict = {}                    # segreto -> scadenza (time.time())
+_avvii_lucchetto = threading.Lock()
+
+
+def nuovo_avvio(validita: float = VALIDITA_AVVIO_S) -> str:
+    """Un segreto d'avvio nuovo, da mettere in `/?avvio=<segreto>`. Vale una
+    volta sola e per poco: quanto basta alla finestra per caricarsi."""
+    s = secrets.token_urlsafe(32)
+    with _avvii_lucchetto:
+        adesso = time.time()
+        for vecchio in [k for k, scade in _avvii.items() if scade < adesso]:
+            del _avvii[vecchio]
+        _avvii[s] = adesso + validita
+    return s
+
+
+def _uguali(a: str, b: str) -> bool:
+    """Confronto a tempo costante fra due stringhe arrivate da fuori.
+    `compare_digest` sulle `str` solleva se trova un carattere non ASCII, e un
+    header può contenerne: sui byte non succede (era un 500 invece di un 401)."""
+    return secrets.compare_digest(a.encode("utf-8", "surrogatepass"),
+                                  b.encode("utf-8", "surrogatepass"))
+
+
+def _spendi_avvio(s: str) -> bool:
+    with _avvii_lucchetto:
+        adesso = time.time()
+        for k in list(_avvii):
+            if _uguali(k, s):
+                return _avvii.pop(k) >= adesso   # speso anche se scaduto
+    return False
+
+
+def _stampa_avvio() -> None:
+    """Chi lancia il server a mano (`python -m uvicorn app.server:app`, per
+    provare senza build) non ha un launcher che gli apra la finestra: gli si
+    scrive l'indirizzo nel terminale. Mai nell'exe: lì l'uscita è il file di
+    log, e un segreto in un file è proprio quello che si vuole evitare."""
+    if getattr(sys, "frozen", False):
+        return
+    try:
+        print(f"VaultMind: apri la pagina con  /?avvio={nuovo_avvio(600)}  "
+              "(vale una volta, per 10 minuti)", flush=True)
+    except Exception:
+        pass
+
+
+_PAGINA_CHIUSA = """<!doctype html><html lang="it"><meta charset="utf-8">
+<title>VaultMind</title>
+<body style="font-family:system-ui,sans-serif;background:#0A0E1A;color:#C9D1E8;
+display:grid;place-items:center;height:100vh;margin:0">
+<div style="max-width:420px;padding:24px;text-align:center;line-height:1.6">
+<h1 style="font-size:20px;color:#fff">VaultMind si apre dalla sua finestra</h1>
+<p>Questa pagina non si può aprire da un browser o da un altro programma.
+Usa l'icona di VaultMind: se l'app è già aperta, torna alla sua finestra.</p>
+</div></body></html>"""
+
+
+def _csp(nonce: str = "") -> str:
+    """Nessun XSS trovato, ma se un giorno un titolo finisse in `innerHTML`
+    questa riga è ciò che impedirebbe allo script di partire. Gli stili in
+    linea restano ammessi: la pagina ne è piena e non eseguono niente."""
+    script = f"'self' 'nonce-{nonce}'" if nonce else "'none'"
+    return ("default-src 'self'; "
+            f"script-src {script}; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob:; font-src 'self' data:; "
+            "media-src 'self' blob:; connect-src 'self'; "
+            "object-src 'none'; base-uri 'none'; form-action 'self'; "
+            "frame-ancestors 'none'")
+
+
 @app.get("/", response_class=HTMLResponse)
-def home():
-    # La pagina riceve il token di sessione: nessun altro sito può leggere
-    # questo HTML (same-origin policy), quindi nessun altro sito può parlare
-    # con le API. Vale per pywebview e per il fallback browser.
+def home(request: Request, avvio: str = ""):
+    primo = bool(avvio) and _spendi_avvio(avvio)
+    if not primo and not _uguali(request.cookies.get(COOKIE_SESSIONE, ""), _SESSIONE):
+        return HTMLResponse(_PAGINA_CHIUSA, status_code=403,
+                            headers={"Content-Security-Policy": _csp()})
+    nonce = secrets.token_urlsafe(16)
     html = (WEB_DIR / "index.html").read_text(encoding="utf-8")
-    return html.replace("__VM_TOKEN__", UI_TOKEN)
+    html = html.replace("__VM_TOKEN__", UI_TOKEN)
+    # Lo script in linea è uno solo: è l'unico che la CSP lascia partire.
+    html = html.replace("<script>", f'<script nonce="{nonce}">', 1)
+    risposta = HTMLResponse(html, headers={"Content-Security-Policy": _csp(nonce)})
+    if primo:
+        # HttpOnly: uno script non lo legge. SameSite=Strict: un sito non lo
+        # fa partire. Senza scadenza: muore con la finestra.
+        risposta.set_cookie(COOKIE_SESSIONE, _SESSIONE, httponly=True,
+                            samesite="strict", path="/")
+    return risposta
 
 
 @app.get("/api/status")
@@ -165,6 +290,11 @@ _DEFAULT_SETTINGS = {
     "aggiornamenti": True,
 }
 
+#: Chi legge, cambia e riscrive le impostazioni lo fa tenendo questo: da
+#: quando anche una richiesta dell'estensione le scrive (l'ultimo uso), due
+#: scritture insieme si mangerebbero l'una l'altra.
+_impostazioni = threading.RLock()
+
 def _load_settings() -> dict:
     s = dict(_DEFAULT_SETTINGS)
     try:
@@ -186,7 +316,8 @@ def _save_settings(s: dict) -> None:
 # risposte — e un POST cieco su /api/clear o /api/delete farebbe danni con il
 # vault sbloccato. Tre serrature, tutte necessarie:
 #   1. header X-VaultMind-Token su ogni /api/*. La UI lo riceve dentro l'HTML
-#      servito da "/" (che nessun altro sito può leggere); un sito terzo non
+#      servito da "/" (che nessun altro sito può leggere, e che dal 10/11/2026
+#      nessun altro programma può chiedere: vedi `home()`); un sito terzo non
 #      può nemmeno inviare un header custom senza un preflight CORS, che qui
 #      viene rifiutato.
 #   2. controllo dell'header Host: chiude il DNS rebinding (attacker.com che
@@ -201,6 +332,10 @@ EXT_ALLOWED = {"/api/status", "/api/query", "/api/reveal", "/api/totp", "/api/li
 
 _EXT_SCHEMES = ("chrome-extension://", "moz-extension://")
 
+#: Il corpo più grande che ha senso: un backup da ripristinare o un audio da
+#: trascrivere. Lo stesso tetto di un messaggio del sync.
+MAX_CORPO = 64 * 1024 * 1024
+
 # codice di abbinamento in corso: solo in RAM, mai su disco
 _pairing: dict = {}
 
@@ -211,15 +346,61 @@ def _hash_token(tok: str) -> str:
 def _ext_registry() -> list:
     return list(_load_settings().get("extensions", []))
 
+#: Un'estensione che non legge niente per così tanti giorni perde l'accesso
+#: e va abbinata di nuovo (trenta secondi, col codice). Il suo token vale
+#: tutto il vault in lettura e sta nel profilo del browser: quello di un
+#: browser che non si usa più — un profilo vecchio, un PC passato a un altro —
+#: non deve restare buono per sempre (pentest del 10/11/2026, M6).
+EXT_SCADENZA_GIORNI = 30
+#: L'ultimo uso si scrive su disco al massimo una volta ogni tanto: basta per
+#: dire «usata oggi», e non riscrive il file a ogni richiesta.
+_EXT_SEGNA_OGNI_S = 3600
+
+
+def _ext_ultimo_uso(e: dict) -> float:
+    """Quando l'estensione ha letto l'ultima volta; 0 se non si sa.
+
+    Quelle abbinate prima che la scadenza esistesse non hanno `last_used`, e
+    NON si conta da `created`: chi l'ha abbinata due mesi fa e la usa ogni
+    giorno verrebbe buttato fuori al primo uso dopo l'aggiornamento. Per
+    loro il conto parte dalla prima lettura che si vede."""
+    try:
+        return float(e["last_used"])
+    except Exception:
+        return 0.0
+
+
 def _ext_for_token(tok: str):
     """L'estensione abbinata per questo token, o None. Su disco sta solo
-    l'hash: chi legge settings.json non ricava il token."""
+    l'hash: chi legge settings.json non ricava il token.
+
+    Chi non si fa vivo da `EXT_SCADENZA_GIORNI` viene tolto qui, al primo
+    tentativo: da quel momento il suo token non è più niente."""
     if not tok:
         return None
     h = _hash_token(tok)
     for e in _ext_registry():
-        if secrets.compare_digest(h, str(e.get("token_hash", ""))):
+        if not _uguali(h, str(e.get("token_hash", ""))):
+            continue
+        ora = time.time()
+        ultimo = _ext_ultimo_uso(e)
+        if ultimo and ora - ultimo < _EXT_SEGNA_OGNI_S:
             return e
+        with _impostazioni:
+            s = _load_settings()
+            resto = [x for x in s.get("extensions", []) if x.get("token_hash") != e.get("token_hash")]
+            # `ultimo == 0`: abbinata prima che la scadenza esistesse. Non è
+            # un motivo per buttarla fuori: da adesso si conta.
+            scaduta = bool(ultimo) and ora - ultimo > EXT_SCADENZA_GIORNI * 86400
+            if not scaduta:
+                e = dict(e, last_used=ora)
+                resto.append(e)
+            s["extensions"] = resto
+            try:
+                _save_settings(s)
+            except OSError:
+                pass   # disco pieno o file bloccato: non è colpa di chi legge
+        return None if scaduta else e
     return None
 
 def _origin_paired(origin: str) -> bool:
@@ -243,9 +424,29 @@ async def _guardia(request: Request, call_next):
     if host not in ("127.0.0.1", "localhost", "::1"):
         return JSONResponse({"detail": "Host non consentito."}, status_code=403)
 
+    # Un corpo senza misura il server lo leggerebbe tutto in memoria prima di
+    # guardare chi lo manda (pentest del 10/11/2026, B8). La pagina e
+    # l'estensione dichiarano sempre la lunghezza: chi non lo fa non è loro.
+    if request.method in ("POST", "PUT", "PATCH"):
+        lunga = request.headers.get("content-length")
+        if lunga is None:
+            if "chunked" in (request.headers.get("transfer-encoding") or "").lower():
+                return JSONResponse({"detail": "Serve Content-Length."}, status_code=411)
+        elif not lunga.isdigit() or int(lunga) > MAX_CORPO:
+            return JSONResponse({"detail": "Richiesta troppo grande."}, status_code=413)
+
     path = request.url.path
     if not path.startswith("/api/"):
-        return await call_next(request)   # "/" e /static: è la pagina stessa
+        # "/" e /static: è la pagina stessa. Chi riceve quella col token lo
+        # decide `home()`; qui solo le intestazioni che valgono per tutte.
+        resp = await call_next(request)
+        resp.headers["X-Content-Type-Options"] = "nosniff"
+        resp.headers["X-Frame-Options"] = "DENY"       # nessun sito la incornicia
+        resp.headers["Referrer-Policy"] = "no-referrer"
+        if path == "/":
+            # La pagina contiene il token: non deve restare in nessuna cache.
+            resp.headers["Cache-Control"] = "no-store"
+        return resp
 
     origin = request.headers.get("origin", "")
 
@@ -266,7 +467,7 @@ async def _guardia(request: Request, call_next):
         return resp
 
     tok = request.headers.get("x-vaultmind-token", "")
-    if secrets.compare_digest(tok, UI_TOKEN):
+    if _uguali(tok, UI_TOKEN):
         return await call_next(request)   # la UI dell'app: accesso pieno
 
     ext = _ext_for_token(tok)
@@ -315,21 +516,23 @@ def pair_claim(body: PairClaimIn, request: Request):
     if _pairing["attempts"] > 5:
         _pairing.clear()
         raise HTTPException(status_code=429, detail="Troppi tentativi: genera un nuovo codice nell'app.")
-    if not secrets.compare_digest(body.code.strip(), _pairing["code"]):
+    if not _uguali(body.code.strip(), _pairing["code"]):
         raise HTTPException(status_code=403, detail="Codice errato.")
     _pairing.clear()
     token = secrets.token_urlsafe(32)
-    s = _load_settings()
-    # ri-abbinare la stessa estensione sostituisce il token vecchio
-    exts = [e for e in s.get("extensions", []) if e.get("origin") != origin]
-    exts.append({
-        "name": (body.name.strip() or "Estensione browser")[:60],
-        "origin": origin,
-        "token_hash": _hash_token(token),
-        "created": time.strftime("%d/%m/%Y %H:%M"),
-    })
-    s["extensions"] = exts
-    _save_settings(s)
+    with _impostazioni:
+        s = _load_settings()
+        # ri-abbinare la stessa estensione sostituisce il token vecchio
+        exts = [e for e in s.get("extensions", []) if e.get("origin") != origin]
+        exts.append({
+            "name": (body.name.strip() or "Estensione browser")[:60],
+            "origin": origin,
+            "token_hash": _hash_token(token),
+            "created": time.strftime("%d/%m/%Y %H:%M"),
+            "last_used": time.time(),
+        })
+        s["extensions"] = exts
+        _save_settings(s)
     return {"ok": True, "token": token}
 
 
@@ -358,7 +561,10 @@ def pair_list():
     il percorso della cartella da caricare nel browser."""
     _require_unlocked()
     return {"extensions": [{"name": e.get("name"), "origin": e.get("origin"),
-                            "created": e.get("created")} for e in _ext_registry()],
+                            "created": e.get("created"),
+                            "last_used": _ext_ultimo_uso(e) or None}
+                           for e in _ext_registry()],
+            "scadenza_giorni": EXT_SCADENZA_GIORNI,
             "folder": _cartella_estensione()}
 
 
@@ -368,10 +574,11 @@ class PairRevokeIn(BaseModel):
 @app.post("/api/pair/revoke")
 def pair_revoke(body: PairRevokeIn):
     _require_unlocked()
-    s = _load_settings()
-    before = s.get("extensions", [])
-    s["extensions"] = [e for e in before if e.get("origin") != body.origin]
-    _save_settings(s)
+    with _impostazioni:
+        s = _load_settings()
+        before = s.get("extensions", [])
+        s["extensions"] = [e for e in before if e.get("origin") != body.origin]
+        _save_settings(s)
     return {"ok": True, "removed": len(before) - len(s["extensions"])}
 
 
@@ -402,13 +609,35 @@ class SettingsIn(BaseModel):
     sfondi: dict[str, str] | None = None
     recenti: list[int] | None = None
 
+def _impostazione_strana(k: str, v) -> Optional[str]:
+    """Perché questo valore non si salva, o `None`. Il file delle impostazioni
+    lo rilegge la pagina a ogni avvio e ci costruisce l'interfaccia: un valore
+    assurdo (un blocco automatico fra un miliardo di minuti, un tema lungo un
+    megabyte) resterebbe lì a ogni riapertura (pentest del 10/11/2026, B4)."""
+    if k == "autolock_minutes" and not 0 <= v <= 24 * 60:
+        return f"Blocco automatico fra 0 e 1440 minuti (letto: {v})."
+    if k == "gen_length" and not 4 <= v <= 128:
+        return f"Lunghezza del generatore fra 4 e 128 (letto: {v})."
+    if k == "theme" and len(v) > 40:
+        return "Nome del tema troppo lungo."
+    if k == "sfondi" and (len(v) > 50 or any(len(a) > 80 or len(b) > 80 for a, b in v.items())):
+        return "Troppi sfondi, o nomi troppo lunghi."
+    if k == "recenti" and len(v) > 200:
+        return f"Troppe voci recenti ({len(v)})."
+    return None
+
+
 @app.post("/api/settings")
 def set_settings(body: SettingsIn):
-    s = _load_settings()
-    for k, v in body.model_dump().items():
-        if v is not None:
-            s[k] = v
-    _save_settings(s)
+    nuove = {k: v for k, v in body.model_dump().items() if v is not None}
+    for k, v in nuove.items():
+        strana = _impostazione_strana(k, v)
+        if strana:
+            raise HTTPException(status_code=400, detail=strana)
+    with _impostazioni:
+        s = _load_settings()
+        s.update(nuove)
+        _save_settings(s)
     # come la GET: gli hash dei token delle estensioni non escono
     fuori = dict(s)
     fuori.pop("extensions", None)
@@ -422,12 +651,99 @@ class ChangeMasterIn(BaseModel):
 @app.post("/api/change_master")
 def change_master(body: ChangeMasterIn):
     _require_unlocked()
-    if len(body.new_master) < 8:
-        raise HTTPException(status_code=400, detail="La nuova password deve avere almeno 8 caratteri.")
+    debole = regole_master.troppo_debole(body.new_master)
+    if debole:
+        raise HTTPException(status_code=400, detail=debole)
     try:
         S.store.change_master(body.old_master, body.new_master)
     except WrongPassword as e:
         raise HTTPException(status_code=403, detail=str(e))
+    return {"ok": True}
+
+
+# ---------------- freno ai tentativi sulla master ----------------
+# Chi ha già il file del vault prova le password per conto suo, e qui non
+# passa. Questo freno è per chi ha solo la finestra aperta davanti (o il token
+# della pagina): senza, una prova sbagliata costava sei centesimi di secondo
+# (pentest del 10/11/2026, M5). Le prime sbagliate sono gratis, perché le dita
+# sbagliano; poi ogni errore raddoppia l'attesa, fino a cinque minuti. Solo in
+# RAM: riavviare l'app azzera il conto, e a quel punto chi prova ha già di
+# meglio da fare col file.
+TENTATIVI_GRATIS = 5
+ATTESA_MASSIMA_S = 300
+_freno = {"sbagliate": 0, "fino": 0.0}
+_freno_lock = threading.Lock()
+
+
+def _freno_attesa() -> int:
+    """Quanti secondi mancano prima di poter riprovare (0 = si può)."""
+    with _freno_lock:
+        return max(0, int(_freno["fino"] - time.time() + 0.999))
+
+
+def _freno_sbagliata() -> None:
+    with _freno_lock:
+        _freno["sbagliate"] += 1
+        oltre = _freno["sbagliate"] - TENTATIVI_GRATIS
+        if oltre >= 0:
+            _freno["fino"] = time.time() + min(ATTESA_MASSIMA_S, 5 * 2 ** min(oltre, 10))
+
+
+def _freno_azzera() -> None:
+    with _freno_lock:
+        _freno["sbagliate"] = 0
+        _freno["fino"] = 0.0
+
+
+# ---------------- blocco automatico, deciso qui ----------------
+# Fino alla 7.2 il vault lo bloccava un timer nella pagina. Se la pagina non
+# girava — finestra ferma, scheda chiusa quando l'app è aperta nel browser,
+# PC tornato dalla sospensione con la pagina congelata — la chiave restava in
+# memoria e l'estensione continuava a leggere (pentest del 10/11/2026, M4).
+# Adesso la pagina dice «l'utente c'è» (`/api/vivo`, al massimo ogni 30 s) e
+# il conto lo tiene il server. Il timer della pagina resta: scatta per primo
+# e ricarica la schermata; questo è il fondo, un minuto dopo.
+MARGINE_BLOCCO_S = 60
+_guardiano_vivo = threading.Event()
+
+
+def _scaduto(ora: Optional[float] = None) -> bool:
+    """Vault aperto e nessuno alla pagina da più del blocco automatico?"""
+    if S.store is None or not S.attivo:
+        return False
+    try:
+        minuti = int(_load_settings().get("autolock_minutes") or 0)
+    except Exception:
+        minuti = int(_DEFAULT_SETTINGS["autolock_minutes"])
+    if minuti <= 0:
+        return False   # «Mai»: una scelta dell'utente, vale anche qui
+    return (ora or time.time()) - S.attivo > minuti * 60 + MARGINE_BLOCCO_S
+
+
+def _guardiano() -> None:
+    # L'orologio da muro e non `monotonic`: un'ora di sospensione deve contare.
+    while True:
+        time.sleep(15)
+        try:
+            if _scaduto():
+                lock()
+        except Exception:
+            pass   # il guardiano non deve morire: riprova al prossimo giro
+
+
+def _avvia_guardiano() -> None:
+    if _guardiano_vivo.is_set():
+        return
+    _guardiano_vivo.set()
+    threading.Thread(target=_guardiano, name="blocco-automatico", daemon=True).start()
+
+
+@app.post("/api/vivo")
+def vivo():
+    """La pagina: l'utente ha toccato qualcosa. Non riapre niente: se il
+    vault è già stato bloccato risponde 401 e la pagina torna alla serratura."""
+    _require_unlocked()
+    S.attivo = time.time()
     return {"ok": True}
 
 
@@ -436,10 +752,20 @@ def unlock(body: UnlockIn):
     store = VaultStore(DEFAULT_VAULT)
     created = False
     if store.exists():
+        attesa = _freno_attesa()
+        if attesa:
+            raise HTTPException(
+                status_code=429,
+                detail=f"Troppi tentativi sbagliati: riprova tra {attesa} secondi.")
         try:
             store.unlock(body.master)
         except WrongPassword:
-            raise HTTPException(status_code=403, detail="Master password errata.")
+            _freno_sbagliata()
+            attesa = _freno_attesa()
+            raise HTTPException(
+                status_code=403,
+                detail="Master password errata." + (
+                    f" Prossimo tentativo tra {attesa} secondi." if attesa else ""))
         except VaultCorrupted:
             # Riprovare la password su un file danneggiato non porta da nessuna
             # parte: va detto subito qual è la strada giusta.
@@ -452,15 +778,24 @@ def unlock(body: UnlockIn):
     else:
         # creazione del vault: qui la password non si "verifica", si FISSA.
         # Una password debole scelta per sbaglio resterebbe l'unica chiave.
-        if len(body.master) < 8:
-            raise HTTPException(
-                status_code=400,
-                detail="Scegli una master password di almeno 8 caratteri: è l'unica chiave del vault.",
-            )
+        debole = regole_master.troppo_debole(body.master)
+        if debole:
+            raise HTTPException(status_code=400, detail=debole)
         os.makedirs(os.path.dirname(DEFAULT_VAULT), exist_ok=True)
         store.create(body.master)
         created = True
+    if not created:
+        # Una copia del vault com'era all'apertura, se è cambiato dall'ultima:
+        # la password è appena stata verificata, quindi è una copia che si
+        # apre. Se non riesce non è un motivo per non aprire.
+        try:
+            copia_di_sicurezza(DEFAULT_VAULT, "apertura")
+        except Exception:
+            pass
+    _freno_azzera()
     S.store = store
+    S.attivo = time.time()
+    _avvia_guardiano()
     _rebuild_index()
     # Il sync gira INSIEME al vault e si ferma con lui: senza chiave non c'è
     # niente da sincronizzare. Il primo giro parte subito, in sottofondo: lo
@@ -695,16 +1030,54 @@ def restore(body: RestoreIn):
     Va eseguito a vault BLOCCATO: dopo il ripristino si sblocca con la master
     password usata sul dispositivo di origine. Il contenuto resta cifrato.
     """
+    return _ripristina(body.content)
+
+
+def _ripristina(testo: str) -> dict:
+    """Il ripristino vero, da un file scelto o da una copia automatica.
+
+    Il vault che c'era non si butta: finisce in `copie/` (motivo
+    `ripristino`) prima che il nuovo prenda il suo posto, e se quella copia
+    non si riesce a fare non si ripristina niente. Chi ha scelto il file
+    sbagliato deve poter tornare indietro.
+    """
     if S.store is not None and S.store.unlocked:
         raise HTTPException(status_code=400, detail="Blocca il vault prima di ripristinare un backup.")
     try:
-        blob = json.loads(body.content)
-        assert {"kdf", "nonce", "ciphertext"} <= set(blob.keys())
-    except Exception:
-        raise HTTPException(status_code=400, detail="File di backup non valido.")
-    os.makedirs(os.path.dirname(DEFAULT_VAULT), exist_ok=True)
-    Path(DEFAULT_VAULT).write_text(body.content, encoding="utf-8")
-    return {"ok": True}
+        copia = sostituisci_vault(DEFAULT_VAULT, testo)
+    except VaultCorrupted:
+        raise HTTPException(status_code=400,
+                            detail="File di backup non valido: non è un vault di VaultMind. "
+                                   "Il vault che c'era non è stato toccato.")
+    except OSError as exc:
+        raise HTTPException(status_code=500,
+                            detail="Non sono riuscito a mettere da parte il vault attuale, "
+                                   f"quindi non ho ripristinato niente ({exc}).")
+    return {"ok": True, "copia": os.path.basename(copia) if copia else None}
+
+
+@app.get("/api/copie")
+def copie():
+    """Le copie automatiche del vault, per la schermata di blocco: «il vault è
+    danneggiato» o «ho svuotato tutto» devono avere una strada che non sia
+    andare a cercare un file in una cartella nascosta."""
+    return {"copie": elenco_copie(DEFAULT_VAULT)}
+
+
+class CopiaIn(BaseModel):
+    nome: str
+
+@app.post("/api/copie/ripristina")
+def copie_ripristina(body: CopiaIn):
+    # Il nome si cerca nell'elenco e non si usa come percorso: quello che
+    # arriva da fuori non deve poter indicare un file qualunque del disco.
+    if not any(c["nome"] == body.nome for c in elenco_copie(DEFAULT_VAULT)):
+        raise HTTPException(status_code=404, detail="Questa copia non c'è più.")
+    try:
+        testo = Path(cartella_copie(DEFAULT_VAULT), body.nome).read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        raise HTTPException(status_code=400, detail="Questa copia non si riesce a leggere.")
+    return _ripristina(testo)
 
 
 @app.post("/api/totp")
@@ -1086,7 +1459,7 @@ def aggiornamento(forza: bool = False):
             "versione": nuova.get("versione"),
             "note": aggiornamenti.note_pulite(str(nuova.get("note") or "")),
             "pagina": nuova.get("pagina") or aggiornamenti.PAGINA_RELEASE,
-            "scaricabile": bool(nuova.get("download")),
+            "scaricabile": aggiornamenti.installabile(nuova),
             "rinviata": _agg_rinviata(s, str(nuova.get("versione") or "")),
         }
     return fuori
@@ -1137,9 +1510,9 @@ def aggiornamento_installa():
     nuova, _ = _agg_controlla()
     if not nuova:
         raise HTTPException(status_code=400, detail="Non c'è nessuna versione più recente da installare.")
-    if not nuova.get("download"):
+    if not aggiornamenti.installabile(nuova):
         raise HTTPException(status_code=400,
-                            detail="Questa release non allega il setup di Windows: scaricalo dalla pagina.")
+                            detail="Questa release non allega il setup firmato di Windows: scaricalo dalla pagina.")
     threading.Thread(target=_agg_lavora, args=(nuova,), daemon=True).start()
     return {"ok": True, "fase": "scarico"}
 
@@ -1152,4 +1525,5 @@ def lock():
     S.store = None
     S.index = None
     S.index_dirty = False
+    S.attivo = 0.0
     return {"ok": True}

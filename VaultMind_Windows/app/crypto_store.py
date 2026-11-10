@@ -273,6 +273,138 @@ def _leggi_blob(path: str) -> dict:
     return {"salt": salt, "nonce": nonce, "ciphertext": ciphertext}
 
 
+def controlla_blob(testo: str) -> None:
+    """Il testo ha la forma di un vault? Solleva `VaultCorrupted` se no.
+
+    Non dice che la password lo aprirà — quello lo sa solo chi la conosce —
+    ma ferma un file qualunque prima che prenda il posto del vault: fino alla
+    7.2 «Ripristina da backup» accettava `{"kdf":{},"nonce":"","ciphertext":""}`
+    e lo scriveva sopra l'unica copia delle password (pentest 10/11/2026, M1).
+    """
+    try:
+        blob = json.loads(testo)
+        salt = base64.b64decode(blob["kdf"]["salt"].encode("ascii"), validate=True)
+        nonce = base64.b64decode(blob["nonce"].encode("ascii"), validate=True)
+        ciphertext = base64.b64decode(blob["ciphertext"].encode("ascii"), validate=True)
+    except Exception as exc:
+        raise VaultCorrupted("Questo file non è un vault di VaultMind.") from exc
+    # 12 è il nonce di GCM, 16 il tag: sotto queste misure non c'è niente da
+    # decifrare, qualunque sia la password.
+    if len(salt) < 8 or len(nonce) != 12 or len(ciphertext) < 16:
+        raise VaultCorrupted("Questo file non è un vault di VaultMind.")
+
+
+# ------------------------------------------------------- copie di sicurezza
+# Il vault è un file solo, e fino alla 7.2 non ne esisteva nessun'altra copia
+# se non quelle che l'utente si ricordava di fare. Tre cose lo riscrivono per
+# intero senza che nessuno abbia battuto una password — un ripristino, una
+# fusione col telefono, «svuota tutto» — e dopo ognuna non si tornava indietro.
+#
+# Le copie stanno in `copie/` accanto al vault: sono il file cifrato tale e
+# quale, quindi chi le trova ha in mano quello che avrebbe col vault, niente di
+# più. Poche per motivo, così una raffica di sync non si porta via la copia
+# fatta prima di svuotare.
+
+COPIE_PER_MOTIVO = 5
+
+
+def cartella_copie(path: str) -> str:
+    return os.path.join(os.path.dirname(os.path.abspath(path)), "copie")
+
+
+def elenco_copie(path: str) -> List[dict]:
+    """Le copie che ci sono, la più recente per prima. Non solleva mai."""
+    d = cartella_copie(path)
+    fuori: List[dict] = []
+    try:
+        nomi = os.listdir(d)
+    except OSError:
+        return fuori
+    for nome in nomi:
+        pezzi = nome.split("-")
+        if not (nome.startswith("vault-") and nome.endswith(".json") and len(pezzi) >= 4):
+            continue
+        try:
+            st = os.stat(os.path.join(d, nome))
+        except OSError:
+            continue
+        fuori.append({"nome": nome, "motivo": pezzi[1],
+                      "quando": int(st.st_mtime), "byte": st.st_size})
+    fuori.sort(key=lambda c: (c["quando"], c["nome"]), reverse=True)
+    return fuori
+
+
+def copia_di_sicurezza(path: str, motivo: str, ogni_s: float = 0.0) -> Optional[str]:
+    """Copia il file del vault in `copie/` prima di un'operazione che lo
+    riscrive. Torna il percorso della copia, o None se non ce n'era bisogno
+    (nessun vault, copia identica già presente, o una dello stesso motivo più
+    giovane di `ogni_s`).
+
+    Solleva `OSError` se la copia non si riesce a scrivere: decide chi chiama
+    se è un motivo per fermarsi (il ripristino sì) o no (il sync no).
+    """
+    if not os.path.isfile(path):
+        return None
+    with open(path, "rb") as f:
+        dati = f.read()
+    d = cartella_copie(path)
+    os.makedirs(d, exist_ok=True)
+    stesse = [c for c in elenco_copie(path) if c["motivo"] == motivo]
+    if stesse:
+        ultima = os.path.join(d, stesse[0]["nome"])
+        if ogni_s and time.time() - stesse[0]["quando"] < ogni_s:
+            return None
+        try:
+            with open(ultima, "rb") as f:
+                if f.read() == dati:
+                    return None
+        except OSError:
+            pass
+    # I millisecondi nel nome: due copie nello stesso secondo (un test, o
+    # svuota subito dopo un ripristino) non devono sovrascriversi.
+    ms = int(time.time() * 1000) % 1000
+    nome = f"vault-{motivo}-{time.strftime('%Y%m%d-%H%M%S')}-{ms:03d}.json"
+    dest = os.path.join(d, nome)
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "wb") as f:
+            f.write(dati)
+        os.replace(tmp, dest)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    for vecchia in stesse[COPIE_PER_MOTIVO - 1:]:
+        try:
+            os.remove(os.path.join(d, vecchia["nome"]))
+        except OSError:
+            pass
+    return dest
+
+
+def sostituisci_vault(path: str, testo: str) -> Optional[str]:
+    """Mette `testo` al posto del vault, dopo averne controllato la forma e
+    aver messo da parte quello che c'era. Torna il percorso della copia del
+    vault precedente (None se non ce n'era uno).
+
+    Solleva `VaultCorrupted` se `testo` non è un vault, `OSError` se la copia
+    del vecchio non si riesce a fare: in tutti e due i casi il vault resta
+    com'era.
+    """
+    controlla_blob(testo)
+    copia = copia_di_sicurezza(path, "ripristino")
+    d = os.path.dirname(os.path.abspath(path)) or "."
+    os.makedirs(d, exist_ok=True)
+    fd, tmp = tempfile.mkstemp(dir=d, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(testo)
+        os.replace(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return copia
+
+
 def apri_blob(testo: str, chiave: bytes) -> dict:
     """Apre un vault **ricevuto da un altro dispositivo**, con la chiave che
     abbiamo già in memoria.
@@ -520,6 +652,7 @@ class VaultStore:
     def clear(self) -> None:
         """Svuota tutte le voci (mantiene il vault e la chiave: resta sbloccato)."""
         self._require_unlocked()
+        self._metti_da_parte("svuota")
         for c in self._entries:
             self._seppellisci(c)
         self._entries = []
@@ -681,6 +814,10 @@ class VaultStore:
         cui il vault è mezzo fuso: o c'è tutto il nuovo, o è rimasto il vecchio.
         """
         self._require_unlocked()
+        # Una all'ora al massimo: con un telefono collegato si fonde a ogni
+        # modifica, e cinque copie degli ultimi cinque minuti non salvano
+        # nessuno da una cancellazione arrivata stamattina.
+        self._metti_da_parte("sync", ogni_s=3600)
         self._entries = list(entries)
         self._tombstones = [dict(t) for t in tombstones]
         self._categories = _clean_categories(categories)
@@ -700,6 +837,15 @@ class VaultStore:
     def _require_unlocked(self):
         if not self.unlocked:
             raise RuntimeError("Vault bloccato: serve unlock() o create().")
+
+    def _metti_da_parte(self, motivo: str, ogni_s: float = 0.0) -> None:
+        """Una copia del file com'è adesso, prima di riscriverlo per intero
+        (vedi `copia_di_sicurezza`). Se non riesce si va avanti lo stesso:
+        un disco pieno non deve impedire di sincronizzare."""
+        try:
+            copia_di_sicurezza(self.path, motivo, ogni_s)
+        except Exception:
+            pass
 
     def _pota_lapidi(self) -> None:
         """Butta via le lapidi troppo vecchie. Qui e non a ogni cancellazione:

@@ -132,9 +132,22 @@ class TestDoveCercare(unittest.TestCase):
         for indirizzi in reti:
             self.assertEqual(254, len(indirizzi))
             self.assertFalse(indirizzi[0].startswith(("127.", "169.254.")))
+            self.assertTrue(rete.di_casa(indirizzi[0]), indirizzi[0])
         principale = rete._principale()
-        if principale and reti:
+        if principale and rete.di_casa(principale) and reti:
             self.assertIn(principale, reti[0], "la scheda principale per prima")
+
+    def test_si_bussa_solo_a_reti_private(self):
+        # Pentest del 10/11/2026, M3: con un IP pubblico sulla scheda il PC
+        # bussava a 254 computer di sconosciuti.
+        for ip in ("192.168.1.10", "10.0.0.5", "172.16.4.2", "172.31.255.1"):
+            self.assertTrue(rete.di_casa(ip), ip)
+        for ip in ("8.8.8.8", "151.38.12.7", "172.32.0.1", "100.64.3.9",   # 100.64: VPN tipo Tailscale
+                   "127.0.0.1", "169.254.7.7", "0.0.0.0", "::1", "", "ciao"):
+            self.assertFalse(rete.di_casa(ip), ip)
+
+    def test_il_prefisso(self):
+        self.assertEqual(rete.prefisso("192.168.1.37"), "192.168.1")
 
 
 if __name__ == "__main__":

@@ -14,6 +14,16 @@ const int portaSync = 8732;
 /// farci allocare memoria finche' non moriamo.
 const int maxMessaggio = 64 * 1024 * 1024;
 
+/// Finche' chi chiama non ha dimostrato di avere la chiave, una riga non puo'
+/// essere piu' lunga di cosi'. La prima riga del PC e' un saluto di poche
+/// centinaia di byte; prima del 10/11/2026 chiunque in rete poteva farne
+/// tenere in memoria 64 MB per collegamento, senza chiave (pentest, M2).
+const int maxPrimaRiga = 64 * 1024;
+
+/// Quanti collegamenti insieme. In casa chiama un PC, al piu' due: gli altri
+/// vengono chiusi subito, senza leggere niente.
+const int maxCollegamenti = 8;
+
 /// A collegamento aperto: un vault grande su una WiFi lenta ci mette un po'.
 const Duration attesaMax = Duration(seconds: 20);
 
@@ -34,6 +44,10 @@ abstract class Canale {
   Future<Map<String, dynamic>> leggi({Duration attesa = attesaMax});
 
   void scrivi(Map<String, dynamic> dato);
+
+  /// Chi sta dall'altra parte ha dimostrato di avere la chiave: da qui le
+  /// righe possono essere grandi quanto un vault ([maxMessaggio]).
+  void fidati();
 
   Future<void> chiudi();
 }

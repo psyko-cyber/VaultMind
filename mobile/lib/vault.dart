@@ -15,6 +15,10 @@ import 'dart:typed_data';
 
 import 'package:cryptography/cryptography.dart';
 
+import 'master.dart';
+
+export 'master.dart' show kMasterMinima, masterTroppoDebole;
+
 /// Parametri del formato. Devono combaciare con `crypto_store.py`: cambiarne
 /// uno qui, senza cambiarlo là, produce vault che l'altra piattaforma non apre.
 const int kArgon2TimeCost = 3;
@@ -106,10 +110,7 @@ String uidNuovo() {
 /// indistinguibili da quelli nati sul PC.
 const int kLunghezzaSalt = 16;
 
-/// Il minimo per una master password NUOVA, lo stesso di `/api/unlock` sul PC.
-/// Contato in caratteri veri (`runes`), come `len()` in Python: con
-/// `String.length` un'emoji varrebbe due.
-const int kMasterMinima = 8;
+// Il minimo e le regole per una master NUOVA stanno in `master.dart`.
 
 /// Un vault nuovo e vuoto, con la sua chiave. **Non scrive niente**: salvarlo
 /// è compito di chi chiama (`creaVault` in `archivio.dart`), e solo quando
@@ -118,9 +119,8 @@ const int kMasterMinima = 8;
 /// Esiste dal 16/09/2026: fino ad allora un vault nasceva solo sul PC, e chi
 /// aveva soltanto il telefono restava fermo alla prima schermata.
 Future<({Vault vault, Uint8List chiave})> nuovoVault(String master) async {
-  if (master.runes.length < kMasterMinima) {
-    throw ArgumentError('La master password deve avere almeno $kMasterMinima caratteri.');
-  }
+  final debole = masterTroppoDebole(master);
+  if (debole != null) throw ArgumentError(debole);
   final salt = Uint8List.fromList(
       List.generate(kLunghezzaSalt, (_) => _casuale.nextInt(256)));
   return (vault: Vault(const [], salt: salt), chiave: await derivaChiave(master, salt));

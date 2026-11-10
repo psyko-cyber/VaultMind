@@ -52,6 +52,18 @@ def _run_server():
     except Exception:
         sys.stderr.write("ERRORE SERVER:\n" + traceback.format_exc() + "\n")
 
+def _indirizzo():
+    """L'indirizzo con cui si apre la finestra: porta un segreto monouso, senza
+    il quale il server non consegna la pagina col token (vedi `home()` in
+    app/server.py). Uno nuovo a ogni chiamata: quello della finestra nativa
+    puo' essere gia' speso quando si ripiega sul browser.
+
+    Lo si chiede al modulo e non lo si passa per variabile d'ambiente o file:
+    cosi' non esce mai da questo processo."""
+    from app import server
+    return f"{URL}/?avvio={server.nuovo_avvio()}"
+
+
 def main():
     sys.stdout.write(f"[{time.strftime('%H:%M:%S')}] VaultMind avvio\n")
     threading.Thread(target=_run_server, daemon=True).start()
@@ -63,12 +75,12 @@ def main():
         return
     try:
         import webview
-        webview.create_window("VaultMind", URL, width=1100, height=820,
+        webview.create_window("VaultMind", _indirizzo(), width=1100, height=820,
                               min_size=(680, 600), background_color="#0A0E1A")
         webview.start()
     except Exception as e:
         sys.stderr.write("webview fallito: " + str(e) + "\n")
-        webbrowser.open(URL)
+        webbrowser.open(_indirizzo())
         while True: time.sleep(60)
 
 if __name__ == "__main__":
