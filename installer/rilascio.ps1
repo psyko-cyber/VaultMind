@@ -296,9 +296,12 @@ if (Test-Path (Join-Path $PACCHETTO "VaultMind.apk")) { $nomi += "VaultMind.apk"
 # pagina (aggiornamenti.py e aggiornamenti.dart). Gli zip non ci sono perche'
 # nessuno li scarica da dentro l'app.
 $daFirmare = @($nomi | Where-Object { $_ -eq "VaultMind-Setup.exe" -or $_ -eq "VaultMind.apk" })
+# Non "$h": PowerShell non distingue maiuscole e minuscole, e $h e' $H, le
+# intestazioni col token. Il 10/11/2026 la prima release RIPUBBLICATA si e'
+# fermata qui sotto, al momento di togliere gli allegati vecchi.
 $righe = foreach ($n in $daFirmare) {
-  $h = (Get-FileHash (Join-Path $PACCHETTO $n) -Algorithm SHA256).Hash.ToLower()
-  "$h *$n"
+  $impronta = (Get-FileHash (Join-Path $PACCHETTO $n) -Algorithm SHA256).Hash.ToLower()
+  "$impronta *$n"
 }
 # Senza BOM e con LF: la prima riga deve cominciare con l'impronta, non con
 # tre byte invisibili che la fanno sembrare un'altra cosa.
