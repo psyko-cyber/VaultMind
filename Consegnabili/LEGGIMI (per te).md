@@ -22,7 +22,7 @@ SmartScreen (siamo senza firma), la master password che al primo avvio si
 **crea** e non è recuperabile, e la spunta Ollama (~2 GB, facoltativa).
 
 La versione precisa la mostra l'installer stesso e, dopo, la voce in
-"App installate" (oggi: 6.8).
+"App installate".
 
 **`VaultMind-Setup.zip`** è lo stesso installer più le istruzioni, in uno zip:
 WhatsApp, molte webmail e i proxy aziendali rifiutano gli allegati `.exe`.
@@ -32,12 +32,19 @@ Chi lo riceve **installa sopra** la versione precedente: niente disinstallazione
 il vault non viene toccato, una sola icona e una sola voce in "App installate"
 (l'`AppId` è fisso, Windows riconosce la stessa app).
 
-## 1-bis. `VaultMind-Estensione.zip` — l'estensione per il browser (~50 KB)
+## 1-bis. `VaultMind-Estensione.zip` — l'estensione per il browser (~280 KB)
 
 L'estensione Chrome/Edge/Brave: cerca e copia dal vault mentre si naviga.
-Dentro c'è `COME SI INSTALLA.txt` (modalità sviluppatore, niente Web Store
-per ora). Richiede l'app **6.8 aggiornata** (build dal 29/07 sera): con un
-exe più vecchio l'abbinamento non esiste e l'estensione resta cieca.
+Dentro c'è `COME SI INSTALLA.txt` (modalità sviluppatore, niente Web Store),
+che dice anche quale versione dell'app serve. Chi ha installato con
+`VaultMind-Setup.exe` non ne ha bisogno: l'estensione è già accanto all'app.
+
+## 1-ter. `VaultMind.apk`, `SHA256SUMS.txt`, `SHA256SUMS.txt.sig`
+
+L'app Android (la lascia qui `mobile\costruisci.ps1 -Release`) e le impronte
+firmate di setup e APK: senza quei due file l'aggiornamento dentro l'app non
+installa. La firma si fa con una chiave che sta solo su questo PC
+(`installer\firma_somme.py`).
 
 ## 2. `VaultMind-Windows.zip` — il ripiego (~0,3 MB)
 
@@ -68,6 +75,6 @@ Tutto quello che sta qui è **generato**: non si modifica a mano.
 
 Sono file rigenerabili dal codice: committarne uno nuovo a ogni modifica
 gonfierebbe il repository senza aggiungere niente che il codice non dica già.
-Nel repo resta questo file, così la cartella non sparisce. E comunque il
-repository è privato: chi deve testare non potrebbe scaricarli da lì, il
-pacchetto va consegnato a mano.
+Nel repo resta questo file, così la cartella non sparisce. Chi deve provare
+li scarica dalla release su GitHub (il repository è pubblico dal 25/10/2026),
+o li riceve a mano.
