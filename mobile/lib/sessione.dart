@@ -210,6 +210,41 @@ class Sessione extends ValueNotifier<Vault> {
     return voce;
   }
 
+  /// Tante voci con **una sola** scrittura: l'export di un altro gestore ne
+  /// porta centinaia, e cifrare il vault intero a ogni voce (Argon2 no, ma
+  /// AES su un file che cresce sì) renderebbe l'import quadratico. È
+  /// `add_many()` del PC, e finiscono nello stesso ordine: in testa, l'ultima
+  /// riga del file per prima, come se fossero entrate una alla volta.
+  ///
+  /// Le voci senza titolo si scartano invece di fermare tutto: chi importa
+  /// 300 voci non deve perderle per una riga storta. Restituisce quante ne ha
+  /// scritte.
+  Future<int> aggiungiVoci(
+      Iterable<({String titolo, List<Campo> campi, List<String> tags})> voci) async {
+    var id = _prossimoId;
+    final adesso = oraOra();
+    final nuove = <Credenziale>[];
+    for (final v in voci) {
+      final t = v.titolo.trim();
+      final campi = _ripulisci(v.campi);
+      if (t.isEmpty || campi.isEmpty) continue;
+      nuove.add(Credenziale(
+        id: id++,
+        title: t,
+        tags: v.tags.map((x) => x.trim().toLowerCase()).where((x) => x.isNotEmpty).toList(),
+        critical: false,
+        fields: campi,
+        categoria: '',
+        uid: uidNuovo(), // casuale: vedi aggiungiVoce()
+        mod: adesso,
+      ));
+    }
+    if (nuove.isEmpty) return 0;
+    await _salva(value.con(
+        credenziali: [...nuove.reversed, ...value.credenziali]));
+    return nuove.length;
+  }
+
   Future<void> modificaVoce(
     int id, {
     required String titolo,

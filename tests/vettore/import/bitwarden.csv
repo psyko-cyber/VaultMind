@@ -1,0 +1,3 @@
+folder,favorite,type,name,notes,fields,reprompt,login_uri,login_username,login_password,login_totp
+Lavoro/Server,1,login,Gitea,,"campo: x",0,https://git.esempio.it,admin,G1tea-Pw,otpauth://totp/Gitea:admin?secret=JBSWY3DPEHPK3PXP&issuer=Gitea
+,,note,Solo nota,testo della nota,,0,,,,

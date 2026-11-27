@@ -1,0 +1,2 @@
+Title,URL,Username,Password,Notes,OTPAuth
+SPID,https://login.esempio.gov.it,RSSMRA80A01H501U,Sp1d-Pw!,,otpauth://totp/SPID:mario?secret=GEZDGNBVGY3TQOJQ&issuer=SPID

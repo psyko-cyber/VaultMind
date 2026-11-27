@@ -1,0 +1,248 @@
+{
+  "apple.csv": {
+    "source": "1Password o Apple",
+    "entries": [
+      {
+        "title": "SPID",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://login.esempio.gov.it"
+          },
+          {
+            "label": "Utente",
+            "value": "RSSMRA80A01H501U"
+          },
+          {
+            "label": "Password",
+            "value": "Sp1d-Pw!"
+          },
+          {
+            "label": "OTP (2FA)",
+            "value": "GEZDGNBVGY3TQOJQ"
+          }
+        ],
+        "tags": []
+      }
+    ]
+  },
+  "bitwarden.csv": {
+    "source": "Bitwarden",
+    "entries": [
+      {
+        "title": "Gitea",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://git.esempio.it"
+          },
+          {
+            "label": "Utente",
+            "value": "admin"
+          },
+          {
+            "label": "Password",
+            "value": "G1tea-Pw"
+          },
+          {
+            "label": "OTP (2FA)",
+            "value": "JBSWY3DPEHPK3PXP"
+          }
+        ],
+        "tags": [
+          "lavoro",
+          "server"
+        ]
+      },
+      {
+        "title": "Solo nota",
+        "fields": [
+          {
+            "label": "Note",
+            "value": "testo della nota"
+          }
+        ],
+        "tags": []
+      }
+    ]
+  },
+  "chrome.csv": {
+    "source": "Chrome o Google",
+    "entries": [
+      {
+        "title": "Amazon",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://www.amazon.it/"
+          },
+          {
+            "label": "Utente",
+            "value": "mario.rossi@esempio.it"
+          },
+          {
+            "label": "Password",
+            "value": "Pa,ss\"word1"
+          }
+        ],
+        "tags": []
+      },
+      {
+        "title": "Poste Italiane",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://www.poste.it/"
+          },
+          {
+            "label": "Utente",
+            "value": "mrossi"
+          },
+          {
+            "label": "Password",
+            "value": "Segreta!2024"
+          },
+          {
+            "label": "Note",
+            "value": "PIN carta: 12345\r\nseconda riga, con virgola"
+          }
+        ],
+        "tags": []
+      },
+      {
+        "title": "senza-nome.it",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://senza-nome.it/"
+          },
+          {
+            "label": "Utente",
+            "value": "utente@esempio.it"
+          },
+          {
+            "label": "Password",
+            "value": "abc123!x"
+          }
+        ],
+        "tags": []
+      }
+    ]
+  },
+  "firefox.csv": {
+    "source": "Firefox",
+    "entries": [
+      {
+        "title": "accounts.esempio.com",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://accounts.esempio.com"
+          },
+          {
+            "label": "Utente",
+            "value": "nonno@esempio.com"
+          },
+          {
+            "label": "Password",
+            "value": "Firefox#1"
+          }
+        ],
+        "tags": []
+      }
+    ]
+  },
+  "generico_puntoevirgola.csv": {
+    "source": "CSV generico",
+    "entries": [
+      {
+        "title": "Enel",
+        "fields": [
+          {
+            "label": "Utente",
+            "value": "mario.rossi"
+          },
+          {
+            "label": "Password",
+            "value": "En3l!pw"
+          },
+          {
+            "label": "Telefono",
+            "value": "3331234567"
+          }
+        ],
+        "tags": []
+      }
+    ]
+  },
+  "keepassxc.csv": {
+    "source": "KeePass",
+    "entries": [
+      {
+        "title": "Netflix",
+        "fields": [
+          {
+            "label": "Utente",
+            "value": "famiglia@esempio.it"
+          },
+          {
+            "label": "Password",
+            "value": "N3tfl1x!"
+          },
+          {
+            "label": "URL",
+            "value": "https://netflix.com"
+          }
+        ],
+        "tags": [
+          "internet"
+        ]
+      }
+    ]
+  },
+  "lastpass.csv": {
+    "source": "LastPass",
+    "entries": [
+      {
+        "title": "Banca Esempio",
+        "fields": [
+          {
+            "label": "URL",
+            "value": "https://banca.esempio.it"
+          },
+          {
+            "label": "Utente",
+            "value": "cliente01"
+          },
+          {
+            "label": "Password",
+            "value": "B4nca$$"
+          },
+          {
+            "label": "OTP (2FA)",
+            "value": "JBSWY3DPEHPK3PXP"
+          },
+          {
+            "label": "Note",
+            "value": "Codice cliente 998"
+          }
+        ],
+        "tags": [
+          "finanza"
+        ]
+      },
+      {
+        "title": "Wi-Fi",
+        "fields": [
+          {
+            "label": "Note",
+            "value": "Wi-Fi casa: rete ospiti"
+          }
+        ],
+        "tags": [
+          "casa"
+        ]
+      }
+    ]
+  }
+}

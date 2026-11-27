@@ -1,0 +1,6 @@
+﻿name,url,username,password,note
+Amazon,https://www.amazon.it/,mario.rossi@esempio.it,"Pa,ss""word1",
+Poste Italiane,https://www.poste.it/,mrossi,Segreta!2024,"PIN carta: 12345
+seconda riga, con virgola"
+,https://senza-nome.it/,utente@esempio.it,abc123!x,
+

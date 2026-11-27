@@ -1,0 +1,3 @@
+# CSV di prova: devono arrivare ai test byte per byte (a capo dentro le
+# virgolette, BOM). Vedi tests/test_import_csv.py.
+* -text

@@ -1,0 +1,3 @@
+url,username,password,totp,extra,name,grouping,fav
+https://banca.esempio.it,cliente01,B4nca$$,JBSWY3DPEHPK3PXP,Codice cliente 998,Banca Esempio,Finanza,1
+http://sn,,,,"Wi-Fi casa: rete ospiti",Wi-Fi,Casa,0

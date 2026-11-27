@@ -1,8 +1,11 @@
 /// Impostazioni dell'app.
 ///
-/// Ci sono solo le cose che sul telefono hanno senso. Cambio master password e
-/// import CSV restano sul PC: il primo perché rifà tutto il vault, il secondo
-/// perché un file CSV su un telefono non ce l'ha nessuno.
+/// Ci sono solo le cose che sul telefono hanno senso. Il cambio della master
+/// password resta sul PC, perché rifà tutto il vault.
+///
+/// L'import CSV invece c'è dal 27/11/2026: prima stava solo sul PC («un CSV su
+/// un telefono non ce l'ha nessuno»), ma chi ha solo il telefono il CSV ce
+/// l'ha eccome — Google lo esporta proprio lì, in Download.
 library;
 
 import 'package:flutter/foundation.dart' show kIsWeb;
@@ -20,6 +23,7 @@ import '../versione.dart';
 import 'aggiornamento.dart';
 import 'dialoghi.dart';
 import 'foglio_generatore.dart';
+import 'importa_csv.dart';
 import 'modulo_voce.dart';
 import 'scheda_voce.dart'
     show avvisoAppunti, copiaNegliAppunti, copiaRifiutata, svuotaDopo;
@@ -226,7 +230,9 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
           _Sezione('Vault'),
           ListTile(
             leading: IconaVM(Icone.info, color: context.cTenue),
-            title: Text('${widget.quanteVoci} voci su questo telefono'),
+            // Dalla sessione e non da quanteVoci: dopo un import CSV fatto da qui
+            // il numero passato all'apertura sarebbe vecchio.
+            title: Text('${widget.sessione.vault.credenziali.length} voci su questo telefono'),
             subtitle: Text(
                 'Una copia completa e cifrata, che funziona anche senza rete.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
@@ -264,6 +270,19 @@ class _SchermataImpostazioniState extends State<SchermataImpostazioni> {
                 'Il vault cifrato di questo telefono, da mandare dove vuoi: chi lo intercetta vede rumore.',
                 style: TextStyle(fontSize: 12, color: context.cTenue)),
             onTap: _backup,
+          ),
+          // Prima del backup: chi arriva da un altro gestore cerca questa, e
+          // le due righe insieme dicono la differenza (CSV in chiaro di un
+          // altro programma, che si aggiunge; vault cifrato, che sostituisce).
+          ListTile(
+            leading: IconaVM(Icone.importa, color: context.cTenue),
+            title: const Text('Importa da un altro gestore'),
+            subtitle: Text(
+                'Il CSV di Google, Bitwarden, LastPass, KeePass e altri. Le voci si aggiungono a quelle che hai.',
+                style: TextStyle(fontSize: 12, color: context.cTenue)),
+            onTap: () => Navigator.of(context).push(MaterialPageRoute(
+                builder: (_) => SchermataImportaCsv(sessione: widget.sessione)))
+                .then((_) => mounted ? setState(() {}) : null),
           ),
           ListTile(
             // Non 'backup': quella e' l'icona del salvataggio, e le due righe
